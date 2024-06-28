@@ -127,7 +127,22 @@
         document.getElementById('load-masechet').addEventListener('click', loadSelectedMasechet);
 
         function isKitzur(s1, s2, verbose = false) {
-            if (s2.includes("'") && s1.includes("'")) {
+            if ((s1.contains("'")||s2.contains("'"))
+                && (s1.contains(" ") || s2.contains(" "))) {
+                ss1 = s1.split(" ");
+                ss2 = s2.split(" ");
+                if (len(ss1) !== len(ss2)) {
+                    return false;
+                }else{
+                    for (let i = 0; i < ss1.length; i++) {
+                        if ((ss1[i] !== ss2[i])&& (!isKitzur(ss1[i], ss2[i], verbose))) {
+                            return false;
+                        }
+                        return true;
+                    }
+                }
+            }
+            if (s2[s1.length - 1] === "'" && s2[s1.length - 1] === "'") {
                 let pos1 = s1.indexOf("'");
                 let pos2 = s2.indexOf("'");
                 let pos = Math.min(pos1, pos2);
@@ -136,13 +151,13 @@
                     return true;
                 }
             }
-            if (s2.includes("'")) {
+            if (s2.[s1.length - 1] === "'") {
                 let pos = s2.indexOf("'");
                 if (s1.substring(0, pos) === s2.substring(0, pos)) {
                     if (verbose) console.log(s1, s2);
                     return true;
                 }
-            } else if (s1.includes("'")) {
+            } else if (s1[s1.length - 1] === "'") {
                 let pos = s1.indexOf("'");
                 if (s1.substring(0, pos) === s2.substring(0, pos)) {
                     if (verbose) console.log(s1, s2);
