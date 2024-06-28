@@ -5,6 +5,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
     <title>Tosefta with Variants</title>
     <style>
         body {
@@ -13,6 +14,15 @@
             line-height: 1.6;
             margin: 0;
             padding: 20px;
+        }
+        .suez-one-regular {
+          font-family: 'Suez One', serif;
+          font-weight: 300;
+          font-style: normal;
+        }
+        .variant {
+            font-family:"Arial", sans-serif;
+            font-weight: bold;
         }
         #app {
             max-width: 1200px;
@@ -64,6 +74,8 @@
         <input type="checkbox" id="vavHibbur" name="vavHibbur" value="vavHibbur">
         <label for="maleh">מלא/חסר (ראשוני, וגס מאוד)</label>
         <input type="checkbox" id="maleh" name="maleh" value="maleh">
+        <label for="multiwitness">הסתר חילופים מעד יחיד</label>
+        <input type="checkbox" id="multiwitness" name="multiwitness" value="multiwitness">
         &nbsp&nbsp&nbsp&nbsp|
         <a href="otzarHaHilufim.html">אוצר החילופים (עדיין בפיתוח)</a>
         &nbsp&nbsp&nbsp&nbsp|
@@ -151,11 +163,11 @@ function displayTextAndVariants(textData, variantsData) {
     const mnCheckbox = document.getElementById('mn');
     const vavHibburCheckbox = document.getElementById('vavHibbur');
     const malehCheckbox = document.getElementById('maleh');
-
+    const multiwitnessCheckbox = document.getElementById('multiwitness');
 
     function updateDisplay() {
-            hidden_count = 0;
-            total_count = 0;
+        let hidden_count = 0;
+        let total_count = 0;
         contentContainer.innerHTML = ''; // Clear existing content
 
         const textArray = textData.text; // Note the [0] here
@@ -194,6 +206,8 @@ function displayTextAndVariants(textData, variantsData) {
                         if (parsedNote) {
                             const [sv, vars] = parsedNote;
                             var first = true;
+                            multiwitness = isMultiWitness(vars);
+                            if (!multiwitnessCheckbox.checked || multiwitness){
                             vars.forEach(([witnesses, varText]) => {
                                 if (!abbreviationsCheckbox.checked || !isKitzur(sv, varText)){
                                  if (!mnCheckbox.checked || !isMN(sv, varText)){
@@ -203,6 +217,7 @@ function displayTextAndVariants(textData, variantsData) {
                                             variantParagraph.innerHTML += `<b>${sv}|</b>&nbsp;`;
                                             first = false;
                                         }
+                                        // change the font of the witnesses
                                         variantParagraph.innerHTML += `<span class="variant">${witnesses}</span>&nbsp;${varText} `;
                                         total_count++;
                                      }else{
@@ -223,6 +238,10 @@ function displayTextAndVariants(textData, variantsData) {
                                 }
                             });
                             variantParagraph.innerHTML += '. <spacer>';
+                        }else{
+                            console.log("MultiWitness", sv, vars);
+                            hidden_count+= vars.length;
+                            }
                         }
                     });
                 }
@@ -244,6 +263,7 @@ function displayTextAndVariants(textData, variantsData) {
     mnCheckbox.addEventListener('change', updateDisplay);
     vavHibburCheckbox.addEventListener('change', updateDisplay);
     malehCheckbox.addEventListener('change', updateDisplay);
+    multiwitnessCheckbox.addEventListener('change', updateDisplay);
 }
 // Fetch both JSON files
 //         Promise.all([

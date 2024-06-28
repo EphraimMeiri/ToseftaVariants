@@ -213,6 +213,9 @@ function mergeVars(vars) {
     const filt = vars.filter(v => v[1].trim() !== "");
     return filt;
 }
+function isMultiWitness(vars) {
+    return (vars.length > 1) || vars[0][0].includes(" ");
+}
 function parseNote3(noteTxt) {
     const type = parseNoteType(noteTxt);
     if (type === "SN") {
