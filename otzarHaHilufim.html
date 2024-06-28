@@ -9,6 +9,18 @@
     <script type="text/javascript" src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.js"></script>
 </head>
 <body>
+    <div id="toggles">
+        <label for="abbreviations">קיצורים</label>
+        <input type="checkbox" id="abbreviations" name="abbreviations" value="abbreviations">
+        <label for="mn">חלופי ם/ן</label>
+        <input type="checkbox" id="mn" name="mn" value="mn">
+        <label for="vavHibbur">ו׳ החיבור</label>
+        <input type="checkbox" id="vavHibbur" name="vavHibbur" value="vavHibbur">
+        <label for="maleh">מלא/חסר (ראשוני, וגס מאוד)</label>
+        <input type="checkbox" id="maleh" name="maleh" value="maleh">
+        &nbsp&nbsp&nbsp&nbsp|
+        <a href="index.html">חזרה לנוסח התוספתא (עדיין בפיתוח)</a>
+    </div>
     <table id="variantsTable" class="display">
         <thead>
             <tr>
@@ -73,10 +85,24 @@
       }
 
       // Function to generate table data
+       const abbreviationsCheckbox = document.getElementById('abbreviations');
+       const mnCheckbox = document.getElementById('mn');
+       const vavHibburCheckbox = document.getElementById('vavHibbur');
+       const malehCheckbox = document.getElementById('maleh');
       function generateTableData(variantsMap, witnesses) {
+
           const tableData = [];
           for (const [key, witnessCount] of variantsMap.entries()) {
               const [sv, varText] = key.split('|');
+              if (abbreviationsCheckbox.checked && isKitzur(sv,varText)) {
+                  continue;
+              }if(mnCheckbox.checked && isMN(sv,varText)){
+                  continue;
+              }if(vavHibburCheckbox.checked && isVavHaChiburDiff(sv,varText)){
+                  continue;
+              }if(malehCheckbox.checked && prelimHaserCheck(sv,varText)){
+                  continue;
+              }
               const row = [sv, varText];
               witnesses.forEach(witness => {
                   row.push(witnessCount[0].get(witness) || 0);
@@ -90,7 +116,9 @@
       }
 
       // Main function to create and populate the table
+      let dataTable;
       async function createVariantsTableAll() {
+
           allvars = new Map();
           allwits = new Set();
             await Promise.all(locations.map(async masechet => {
@@ -112,17 +140,22 @@
           });
 
 
-            // Add data to the table
-            table.DataTable({
-                data: tableData,
+        // Initialize DataTable if it doesn't exist, otherwise just update data
+        if (!dataTable) {
+            dataTable = table.DataTable({
+                data: generateTableData(allvars, allwits),
                 columns: [
                     { title: 'S1' },
                     { title: 'S2' },
-
-                    ...Array.from(allwits).map(witness => ({ title: witness })),  ...Array.from(allwits).map(witness => ({ title: witness+"1" }))                ]
+                    ...Array.from(allwits).map(witness => ({ title: witness })),
+                    ...Array.from(allwits).map(witness => ({ title: witness + "1" }))
+                ]
             });
+        } else {
+            dataTable.clear().rows.add(generateTableData(allvars, allwits)).draw();
+        }
       }
-      async function createVariantsTable(location=null) {
+      async function createVariantsTableSingle(location=null) {
           if (!location) {
               createVariantsTableAll();
           } else {
@@ -154,8 +187,18 @@
       }
 
       // Fetch the variants data and create the table
-        createVariantsTable();
+        createVariantsTableAll();
 
+      function updateTable() {
+        if (dataTable) {
+            dataTable.clear().rows.add(generateTableData(allvars, allwits)).draw();
+        }
+}
+        // Add event listeners to checkboxes
+        abbreviationsCheckbox.addEventListener('change', updateTable);
+        mnCheckbox.addEventListener('change', updateTable);
+        vavHibburCheckbox.addEventListener('change', updateTable);
+        malehCheckbox.addEventListener('change', updateTable);
 
     </script>
 </body>

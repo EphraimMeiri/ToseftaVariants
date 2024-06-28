@@ -66,6 +66,8 @@
         <input type="checkbox" id="maleh" name="maleh" value="maleh">
         &nbsp&nbsp&nbsp&nbsp|
         <a href="otzarHaHilufim.html">אוצר החילופים (עדיין בפיתוח)</a>
+        &nbsp&nbsp&nbsp&nbsp|
+        הוסתרו <span id="hidden_count">0</span> חילופים מתוך <span id="total_count">0</span>
     </div>
     <div id="masechet-selector">
         <label for="masechet-dropdown">Select Masechet:</label>
@@ -149,7 +151,11 @@ function displayTextAndVariants(textData, variantsData) {
     const mnCheckbox = document.getElementById('mn');
     const vavHibburCheckbox = document.getElementById('vavHibbur');
     const malehCheckbox = document.getElementById('maleh');
+
+
     function updateDisplay() {
+            hidden_count = 0;
+            total_count = 0;
         contentContainer.innerHTML = ''; // Clear existing content
 
         const textArray = textData.text; // Note the [0] here
@@ -198,17 +204,22 @@ function displayTextAndVariants(textData, variantsData) {
                                             first = false;
                                         }
                                         variantParagraph.innerHTML += `<span class="variant">${witnesses}</span>&nbsp;${varText} `;
+                                        total_count++;
                                      }else{
                                         console.log("Haser", sv, varText);
+                                        hidden_count++;
                                      }
                                     }else{
                                         console.log("Vav", sv, varText);
+                                        hidden_count++;
                                     }
                                  }else{
                                     console.log("MN", sv, varText);
+                                    hidden_count++;
                                  }
                                 }else{
                                     console.log("Kitzur", sv, varText);
+                                    hidden_count++;
                                 }
                             });
                             variantParagraph.innerHTML += '. <spacer>';
@@ -221,6 +232,8 @@ function displayTextAndVariants(textData, variantsData) {
                 contentContainer.appendChild(paragraphPair);
             });
         });
+        document.getElementById('hidden_count').textContent = hidden_count;
+        document.getElementById('total_count').textContent = hidden_count + total_count;
     }
 
     // Initial display

@@ -84,21 +84,21 @@ function isVavHaChiburDiff(s1, s2) {
     return false;
 }
 function isKitzur(s1, s2, verbose = false) {
-    // if ((s1.includes("'")||s2.includes("'"))
-    //     && (s1.includes(" ") || s2.includes(" "))) {
-    //     ss1 = s1.split(" ");
-    //     ss2 = s2.split(" ");
-    //     if (ss1.length !== ss2.length) {
-    //         return false;
-    //     }else{
-    //         for (let i = 0; i < ss1.length; i++) {
-    //             if ((ss1[i] !== ss2[i])&& (!isKitzur(ss1[i], ss2[i], verbose))) {
-    //                 return false;
-    //             }
-    //             return true;
-    //         }
-    //     }
-    // }
+    if ((s1.includes("'")||s2.includes("'"))
+        && (s1.includes(" ") || s2.includes(" "))) {
+        ss1 = s1.split(" ");
+        ss2 = s2.split(" ");
+        if (ss1.length !== ss2.length) {
+            return false;
+        }else{
+            for (let i = 0; i < ss1.length; i++) {
+                if ((ss1[i] !== ss2[i])&& (!isKitzur(ss1[i], ss2[i], verbose))) {
+                    return false;
+                }
+                return true;
+            }
+        }
+    }
     if(s1.includes('"')){
         s1a= s1.replace(/"/g, "");
         l1= s1.length-1; // Don't want to include " in the length
@@ -109,6 +109,21 @@ function isKitzur(s1, s2, verbose = false) {
         }else{
             for (let i = 0; i < l1; i++) {
                 if (s1a[i] !== ss2[i][0]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }if(s2.includes('"')){
+        s2a= s2.replace(/"/g, "");
+        l2= s2.length-1; // Don't want to include " in the length
+        ss1= s1.split(" ");
+        l1= ss1.length;
+        if (l1 !== l2) {
+            return false;
+        }else{
+            for (let i = 0; i < l2; i++) {
+                if (s2a[i] !== ss1[i][0]) {
                     return false;
                 }
             }
@@ -210,6 +225,9 @@ function parseNote3(noteTxt) {
         vars = vars.map(v => [v[0], v[1].trim().split('.')[0]]);
         return [sv, vars];
     } else if (type === "CH") {
+        let [sv, note] = noteTxt.split("| ");
+        sv= sv.split("<b>")[1].split("</b>")[0].trim();
+        let affirming = note.split(".")[0].split();
         return false;
     }
     return null;
