@@ -60,6 +60,10 @@
         <input type="checkbox" id="abbreviations" name="abbreviations" value="abbreviations">
         <label for="mn">חלופי ם/ן</label>
         <input type="checkbox" id="mn" name="mn" value="mn">
+        <label for="vavHibbur">ו׳ החיבור</label>
+        <input type="checkbox" id="vavHibbur" name="vavHibbur" value="vavHibbur">
+        <label for="maleh">מלא/חסר (ראשוני, וגס מאוד)</label>
+        <input type="checkbox" id="maleh" name="maleh" value="maleh">
     </div>
     <div id="masechet-selector">
         <label for="masechet-dropdown">Select Masechet:</label>
@@ -126,6 +130,53 @@
         // Add event listener to the load button
         document.getElementById('load-masechet').addEventListener('click', loadSelectedMasechet);
 
+        function kitzurFilter(s1, s2) {
+            let pos = s1.length;
+            if (s1.slice(-1) === "'" && s2.slice(-1) === "'") {
+                let pos1 = s1.indexOf("'");
+                let pos2 = s2.indexOf("'");
+                pos = Math.min(pos1, pos2);
+            } else if (s1.slice(-1) === "'") {
+                pos = s1.indexOf("'");
+            } else if (s2.slice(-1) === "'") {
+                pos = s2.indexOf("'");
+            } else {
+                // No kitzur here
+                return [s1, s2];
+            }
+            s1 = s1.slice(0, pos);
+            s2 = s2.slice(0, pos);
+            return [s1, s2];
+        }
+
+        function prelimHaserCheck(s1, s2) {
+            if (isMN(s1, s2)) {
+                return false;
+            }
+            if (isKitzur(s1, s2)) {
+                return false;
+            }
+            let a = s1[0];
+            let b = s2[0];
+            a += s1.slice(1, -1).split('').filter(l => l !== 'י' && l !== 'ו').join('');
+            b += s2.slice(1, -1).split('').filter(l => l !== 'י' && l !== 'ו').join('');
+            if (!((s1.slice(-1) === 'ן' && s2.slice(-1) === 'ם') ||
+                  (s1.slice(-1) === 'ם' && s2.slice(-1) === 'ן'))) {
+                a += s1.slice(-1);
+                b += s2.slice(-1);
+            }
+            // [a, b] = kitzurFilter(a, b);
+            return a === b;
+        }
+        function isVavHaChiburDiff(s1, s2) {
+            if (s1[0]==="ו" && s1.substring(1) === s2) {
+                return true;
+            }
+            if (s2[0]==="ו" && s2.substring(1) === s1) {
+                return true;
+            }
+            return false;
+        }
         function isKitzur(s1, s2, verbose = false) {
             if ((s1.includes("'")||s2.includes("'"))
                 && (s1.includes(" ") || s2.includes(" "))) {
@@ -286,7 +337,8 @@ function displayTextAndVariants(textData, variantsData) {
     const contentContainer = document.getElementById('content-container');
     const abbreviationsCheckbox = document.getElementById('abbreviations');
     const mnCheckbox = document.getElementById('mn');
-
+    const vavHibburCheckbox = document.getElementById('vavHibbur');
+    const malehCheckbox = document.getElementById('maleh');
     function updateDisplay() {
         contentContainer.innerHTML = ''; // Clear existing content
 
@@ -327,14 +379,26 @@ function displayTextAndVariants(textData, variantsData) {
                             const [sv, vars] = parsedNote;
                             var first = true;
                             vars.forEach(([witnesses, varText]) => {
-                                if (!abbreviationsCheckbox.checked || !isKitzur(sv, varText)) {
-                                    if (!mnCheckbox.checked || !isMN(sv, varText)) {
+                                if (!abbreviationsCheckbox.checked || !isKitzur(sv, varText)){
+                                 if (!mnCheckbox.checked || !isMN(sv, varText)){
+                                    if (!vavHibburCheckbox.checked || !isVavHaChiburDiff(sv, varText)){
+                                     if (!malehCheckbox.checked || !prelimHaserCheck(sv, varText)) {
                                         if (first) {
                                             variantParagraph.innerHTML += `<b>${sv}|</b>&nbsp;`;
                                             first = false;
                                         }
                                         variantParagraph.innerHTML += `<span class="variant">${witnesses}</span>&nbsp;${varText} `;
+                                     }else{
+                                        console.log("Haser", sv, varText);
+                                     }
+                                    }else{
+                                        console.log("Vav", sv, varText);
                                     }
+                                 }else{
+                                    console.log("MN", sv, varText);
+                                 }
+                                }else{
+                                    console.log("Kitzur", sv, varText);
                                 }
                             });
                             variantParagraph.innerHTML += '. <spacer>';
@@ -355,6 +419,8 @@ function displayTextAndVariants(textData, variantsData) {
     // Add event listeners to checkboxes
     abbreviationsCheckbox.addEventListener('change', updateDisplay);
     mnCheckbox.addEventListener('change', updateDisplay);
+    vavHibburCheckbox.addEventListener('change', updateDisplay);
+    malehCheckbox.addEventListener('change', updateDisplay);
 }
 // Fetch both JSON files
 //         Promise.all([
