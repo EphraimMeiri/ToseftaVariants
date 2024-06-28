@@ -127,11 +127,11 @@
         document.getElementById('load-masechet').addEventListener('click', loadSelectedMasechet);
 
         function isKitzur(s1, s2, verbose = false) {
-            if ((s1.contains("'")||s2.contains("'"))
-                && (s1.contains(" ") || s2.contains(" "))) {
+            if ((s1.includes("'")||s2.includes("'"))
+                && (s1.includes(" ") || s2.includes(" "))) {
                 ss1 = s1.split(" ");
                 ss2 = s2.split(" ");
-                if (len(ss1) !== len(ss2)) {
+                if (ss1.length !== ss2.length) {
                     return false;
                 }else{
                     for (let i = 0; i < ss1.length; i++) {
@@ -140,6 +140,22 @@
                         }
                         return true;
                     }
+                }
+            }
+            if(s1.includes('"')){
+                s1a= s1.replace(/"/g, "");
+                l1= s1.length-1; // Don't want to include " in the length
+                ss2= s2.split(" ");
+                l2= ss2.length;
+                if (l1 !== l2) {
+                    return false;
+                }else{
+                    for (let i = 0; i < l1; i++) {
+                        if (s1a[i] !== ss2[i][0]) {
+                            return false;
+                        }
+                    }
+                    return true;
                 }
             }
             if (s2[s1.length - 1] === "'" && s2[s1.length - 1] === "'") {
@@ -151,7 +167,7 @@
                     return true;
                 }
             }
-            if (s2.[s1.length - 1] === "'") {
+            if (s2[s1.length - 1] === "'") {
                 let pos = s2.indexOf("'");
                 if (s1.substring(0, pos) === s2.substring(0, pos)) {
                     if (verbose) console.log(s1, s2);
