@@ -32,6 +32,8 @@
           if (!witnessesSet) {
               witnessesSet = new Set();
           }
+          witnessesSet.add("sv");
+
           variantsData.text.forEach(variantPerek => {
             variantPerek.forEach(variantLine => {
                 variantLine.forEach(variantItem =>{
@@ -41,20 +43,26 @@
                     vars.forEach(([witnesses,varText]) => {
                         const key = `${sv}|${varText}`;
                         const invkey= `${varText}|${sv}`;
-                        if (!variantsMap.has(key) ){ //|| !variantsMap.has(invkey)
-                            variantsMap.set(key, new Map());
+                        if (!variantsMap.has(key) && !variantsMap.has(invkey)){ //
+                            variantsMap.set(key, [new Map(),new Map()]);
                         }
                         if (variantsMap.has(key)){
+                            const oldCounts = variantsMap.get(key);
+                            oldCounts[0].set("sv", (oldCounts[0].get("sv") || 0) + 1);
                             witnesses.split(" ").forEach(wit =>{
-                                const oldCounts = variantsMap.get(key);
-                                oldCounts.set(wit, (oldCounts.get(wit) || 0) + 1);
-                                variantsMap.set(key, oldCounts);
+                                oldCounts[1].set(wit, (oldCounts[1].get(wit) || 0) + 1);
                                 witnessesSet.add(wit);
                             });
-                        // }else if (variantsMap.has(invkey)){
-                        //     witnesses.split(" ").forEach(wit =>{
-                        //         variantsMap.set(invkey, (variantsMap.get(invkey).witnesses.get(wit) || 0) + 1);
-                        //     });
+                            variantsMap.set(key, oldCounts);
+                        }else if (variantsMap.has(invkey)){
+                            console.log('invkey', invkey)
+                            const oldCounts = variantsMap.get(invkey);
+                            oldCounts[1].set("sv", (oldCounts[1].get("sv") || 0) + 1);
+                            witnesses.split(" ").forEach(wit =>{
+                                oldCounts[0].set(wit, (oldCounts[0].get(wit) || 0) + 1);
+                                witnessesSet.add(wit);
+                            });
+                            variantsMap.set(invkey, oldCounts);
                         }
                     });
                 }
@@ -71,7 +79,10 @@
               const [sv, varText] = key.split('|');
               const row = [sv, varText];
               witnesses.forEach(witness => {
-                  row.push(witnessCount.get(witness) || 0);
+                  row.push(witnessCount[0].get(witness) || 0);
+              });
+              witnesses.forEach(witness => {
+                  row.push(witnessCount[1].get(witness) || 0);
               });
               tableData.push(row);
           }
@@ -96,16 +107,19 @@
           allwits.forEach(witness => {
               table.find('thead tr').append(`<th>${witness}</th>`);
           });
+          allwits.forEach(witness => {
+              table.find('thead tr').append(`<th>${witness}1</th>`);
+          });
 
 
             // Add data to the table
             table.DataTable({
                 data: tableData,
                 columns: [
-                    { title: 'SV' },
-                    { title: 'Variant Text' },
-                    ...Array.from(allwits).map(witness => ({ title: witness }))
-                ]
+                    { title: 'S1' },
+                    { title: 'S2' },
+
+                    ...Array.from(allwits).map(witness => ({ title: witness })),  ...Array.from(allwits).map(witness => ({ title: witness+"1" }))                ]
             });
       }
       async function createVariantsTable(location=null) {
