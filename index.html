@@ -109,6 +109,14 @@
     <script src="tosefta_parsing_tools.js"></script>
     <script>
 
+        function getUrlParameter(name) {
+            name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+            var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+            var results = regex.exec(location.search);
+            return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+        }
+        // Check if masechet is in the URL
+        var masechet = getUrlParameter('masechet');
         // Populate the dropdown
         const dropdown = document.getElementById('masechet-dropdown');
         locations.forEach(location => {
@@ -117,10 +125,28 @@
             option.textContent = location.split('/')[1].replace('Tosefta%20', '').replace('%20', ' ');
             dropdown.appendChild(option);
         });
+        function findOptionValueByText(selectElement, text) {
+            for(var i = 0; i < selectElement.options.length; i++) {
+                if(selectElement.options[i].text === text) {
+                    return selectElement.options[i].value;
+                }
+            }
+            return null;
+        }
 
+        if (masechet) {
+            document.getElementById('masechet-dropdown').value = findOptionValueByText(document.getElementById('masechet-dropdown'), masechet);
+            loadSelectedMasechet();
+        }
+        function updateUrl(masechet) {
+            var newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?masechet=' + encodeURIComponent(masechet);
+            window.history.pushState({path:newUrl},'',newUrl);
+        }
         // Function to load the selected masechet
         function loadSelectedMasechet() {
             const selectedLocation = dropdown.value.replace(' ', "%20");
+            const selectedText = dropdown.options[dropdown.selectedIndex].text;
+            updateUrl(selectedText);
             const textUrl = url1 + selectedLocation + url2;
             const variantsUrl = variant_url1 + selectedLocation.replace("Tosefta%20", "Variants%20on%20") + variants_url2;
 
@@ -195,7 +221,7 @@ function displayTextAndVariants(textData, variantsData){
             // Add chapter header
             const chapterHeader = document.createElement('h2');
             chapterHeader.className = 'chapter-header';
-            chapterHeader.textContent = `פרק ${perekIndex + 1}`;
+            chapterHeader.textContent = `פרק ${ convert_number(perekIndex + 1)}`;
             contentContainer.appendChild(chapterHeader);
 
             textPerek.forEach((textItem, halachaIndex) => {
@@ -228,6 +254,12 @@ function displayTextAndVariants(textData, variantsData){
                     }
                     variantsArray[perekIndex][halachaIndex].forEach(variantItem => {
                         loc = [masechet,perekIndex,halachaIndex]
+                        if (!variantItem.includes("|")) {
+                            console.log("No pipe",loc,variantItem);
+                            variantParagraph.innerHTML += "<sup>*</sup> ";
+                            variantParagraph.innerHTML += variantItem + ' ';
+                            return;
+                        }
                         const parsedNote = parseNote3(variantItem,loc);
                         if (parsedNote) {
                             let sv,vars,affirmingWitnesses ;

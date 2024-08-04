@@ -195,7 +195,7 @@ function parseNoteType(noteTxt) {
     noteTxt = noteTxt.replace("</big> <big>", " ");
     let sv, body;
     try {
-        [sv, body] = noteTxt.split("| ");
+        [sv, body] = noteTxt.split("|");
         sv= sv.trim();
         body = body.trim();
     } catch (error) {
@@ -300,7 +300,7 @@ function parseSv(sv) {
 }
 function parseVars(note,loc){
     if (note.includes(`ב<big>`)){
-        console.log("Note with ב< format",loc,note);
+        // console.log("Note with ב< format",loc,note);
         note = note.replace(`ב<big>`, `<big>`);
     }
     let notes = note.split("<big>");
@@ -323,8 +323,12 @@ function parseVars(note,loc){
 function parseNote3(noteTxt,loc) {
     const type = parseNoteType(noteTxt);
     if (type === "SN") {
-        let [sv, note] = noteTxt.split("| ");
+        let [sv, note] = noteTxt.split("\|");
         sv = sv.trim()
+        if (!note){
+            console.error("SN with no note",loc,noteTxt);
+            return null;
+        }
         note= note.trim();
         sv= parseSv(sv,noteTxt);
         if(note.includes("(")){
@@ -334,7 +338,7 @@ function parseNote3(noteTxt,loc) {
         // console.log(["SN",sv, vars,noteTxt])
         return [sv, vars];
     } else if (type === "CH") {
-        let [sv, note] = noteTxt.split("| ");
+        let [sv, note] = noteTxt.split("\|");
         sv= parseSv(sv);
         if(note.includes("...")){
             console.log("CH note with ...",loc,note);
@@ -380,4 +384,48 @@ function parseNote3(noteTxt,loc) {
         return [noteTxt];
     }
     return null;
+}
+
+const gimatriot = {
+    "א": 1, "ב": 2, "ג": 3, "ד": 4, "ה": 5,
+    "ו": 6, "ז": 7, "ח": 8, "ט": 9, "י": 10,
+    "כ": 20, "ל": 30, "מ": 40,
+    "נ": 50, "ס": 60, "ע": 70, "פ": 80,
+    "צ": 90, "ק": 100, "ר": 200,
+    "ש": 300, "ת": 400, "א׳": 1000 // Could fill in more thousands etc.
+};
+
+const by_values = Object.keys(gimatriot).sort((a, b) => gimatriot[b] - gimatriot[a]);
+
+const inverse = Object.fromEntries(
+    Object.entries(gimatriot).map(([k, v]) => [v, k])
+);
+
+function convert_number(integer) {
+    if (integer === 0) {
+        return "0";
+    }
+    if (inverse[integer]) {
+        return inverse[integer];
+    } else {
+        let output = "";
+        let remainder = integer;
+        while (remainder > 0) {
+            for (let value of by_values) {
+                if (remainder === 15) {
+                    output += "טו";
+                    return output;
+                } else if (remainder === 16) {
+                    output += "טז";
+                    return output;
+                }
+                if (gimatriot[value] <= remainder) {
+                    remainder -= gimatriot[value];
+                    output += value;
+                    break;
+                }
+            }
+        }
+        return output;
+    }
 }
