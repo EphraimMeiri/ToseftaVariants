@@ -7,6 +7,31 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.css">
     <script type="text/javascript" src="https://code.jquery.com/jquery-3.5.1.js"></script>
     <script type="text/javascript" src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.js"></script>
+        <style>
+        .rtl-container {
+            direction: rtl;
+            text-align: right;
+        }
+
+        .rtl-text {
+            unicode-bidi: bidi-override;
+        }
+
+        #variantDetails {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        #variantDetails h3 {
+            margin-top: 0;
+        }
+
+        #variantDetails p {
+            margin: 5px 0;
+        }
+    </style>
 </head>
 <body>
     <div id="toggles">
@@ -33,43 +58,76 @@
             <!-- Table data will be inserted here -->
         </tbody>
     </table>
+    <div id="variantDetails"></div>
 
     <script src="tosefta_parsing_tools.js"></script>
     <script>
       // Function to parse notes and collect data
-      function parseNoteSwitches(variantsData,variantsMap=null, witnessesSet=null) {
+      function parseNoteSwitches(variantsData,variantsMap=null, witnessesSet=null,variantsList=null) {
           if (!variantsMap) {
               variantsMap = new Map();
           }
           if (!witnessesSet) {
               witnessesSet = new Set();
           }
+            if (!variantsList) {
+                variantsList = new Map();
+            }
           witnessesSet.add("sv");
-
-          variantsData.text.forEach(variantPerek => {
-            variantPerek.forEach(variantLine => {
-                variantLine.forEach(variantItem =>{
-               const parsedNote = parseNote3(variantItem);
+          masechet= variantsData.title.split("Variants on ")[1];
+          variantsData.text.forEach((variantPerek,perek_i) => {
+            variantPerek.forEach((variantHalakah,halakah_i) => {
+                variantHalakah.forEach((variantItem,item_i) =>{
+                loc=[masechet,perek_i,halakah_i,item_i];
+                // console.log('loc',loc)
+               const parsedNote = parseNote3(variantItem,loc);
                 if (parsedNote) {
-                    const [sv, vars] = parsedNote;
+                    let sv, vars, affirmingWitnesses;
+                    if(parsedNote.length === 2){
+                        sv = parsedNote[0][0];
+                        vars = parsedNote[1];
+                    }else if(parsedNote.length === 3){
+                        sv = parsedNote[0];
+                        vars = parsedNote[1];
+                        affirmingWitnesses = parsedNote[2];
+                    }else{
+                        return;
+                    }
                     vars.forEach(([witnesses,varText]) => {
                         const key = `${sv}|${varText}`;
                         const invkey= `${varText}|${sv}`;
                         if (!variantsMap.has(key) && !variantsMap.has(invkey)){ //
                             variantsMap.set(key, [new Map(),new Map()]);
+                            variantsList.set(key, [[loc,variantItem]]);
                         }
                         if (variantsMap.has(key)){
                             const oldCounts = variantsMap.get(key);
-                            oldCounts[0].set("sv", (oldCounts[0].get("sv") || 0) + 1);
+                            const oldList = variantsList.get(key);
+                            variantsList.set(key, [...oldList,[loc,variantItem]]);
+                            if(affirmingWitnesses){
+                                affirmingWitnesses.split(" ").forEach(wit =>{
+                                    oldCounts[1].set(wit, (oldCounts[1].get(wit) || 0) + 1);
+                                    witnessesSet.add(wit);
+                                });
+                            }else{
+                                oldCounts[0].set("sv", (oldCounts[0].get("sv") || 0) + 1);
+                            }
                             witnesses.split(" ").forEach(wit =>{
                                 oldCounts[1].set(wit, (oldCounts[1].get(wit) || 0) + 1);
                                 witnessesSet.add(wit);
                             });
                             variantsMap.set(key, oldCounts);
                         }else if (variantsMap.has(invkey)){
-                            console.log('invkey', invkey)
+                            // console.log('invkey', invkey)
                             const oldCounts = variantsMap.get(invkey);
-                            oldCounts[1].set("sv", (oldCounts[1].get("sv") || 0) + 1);
+                            if(affirmingWitnesses){
+                                affirmingWitnesses.split(" ").forEach(wit =>{
+                                    oldCounts[0].set(wit, (oldCounts[0].get(wit) || 0) + 1);
+                                    witnessesSet.add(wit);
+                                });
+                            }else{
+                                oldCounts[1].set("sv", (oldCounts[1].get("sv") || 0) + 1);
+                            }
                             witnesses.split(" ").forEach(wit =>{
                                 oldCounts[0].set(wit, (oldCounts[0].get(wit) || 0) + 1);
                                 witnessesSet.add(wit);
@@ -81,7 +139,7 @@
                 });
             });
         });
-          return { variantsMap, witnessesSet };
+          return { variantsMap, witnessesSet,variantsList };
       }
 
       // Function to generate table data
@@ -117,16 +175,18 @@
 
       // Main function to create and populate the table
       let dataTable;
+      let varList;
       async function createVariantsTableAll() {
-
           allvars = new Map();
           allwits = new Set();
+          varList = new Map();
             await Promise.all(locations.map(async masechet => {
                 console.log('loading', masechet);
                 const variantsData = await getToseftavariants(masechet);
-                const result = parseNoteSwitches(variantsData, allvars, allwits);
+                const result = parseNoteSwitches(variantsData, allvars, allwits, varList);
                 allvars = result.variantsMap;
                 allwits = result.witnessesSet;
+                varList = result.variantsList;
             }));
           const tableData = generateTableData(allvars, allwits);
 
@@ -149,22 +209,50 @@
                     { title: 'S2' },
                     ...Array.from(allwits).map(witness => ({ title: witness })),
                     ...Array.from(allwits).map(witness => ({ title: witness + "1" }))
-                ]
+                ],
+                createdRow: function(row, data, dataIndex) {
+                    $(row).on('click', function() {
+                        handleRowClick(data);
+                    });
+                }
             });
         } else {
             dataTable.clear().rows.add(generateTableData(allvars, allwits)).draw();
         }
       }
+
+function handleRowClick(rowData) {
+    console.log("Row clicked", rowData);
+    const variant = rowData[0]+"|"+rowData[1]; // Assuming the variant identifier is in the first column
+    const variantDetails = varList.get(variant);
+
+    if (variantDetails) {
+        const detailsHtml = variantDetails.map(([location, text]) =>
+            `<p><strong>${location}:</strong> <span class="rtl-text">${text}</span></p>`
+        ).join('');
+
+        $('#variantDetails').html(`
+            <h3>Details for Variant: ${variant}</h3>
+            <div class="rtl-container">
+                ${detailsHtml}
+            </div>
+        `);
+    } else {
+        $('#variantDetails').html(`<p>No details available for variant: ${variant}</p>`);
+    }
+}
+
       async function createVariantsTableSingle(location=null) {
           if (!location) {
               createVariantsTableAll();
           } else {
-            console.log('loading', location);
+            // console.log('loading', location);
             const variantsData = await getToseftavariants(location);
-            console.log('variantsData', variantsData);
+            // console.log('variantsData', variantsData);
             const result = parseNoteSwitches(variantsData);
-            allvars = result.variantsMap;
-            allwits = result.witnessesSet;
+                allvars = result.variantsMap;
+                allwits = result.witnessesSet;
+                varList = result.variantsList;
           const tableData = generateTableData(allvars, allwits);
 
           // Add witness columns dynamically

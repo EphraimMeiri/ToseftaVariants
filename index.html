@@ -40,6 +40,18 @@
         .text-content, .variant-content {
             width: 48%;
         }
+        .hidden-variant-content {
+            display: none;
+            width: 32%;
+        }
+        .show-hidden .text-content,
+        .show-hidden .variant-content,
+        .show-hidden .hidden-variant-content {
+            width: 32%;
+        }
+        .hidden-variant-content {
+            display: none;
+        }
         .chapter-header {
             font-size: 1.5em;
             font-weight: bold;
@@ -76,6 +88,8 @@
         <input type="checkbox" id="maleh" name="maleh" value="maleh">
         <label for="multiwitness">הסתר חילופים מעד יחיד</label>
         <input type="checkbox" id="multiwitness" name="multiwitness" value="multiwitness">
+        <label for="showHidden">Show hidden variants</label>
+        <input type="checkbox" id="showHidden" name="showHidden" value="showHidden">
         &nbsp&nbsp&nbsp&nbsp|
         <a href="otzarHaHilufim.html">אוצר החילופים (עדיין בפיתוח)</a>
         &nbsp&nbsp&nbsp&nbsp|
@@ -157,22 +171,26 @@
         }
 
 
-function displayTextAndVariants(textData, variantsData) {
+function displayTextAndVariants(textData, variantsData){
     const contentContainer = document.getElementById('content-container');
     const abbreviationsCheckbox = document.getElementById('abbreviations');
     const mnCheckbox = document.getElementById('mn');
     const vavHibburCheckbox = document.getElementById('vavHibbur');
     const malehCheckbox = document.getElementById('maleh');
     const multiwitnessCheckbox = document.getElementById('multiwitness');
+    const showHiddenCheckbox = document.getElementById('showHidden');
 
     function updateDisplay() {
         let hidden_count = 0;
         let total_count = 0;
         contentContainer.innerHTML = ''; // Clear existing content
 
-        const textArray = textData.text; // Note the [0] here
-        const variantsArray = variantsData.text; // And here
+        // Toggle the 'show-hidden' class on the container
+        contentContainer.classList.toggle('show-hidden', showHiddenCheckbox.checked);
 
+        const textArray = textData.text;
+        const variantsArray = variantsData.text;
+        const masechet = variantsData.title.split("Variants on ")[1];
         textArray.forEach((textPerek, perekIndex) => {
             // Add chapter header
             const chapterHeader = document.createElement('h2');
@@ -200,59 +218,80 @@ function displayTextAndVariants(textData, variantsData) {
                 const variantParagraph = document.createElement('p');
                 variantParagraph.className = 'variant-content';
 
+                // New element for hidden variants
+                const hiddenVariantParagraph = document.createElement('p');
+                hiddenVariantParagraph.className = 'hidden-variant-content';
+
                 if (variantsArray[perekIndex] && variantsArray[perekIndex][halachaIndex]) {
+                    if(!Array.isArray(variantsArray[perekIndex][halachaIndex])){
+                        console.error("Not an array",loc,variantsArray[perekIndex][halachaIndex]);
+                    }
                     variantsArray[perekIndex][halachaIndex].forEach(variantItem => {
-                        const parsedNote = parseNote3(variantItem);
+                        loc = [masechet,perekIndex,halachaIndex]
+                        const parsedNote = parseNote3(variantItem,loc);
                         if (parsedNote) {
-                            const [sv, vars] = parsedNote;
-                            var first = true;
-                            multiwitness = isMultiWitness(vars);
-                            if (!multiwitnessCheckbox.checked || multiwitness){
-                            vars.forEach(([witnesses, varText]) => {
-                                if (!abbreviationsCheckbox.checked || !isKitzur(sv, varText)){
-                                 if (!mnCheckbox.checked || !isMN(sv, varText)){
-                                    if (!vavHibburCheckbox.checked || !isVavHaChiburDiff(sv, varText)){
-                                     if (!malehCheckbox.checked || !prelimHaserCheck(sv, varText)) {
-                                        if (first) {
-                                            variantParagraph.innerHTML += `<b>${sv}|</b>&nbsp;`;
-                                            first = false;
-                                        }
-                                        // change the font of the witnesses
-                                        variantParagraph.innerHTML += `<span class="variant">${witnesses}</span>&nbsp;${varText} `;
-                                        total_count++;
-                                     }else{
-                                        console.log("Haser", sv, varText);
-                                        hidden_count++;
-                                     }
-                                    }else{
-                                        console.log("Vav", sv, varText);
-                                        hidden_count++;
-                                    }
-                                 }else{
-                                    console.log("MN", sv, varText);
-                                    hidden_count++;
-                                 }
-                                }else{
-                                    console.log("Kitzur", sv, varText);
-                                    hidden_count++;
-                                }
-                            });
-                            variantParagraph.innerHTML += '. <spacer>';
-                        }else{
-                            console.log("MultiWitness", sv, vars);
-                            hidden_count+= vars.length;
+                            let sv,vars,affirmingWitnesses ;
+                            if (parsedNote.length == 2) {
+                                [sv, vars] = parsedNote;
+                            } else if(parsedNote.length == 3) {
+                                [sv, vars, affirmingWitnesses] = parsedNote;
+                            }else{
+                                total_count++;
+                                variantParagraph.innerHTML += variantItem + ' ';
+                                // continue to next iteration
+                                return;
                             }
+                            var first = true;
+                            // console.log("Is multi? ",vars)
+                            multiwitness = isMultiWitness(vars);
+                            vars.forEach(([witnesses, varText]) => {
+                                let isHidden = false;
+                                if (multiwitnessCheckbox.checked && !multiwitness) isHidden = true;
+                                if (abbreviationsCheckbox.checked && isKitzur(sv[0], varText)) isHidden = true;
+                                if (mnCheckbox.checked && isMN(sv[0], varText)) isHidden = true;
+                                if (vavHibburCheckbox.checked && isVavHaChiburDiff(sv[0], varText)) isHidden = true;
+                                if (malehCheckbox.checked && prelimHaserCheck(sv[0], varText)) isHidden = true;
+
+                                let variantHTML = '';
+                                if (first) {
+                                    variantHTML += `<b>${sv[0]}`;
+                                    if(sv[1]){
+                                        variantHTML += ` ${sv[1]}`;
+                                    }
+                                    variantHTML += `</b> |`;
+                                    if (affirmingWitnesses) {
+                                        variantHTML += ` כ׳׳ה ${affirmingWitnesses}.`;
+                                    }
+                                }
+                                variantHTML += ` <span class="variant">${witnesses}</span>&nbsp;${varText} `;
+                                if (isHidden) {
+                                    hiddenVariantParagraph.innerHTML += variantHTML;
+                                    hidden_count++;
+                                } else {
+                                    variantParagraph.innerHTML += variantHTML;
+                                }
+                                first = false;
+                                total_count++;
+                            });
+                            variantParagraph.innerHTML += '․ <spacer>';
+                            hiddenVariantParagraph.innerHTML += '․ <spacer>';
                         }
                     });
                 }
 
                 paragraphPair.appendChild(textParagraph);
                 paragraphPair.appendChild(variantParagraph);
+                paragraphPair.appendChild(hiddenVariantParagraph);
                 contentContainer.appendChild(paragraphPair);
             });
         });
         document.getElementById('hidden_count').textContent = hidden_count;
         document.getElementById('total_count').textContent = hidden_count + total_count;
+                // Show/hide hidden variants based on checkbox
+        const hiddenVariants = document.getElementsByClassName('hidden-variant-content');
+        for (let element of hiddenVariants) {
+            element.style.display = showHiddenCheckbox.checked ? 'block' : 'none';
+        }
     }
 
     // Initial display
@@ -264,6 +303,8 @@ function displayTextAndVariants(textData, variantsData) {
     vavHibburCheckbox.addEventListener('change', updateDisplay);
     malehCheckbox.addEventListener('change', updateDisplay);
     multiwitnessCheckbox.addEventListener('change', updateDisplay);
+    showHiddenCheckbox.addEventListener('change', updateDisplay);
+
 }
 // Fetch both JSON files
 //         Promise.all([
