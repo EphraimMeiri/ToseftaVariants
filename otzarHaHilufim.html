@@ -224,9 +224,12 @@
 function handleRowClick(rowData) {
     console.log("Row clicked", rowData);
     const variant = rowData[0]+"|"+rowData[1]; // Assuming the variant identifier is in the first column
-    const variantDetails = varList.get(variant);
+    let variantDetails = varList.get(variant);
 
     if (variantDetails) {
+        // De-duplicate the variant details
+        variantDetails = Array.from(new Set(variantDetails.map(JSON.stringify)), JSON.parse);
+
         const detailsHtml = variantDetails.map(([location, text]) =>
             `<p><strong>${location}:</strong> <span class="rtl-text">${text}</span></p>`
         ).join('');
@@ -241,7 +244,6 @@ function handleRowClick(rowData) {
         $('#variantDetails').html(`<p>No details available for variant: ${variant}</p>`);
     }
 }
-
       async function createVariantsTableSingle(location=null) {
           if (!location) {
               createVariantsTableAll();
