@@ -1,113 +1,414 @@
 <!DOCTYPE html>
-<html>
+<html lang="he">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
-    <title>Tosefta with Variants</title>
-    <style>
-        body {
-            font-family: 'Noto Serif Hebrew', serif;
-            direction: rtl;
-            line-height: 1.6;
-            margin: 0;
-            padding: 20px;
-        }
-        .suez-one-regular {
-          font-family: 'Suez One', serif;
-          font-weight: 300;
-          font-style: normal;
-        }
-        .variant {
-            font-family:"Arial", sans-serif;
-            font-weight: bold;
-        }
-        #app {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        #content-container {
-            display: flex;
-            flex-direction: column;
-        }
-        .paragraph-pair {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 20px;
-        }
-        .text-content, .variant-content {
-            width: 48%;
-        }
-        .hidden-variant-content {
-            display: none;
-            width: 32%;
-        }
-        .show-hidden .text-content,
-        .show-hidden .variant-content,
-        .show-hidden .hidden-variant-content {
-            width: 32%;
-        }
-        .hidden-variant-content {
-            display: none;
-        }
-        .chapter-header {
-            font-size: 1.5em;
-            font-weight: bold;
-            text-align: center;
-            margin: 20px 0;
-        }
-        .paragraph-number {
-            position: absolute;
-            right: -30px;
-            top: 0;
-            font-weight: bold;
-            color: #888;
-        }
-        .paragraph-pair {
-            position: relative;
-            padding-right: 30px;
-            margin-bottom: 10px;
-        }
-
-        sup {
-            color: red;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
+    <title>תוספתא עם חילופי נוסח</title>
 </head>
 <body>
-    <div id="toggles">
-        <label for="abbreviations">קיצורים</label>
-        <input type="checkbox" id="abbreviations" name="abbreviations" value="abbreviations">
-        <label for="mn">חלופי ם/ן</label>
-        <input type="checkbox" id="mn" name="mn" value="mn">
-        <label for="vavHibbur">ו׳ החיבור</label>
-        <input type="checkbox" id="vavHibbur" name="vavHibbur" value="vavHibbur">
-        <label for="maleh">מלא/חסר (ראשוני, וגס מאוד)</label>
-        <input type="checkbox" id="maleh" name="maleh" value="maleh">
-        <label for="multiwitness">הסתר חילופים מעד יחיד</label>
-        <input type="checkbox" id="multiwitness" name="multiwitness" value="multiwitness">
-        <label for="showHidden">Show hidden variants</label>
-        <input type="checkbox" id="showHidden" name="showHidden" value="showHidden">
-        &nbsp&nbsp&nbsp&nbsp|
-        <a href="otzarHaHilufim.html">אוצר החילופים (עדיין בפיתוח)</a>
-        &nbsp&nbsp&nbsp&nbsp|
-        הוסתרו <span id="hidden_count">0</span> חילופים מתוך <span id="total_count">0</span>
-    </div>
-    <div id="masechet-selector">
-        <label for="masechet-dropdown">Select Masechet:</label>
-        <select id="masechet-dropdown"></select>
-        <button id="load-masechet">Load Masechet</button>
+    <header class="site-header">
+        <h1>תוספתא עם חילופי נוסח</h1>
+        <div class="header-controls">
+            <nav><a href="otzarHaHilufim.html">אוצר החילופים</a></nav>
+        </div>
+    </header>
 
-        <!--    Link to OtzarHaHilufim-->
-    </div>
-    <div id="app">
-            <div id="content-container"></div>
+    <!-- Mobile sidebar toggle -->
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="פתח/סגור סרגל צד">☰</button>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <div class="page-layout">
+        <!-- Sidebar: masechet selector + all filters -->
+        <aside class="sidebar" id="sidebar">
+            <div class="masechet-selector">
+                <label for="masechet-dropdown">בחירת מסכת:</label>
+                <select id="masechet-dropdown"></select>
+                <button id="load-masechet">טען</button>
+            </div>
+
+            <section class="filters-section">
+                <label class="filter-toggle"><input type="checkbox" id="showHidden"> הצג חילופים מוסתרים</label>
+                <label class="filter-toggle"><input type="checkbox" id="multiwitness"> הסתר חילופים מעד יחיד</label>
+
+                <details open>
+                    <summary>כתיב</summary>
+                    <div class="filter-body">
+                        <label class="filter-parent"><input type="checkbox" id="hideMinorOrthography"> כתיב משני</label>
+                        <div class="filter-children" data-parent="hideMinorOrthography">
+                            <div class="detail-slot" data-category="minor_orthography"></div>
+                        </div>
+                        <label><input type="checkbox" id="hideNameOrthography"> כתיב שמות</label>
+                        <div class="filter-children" data-parent="hideNameOrthography">
+                            <div class="detail-slot" data-category="name_orthography"></div>
+                        </div>
+                    </div>
+                </details>
+
+                <details open>
+                    <summary>תוכן</summary>
+                    <div class="filter-body">
+                        <label class="filter-parent"><input type="checkbox" id="hideOtherMinor"> שוני משני</label>
+                        <div class="filter-children" data-parent="hideOtherMinor">
+                            <div class="detail-slot" data-category="other_minor"></div>
+                        </div>
+                        <label><input type="checkbox" id="hideMinor"> שוני קל</label>
+                        <div class="filter-children" data-parent="hideMinor">
+                            <div class="detail-slot" data-category="minor"></div>
+                        </div>
+                        <label><input type="checkbox" id="hideCitationScope"> היקף ציטוט</label>
+                        <div class="filter-children" data-parent="hideCitationScope">
+                            <div class="detail-slot" data-category="citation_scope"></div>
+                        </div>
+                    </div>
+                </details>
+
+                <div class="status-bar">
+                    הוסתרו <strong><span id="hidden_count">0</span></strong> חילופים מתוך <strong><span id="total_count">0</span></strong>
+                </div>
+            </section>
+        </aside>
+
+        <!-- Perek/Halakha navigation -->
+        <nav class="toc-nav" id="toc-nav"></nav>
+
+        <!-- Main content area -->
+        <div class="main-content">
+            <section class="card" id="app">
+                <div id="content-container"></div>
+            </section>
+
+        </div>
     </div>
 
     <script src="tosefta_parsing_tools.js"></script>
     <script>
+        let currentTextData = null;
+        let currentVariantsData = null;
+        let refreshCurrentDisplay = null;
+
+        // --- Sidebar toggle (mobile) ---
+        const sidebarEl = document.getElementById('sidebar');
+        const sidebarToggleBtn = document.getElementById('sidebar-toggle');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+        function toggleSidebar() {
+            sidebarEl.classList.toggle('open');
+            sidebarOverlay.classList.toggle('visible');
+        }
+        sidebarToggleBtn.addEventListener('click', toggleSidebar);
+        sidebarOverlay.addEventListener('click', toggleSidebar);
+
+        // --- Parent/child filter interaction ---
+        // Any checkbox whose id matches a filter-children[data-parent] dims that container when checked
+        document.querySelectorAll('.filter-children[data-parent]').forEach(childrenContainer => {
+            const parentId = childrenContainer.dataset.parent;
+            const parentCb = document.getElementById(parentId);
+            if (!parentCb) return;
+
+            function syncChildren() {
+                childrenContainer.classList.toggle('disabled', parentCb.checked);
+            }
+
+            parentCb.addEventListener('change', syncChildren);
+            syncChildren();
+        });
+
+        function escapeHtml(text) {
+            return String(text ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        // Maps raw English reason strings to Hebrew display groups
+        // Returns { key, hebrew } or null to suppress display
+        function groupReason(reason) {
+            if (!reason) return null;
+            if (reason === 'both empty') return null;
+            if (reason === 'substantive variant - needs review') return null;
+
+            // Abbreviations
+            if (reason.includes('abbreviation')) {
+                return { key: 'abbreviation', hebrew: 'קיצורים' };
+            }
+            // Haser/maleh (but not "abbreviation + haser/maleh" which is caught above)
+            if (reason.includes('haser/maleh')) {
+                return { key: 'haser_maleh', hebrew: 'מלא/חסר' };
+            }
+            // Mem/nun
+            if (reason.includes('mem/nun')) {
+                return { key: 'mem_nun', hebrew: 'חלופי ם/ן' };
+            }
+            // Prefix differences
+            if (reason.startsWith('prefix difference:')) {
+                return { key: 'prefix_diff', hebrew: 'הבדלי תחיליות' };
+            }
+            // Prefix swaps
+            if (reason.startsWith('prefix swap:')) {
+                return { key: 'prefix_swap', hebrew: 'חילופי תחיליות' };
+            }
+            // Orthography variants (minor category)
+            if (reason.startsWith('orthography')) {
+                return { key: 'orthography', hebrew: 'כתיב חלופי' };
+            }
+            // Rabbi name variants
+            if (reason === 'rabbi name variant') {
+                return { key: 'rabbi_name', hebrew: 'שמות חכמים' };
+            }
+            // Citation scope
+            if (reason.startsWith('citation_scope:')) {
+                return { key: 'citation_scope', hebrew: 'היקף ציטוט' };
+            }
+            // Minor addition/omission
+            if (reason.startsWith('minor addition/omission:')) {
+                return { key: 'minor_add_omit', hebrew: 'תוספת/השמטה קלה' };
+            }
+            // Addition/omission (major)
+            if (reason.startsWith('addition/omission:')) {
+                return { key: 'add_omit', hebrew: 'תוספת/השמטה' };
+            }
+            // Single letter difference
+            if (reason === 'single letter difference') {
+                return { key: 'single_letter', hebrew: 'הבדל אות בודדת' };
+            }
+            // Word order
+            if (reason.startsWith('word order')) {
+                return { key: 'word_order', hebrew: 'סדר מילים' };
+            }
+            // Fallback — show reason as-is
+            return { key: reason, hebrew: reason };
+        }
+
+        // Hebrew label for an individual reason (used inside expanded groups)
+        function reasonToHebrew(reason) {
+            if (reason === 'abbreviation (kitzur)') return 'קיצור';
+            if (reason === 'abbreviation + haser/maleh') return 'קיצור + מלא/חסר';
+            if (reason === 'haser/maleh spelling') return 'כתיב מלא/חסר';
+            if (reason === 'haser/maleh + mem/nun') return 'מלא/חסר + ם/ן';
+            if (reason === 'mem/nun final swap') return 'חלופי ם/ן';
+            if (reason.startsWith('prefix difference: ')) return 'תחילית: ' + reason.split(': ')[1];
+            if (reason.startsWith('prefix swap: ')) return 'חילוף: ' + reason.split(': ')[1];
+            if (reason === 'orthography') return 'כתיב';
+            if (reason.startsWith('orthography: ')) return 'כתיב: ' + reason.split(': ')[1];
+            if (reason === 'rabbi name variant') return 'שמות חכמים';
+            if (reason.startsWith('citation_scope: marker only')) {
+                const match = reason.match(/\((.+)\)/);
+                return 'סמן: ' + (match ? match[1] : '');
+            }
+            if (reason.startsWith('minor addition/omission: ')) return 'תוספת/השמטה: ' + reason.split(': ')[1];
+            if (reason.startsWith('addition/omission: ')) return 'תוספת/השמטה: ' + reason.split(': ')[1];
+            if (reason === 'single letter difference') return 'הבדל אות בודדת';
+            if (reason === 'word order difference') return 'סדר מילים';
+            if (reason === 'word order difference (with prefixes)') return 'סדר מילים (עם תחיליות)';
+            return reason;
+        }
+
+        function getHiddenCategoriesSet() {
+            const hidden = new Set();
+            if (document.getElementById('hideMinorOrthography').checked) hidden.add('minor_orthography');
+            if (document.getElementById('hideNameOrthography').checked) hidden.add('name_orthography');
+            if (document.getElementById('hideMinor').checked) hidden.add('minor');
+            if (document.getElementById('hideOtherMinor').checked) hidden.add('other_minor');
+            if (document.getElementById('hideCitationScope').checked) hidden.add('citation_scope');
+            return hidden;
+        }
+
+        function getHiddenReasonDetailsSet() {
+            const hidden = new Set();
+            const checked = document.querySelectorAll('.detail-reason-toggle:checked');
+            checked.forEach(input => {
+                // Each checkbox has a data-reasons attribute with JSON array of reason strings
+                const reasons = input.dataset.reasons;
+                if (reasons) {
+                    try {
+                        JSON.parse(reasons).forEach(r => hidden.add(r));
+                    } catch (e) {}
+                } else {
+                    hidden.add(input.value);
+                }
+            });
+            return hidden;
+        }
+
+        function buildClassificationDetailCounts(variantsData) {
+            // Returns Map<reason, {count, category}>
+            const detailCounts = new Map();
+            if (!variantsData || !Array.isArray(variantsData.text)) {
+                return detailCounts;
+            }
+
+            const masechet = (variantsData.title || "").replace("Variants on ", "");
+            variantsData.text.forEach((variantPerek, perekIndex) => {
+                if (!Array.isArray(variantPerek)) return;
+                variantPerek.forEach((variantHalakha, halachaIndex) => {
+                    if (!Array.isArray(variantHalakha)) return;
+                    variantHalakha.forEach((variantItem, itemIndex) => {
+                        if (typeof variantItem !== "string" || !variantItem.includes("|")) return;
+                        const loc = [masechet, perekIndex, halachaIndex, itemIndex];
+                        const parsedNote = parseNote3(variantItem, loc);
+                        if (!Array.isArray(parsedNote) || (parsedNote.length !== 2 && parsedNote.length !== 3)) return;
+
+                        const sv = parsedNote[0];
+                        const vars = parsedNote[1];
+                        if (!Array.isArray(vars)) return;
+
+                        vars.forEach(([, varText]) => {
+                            const classification = classifyVariantPair(sv[0], varText);
+                            const existing = detailCounts.get(classification.reason);
+                            if (existing) {
+                                existing.count++;
+                            } else {
+                                detailCounts.set(classification.reason, {
+                                    count: 1,
+                                    category: classification.category
+                                });
+                            }
+                        });
+                    });
+                });
+            });
+
+            return detailCounts;
+        }
+
+        function renderClassificationDetailControls(variantsData) {
+            // Clear all detail slots
+            document.querySelectorAll('.detail-slot').forEach(slot => {
+                slot.innerHTML = '';
+            });
+
+            const counts = buildClassificationDetailCounts(variantsData);
+            const selected = getHiddenReasonDetailsSet();
+
+            // Group raw reasons into Hebrew display groups per category
+            // Structure: category → groupKey → { hebrew, totalCount, items[] }
+            const byCategory = new Map();
+            for (const [reason, { count, category }] of counts) {
+                const group = groupReason(reason);
+                if (!group) continue;
+
+                if (!byCategory.has(category)) {
+                    byCategory.set(category, new Map());
+                }
+                const catGroups = byCategory.get(category);
+                if (!catGroups.has(group.key)) {
+                    catGroups.set(group.key, { hebrew: group.hebrew, totalCount: 0, items: [] });
+                }
+                const g = catGroups.get(group.key);
+                g.totalCount += count;
+                g.items.push({ reason, count, hebrew: reasonToHebrew(reason) });
+            }
+
+            // Render grouped checkboxes into category slots
+            let globalIdx = 0;
+            for (const [category, groups] of byCategory) {
+                const slot = document.querySelector(`.detail-slot[data-category="${category}"]`);
+                if (!slot) continue;
+
+                const sorted = [...groups.values()].sort((a, b) => b.totalCount - a.totalCount);
+
+                sorted.forEach(({ hebrew, totalCount, items }) => {
+                    const groupId = `dg_${globalIdx++}`;
+                    const allReasons = items.map(i => i.reason);
+                    const allChecked = allReasons.every(r => selected.has(r));
+                    const someChecked = !allChecked && allReasons.some(r => selected.has(r));
+
+                    if (items.length === 1) {
+                        // Single reason — simple checkbox, no expand
+                        const reasonsJson = escapeHtml(JSON.stringify(allReasons));
+                        const checked = allChecked ? 'checked' : '';
+                        slot.innerHTML += `<label><input class="detail-reason-toggle" type="checkbox" id="${groupId}" data-reasons="${reasonsJson}" ${checked}> ${escapeHtml(hebrew)} <span class="detail-count">(${totalCount})</span></label>`;
+                    } else {
+                        // Multi-reason group — expandable
+                        const reasonsJson = escapeHtml(JSON.stringify(allReasons));
+                        const checked = allChecked ? 'checked' : '';
+
+                        let html = `<div class="detail-group">`;
+                        html += `<div class="detail-group-header">`;
+                        html += `<label><input class="detail-reason-group-toggle" type="checkbox" data-reasons="${reasonsJson}" data-group="${groupId}" ${checked}> ${escapeHtml(hebrew)} <span class="detail-count">(${totalCount})</span></label>`;
+                        html += `<span class="detail-expand" data-target="${groupId}">◂</span>`;
+                        html += `</div>`;
+                        html += `<div class="detail-group-children" id="${groupId}">`;
+
+                        items.sort((a, b) => b.count - a.count);
+                        items.forEach((item, idx) => {
+                            const childId = `${groupId}_${idx}`;
+                            const childReasons = escapeHtml(JSON.stringify([item.reason]));
+                            const childChecked = selected.has(item.reason) ? 'checked' : '';
+                            html += `<label><input class="detail-reason-toggle" type="checkbox" id="${childId}" data-reasons="${childReasons}" data-parent-group="${groupId}" ${childChecked}> ${escapeHtml(item.hebrew)} <span class="detail-count">(${item.count})</span></label>`;
+                        });
+
+                        html += `</div></div>`;
+                        slot.innerHTML += html;
+                    }
+                });
+            }
+
+            // Set indeterminate state on group checkboxes where some (not all) children are checked
+            document.querySelectorAll('.detail-reason-group-toggle').forEach(groupCb => {
+                const groupId = groupCb.dataset.group;
+                const children = document.querySelectorAll(`[data-parent-group="${groupId}"]`);
+                const checkedCount = [...children].filter(c => c.checked).length;
+                if (checkedCount > 0 && checkedCount < children.length) {
+                    groupCb.indeterminate = true;
+                    groupCb.checked = false;
+                }
+            });
+
+            // Expand/collapse handlers
+            document.querySelectorAll('.detail-expand').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = document.getElementById(btn.dataset.target);
+                    if (target) {
+                        const isOpen = target.classList.toggle('open');
+                        btn.textContent = isOpen ? '▾' : '◂';
+                        btn.classList.toggle('open', isOpen);
+                    }
+                });
+            });
+
+            // Group checkbox → sync all children
+            document.querySelectorAll('.detail-reason-group-toggle').forEach(groupCb => {
+                groupCb.addEventListener('change', () => {
+                    const groupId = groupCb.dataset.group;
+                    document.querySelectorAll(`[data-parent-group="${groupId}"]`).forEach(child => {
+                        child.checked = groupCb.checked;
+                    });
+                    groupCb.indeterminate = false;
+                    if (typeof refreshCurrentDisplay === 'function') refreshCurrentDisplay();
+                });
+            });
+
+            // Child checkbox → sync group parent state
+            document.querySelectorAll('.detail-reason-toggle[data-parent-group]').forEach(childCb => {
+                childCb.addEventListener('change', () => {
+                    const groupId = childCb.dataset.parentGroup;
+                    const siblings = document.querySelectorAll(`[data-parent-group="${groupId}"]`);
+                    const groupToggle = document.querySelector(`.detail-reason-group-toggle[data-group="${groupId}"]`);
+                    if (groupToggle) {
+                        const allChecked = [...siblings].every(s => s.checked);
+                        const someChecked = [...siblings].some(s => s.checked);
+                        groupToggle.checked = allChecked;
+                        groupToggle.indeterminate = someChecked && !allChecked;
+                    }
+                    if (typeof refreshCurrentDisplay === 'function') refreshCurrentDisplay();
+                });
+            });
+
+            // Simple (non-grouped) detail toggles
+            document.querySelectorAll('.detail-reason-toggle:not([data-parent-group])').forEach(input => {
+                input.onchange = () => {
+                    if (typeof refreshCurrentDisplay === 'function') refreshCurrentDisplay();
+                };
+            });
+        }
 
         function getUrlParameter(name) {
             name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
@@ -143,19 +444,82 @@
             window.history.pushState({path:newUrl},'',newUrl);
         }
         // Function to load the selected masechet
+        // --- TOC navigation ---
+        const tocNav = document.getElementById('toc-nav');
+        let tocObserver = null;
+
+        function buildTocNav(textData) {
+            tocNav.innerHTML = '';
+            if (tocObserver) {
+                tocObserver.disconnect();
+                tocObserver = null;
+            }
+
+            const textArray = textData.text;
+            if (!textArray || textArray.length === 0) return;
+
+            textArray.forEach((textPerek, perekIndex) => {
+                const group = document.createElement('div');
+                group.className = 'toc-perek';
+
+                const label = document.createElement('a');
+                label.className = 'toc-perek-label';
+                label.textContent = convert_number(perekIndex + 1);
+                label.href = `#perek-${perekIndex}`;
+                label.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    document.getElementById(`perek-${perekIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+                group.appendChild(label);
+
+                const halakhot = document.createElement('div');
+                halakhot.className = 'toc-halakhot';
+                textPerek.forEach((_, halachaIndex) => {
+                    const link = document.createElement('a');
+                    link.className = 'toc-h';
+                    link.textContent = halachaIndex + 1;
+                    link.href = `#hal-${perekIndex}-${halachaIndex}`;
+                    link.dataset.halId = `hal-${perekIndex}-${halachaIndex}`;
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        document.getElementById(`hal-${perekIndex}-${halachaIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                    halakhot.appendChild(link);
+                });
+                group.appendChild(halakhot);
+                tocNav.appendChild(group);
+            });
+
+            // Highlight current halakha on scroll
+            tocObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const link = tocNav.querySelector(`.toc-h[data-hal-id="${entry.target.id}"]`);
+                    if (link) {
+                        link.classList.toggle('active', entry.isIntersecting);
+                    }
+                });
+            }, { rootMargin: '-60px 0px -70% 0px' });
+
+            document.querySelectorAll('.paragraph-pair[id]').forEach(el => {
+                tocObserver.observe(el);
+            });
+        }
+
         function loadSelectedMasechet() {
             const selectedLocation = dropdown.value.replace(' ', "%20");
             const selectedText = dropdown.options[dropdown.selectedIndex].text;
             updateUrl(selectedText);
-            const textUrl = url1 + selectedLocation + url2;
-            const variantsUrl = variant_url1 + selectedLocation.replace("Tosefta%20", "Variants%20on%20") + variants_url2;
 
             Promise.all([
                 getToseftaText(selectedLocation),
                 getToseftavariants(selectedLocation)
             ])
             .then(([textData, variantsData]) => {
+                currentTextData = textData;
+                currentVariantsData = variantsData;
+                renderClassificationDetailControls(variantsData);
                 displayTextAndVariants(textData, variantsData);
+                buildTocNav(textData);
             })
             .catch(error => {
                 console.error('Error loading the JSON files:', error);
@@ -199,17 +563,68 @@
 
 function displayTextAndVariants(textData, variantsData){
     const contentContainer = document.getElementById('content-container');
-    const abbreviationsCheckbox = document.getElementById('abbreviations');
-    const mnCheckbox = document.getElementById('mn');
-    const vavHibburCheckbox = document.getElementById('vavHibbur');
-    const malehCheckbox = document.getElementById('maleh');
     const multiwitnessCheckbox = document.getElementById('multiwitness');
     const showHiddenCheckbox = document.getElementById('showHidden');
+    const hideMinorOrthographyCheckbox = document.getElementById('hideMinorOrthography');
+    const hideNameOrthographyCheckbox = document.getElementById('hideNameOrthography');
+    const hideMinorCheckbox = document.getElementById('hideMinor');
+    const hideOtherMinorCheckbox = document.getElementById('hideOtherMinor');
+    const hideCitationScopeCheckbox = document.getElementById('hideCitationScope');
+
+    // --- Highlight linking between sup refs and note spans ---
+    let activeNoteId = null;
+
+    function clearHighlights() {
+        if (!activeNoteId) return;
+        contentContainer.querySelectorAll(`.highlight[data-note-id="${activeNoteId}"]`).forEach(el => {
+            el.classList.remove('highlight');
+        });
+        activeNoteId = null;
+    }
+
+    function highlightNote(noteId) {
+        clearHighlights();
+        activeNoteId = noteId;
+        contentContainer.querySelectorAll(`[data-note-id="${noteId}"]`).forEach(el => {
+            el.classList.add('highlight');
+        });
+    }
+
+    // Event delegation on the content container
+    contentContainer.addEventListener('mouseover', (e) => {
+        const ref = e.target.closest('.note-ref, .note-span');
+        if (ref && ref.dataset.noteId) {
+            highlightNote(ref.dataset.noteId);
+        }
+    });
+    contentContainer.addEventListener('mouseout', (e) => {
+        const ref = e.target.closest('.note-ref, .note-span');
+        if (ref) {
+            clearHighlights();
+        }
+    });
+    // Click on a sup scrolls the note into view
+    contentContainer.addEventListener('click', (e) => {
+        const ref = e.target.closest('.note-ref');
+        if (ref && ref.dataset.noteId) {
+            const noteId = ref.dataset.noteId;
+            // Find the first matching note-span (prefer visible column)
+            const target = contentContainer.querySelector(`.variant-content .note-span[data-note-id="${noteId}"]`)
+                        || contentContainer.querySelector(`.note-span[data-note-id="${noteId}"]`);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                highlightNote(noteId);
+            }
+        }
+    });
 
     function updateDisplay() {
         let hidden_count = 0;
         let total_count = 0;
+        const fullyHiddenNotes = new Set();
         contentContainer.innerHTML = ''; // Clear existing content
+        const hiddenCategories = getHiddenCategoriesSet();
+        const hiddenReasonDetails = getHiddenReasonDetailsSet();
 
         // Toggle the 'show-hidden' class on the container
         contentContainer.classList.toggle('show-hidden', showHiddenCheckbox.checked);
@@ -221,12 +636,14 @@ function displayTextAndVariants(textData, variantsData){
             // Add chapter header
             const chapterHeader = document.createElement('h2');
             chapterHeader.className = 'chapter-header';
+            chapterHeader.id = `perek-${perekIndex}`;
             chapterHeader.textContent = `פרק ${ convert_number(perekIndex + 1)}`;
             contentContainer.appendChild(chapterHeader);
 
             textPerek.forEach((textItem, halachaIndex) => {
                 const paragraphPair = document.createElement('div');
                 paragraphPair.className = 'paragraph-pair';
+                paragraphPair.id = `hal-${perekIndex}-${halachaIndex}`;
 
                 // Add paragraph (halacha) number
                 const paragraphNumber = document.createElement('span');
@@ -234,79 +651,119 @@ function displayTextAndVariants(textData, variantsData){
                 paragraphNumber.textContent = halachaIndex + 1;
                 paragraphPair.appendChild(paragraphNumber);
 
-                // Display main text
+                // Display main text — inject data-note-id on each sup
                 const textParagraph = document.createElement('p');
                 textParagraph.className = 'text-content';
-                const updatedText = textItem.replace(/<i data-commentator="Variants" data-label="([^"]+)" data-order="\d+"><\/i>/g, '<sup>$1</sup>');
+                let supIndex = 0;
+                const updatedText = textItem.replace(
+                    /<i data-commentator="Variants" data-label="([^"]+)" data-order="\d+"><\/i>/g,
+                    (match, label) => {
+                        const noteId = `n-${perekIndex}-${halachaIndex}-${supIndex}`;
+                        supIndex++;
+                        return `<sup class="note-ref" data-note-id="${noteId}">${label}</sup>`;
+                    }
+                );
                 textParagraph.innerHTML = updatedText;
 
-                // Display corresponding variant
-                const variantParagraph = document.createElement('p');
+                // Containers for visible and hidden variants
+                const variantParagraph = document.createElement('div');
                 variantParagraph.className = 'variant-content';
 
-                // New element for hidden variants
-                const hiddenVariantParagraph = document.createElement('p');
+                const hiddenVariantParagraph = document.createElement('div');
                 hiddenVariantParagraph.className = 'hidden-variant-content';
 
                 if (variantsArray[perekIndex] && variantsArray[perekIndex][halachaIndex]) {
                     if(!Array.isArray(variantsArray[perekIndex][halachaIndex])){
-                        console.error("Not an array",loc,variantsArray[perekIndex][halachaIndex]);
+                        console.error("Not an array", [masechet, perekIndex, halachaIndex], variantsArray[perekIndex][halachaIndex]);
                     }
+                    let noteIdx = 0;
                     variantsArray[perekIndex][halachaIndex].forEach(variantItem => {
-                        loc = [masechet,perekIndex,halachaIndex]
+                        const noteId = `n-${perekIndex}-${halachaIndex}-${noteIdx}`;
+                        noteIdx++;
+
+                        const loc = [masechet, perekIndex, halachaIndex];
                         if (!variantItem.includes("|")) {
                             console.log("No pipe",loc,variantItem);
-                            variantParagraph.innerHTML += "<sup>*</sup> ";
-                            variantParagraph.innerHTML += variantItem + ' ';
+                            variantParagraph.innerHTML += `<span class="note-span" data-note-id="${noteId}"><sup>*</sup> ${variantItem}</span> `;
                             return;
                         }
                         const parsedNote = parseNote3(variantItem,loc);
                         if (parsedNote) {
-                            let sv,vars,affirmingWitnesses ;
+                            let sv, vars, affirmingWitnesses;
                             if (parsedNote.length == 2) {
                                 [sv, vars] = parsedNote;
                             } else if(parsedNote.length == 3) {
                                 [sv, vars, affirmingWitnesses] = parsedNote;
-                            }else{
+                            } else {
                                 total_count++;
-                                variantParagraph.innerHTML += variantItem + ' ';
-                                // continue to next iteration
+                                variantParagraph.innerHTML += `<span class="note-span" data-note-id="${noteId}">${variantItem}</span> `;
                                 return;
                             }
-                            var first = true;
-                            // console.log("Is multi? ",vars)
-                            multiwitness = isMultiWitness(vars);
-                            vars.forEach(([witnesses, varText]) => {
-                                let isHidden = false;
-                                if (multiwitnessCheckbox.checked && !multiwitness) isHidden = true;
-                                if (abbreviationsCheckbox.checked && isKitzur(sv[0], varText)) isHidden = true;
-                                if (mnCheckbox.checked && isMN(sv[0], varText)) isHidden = true;
-                                if (vavHibburCheckbox.checked && isVavHaChiburDiff(sv[0], varText)) isHidden = true;
-                                if (malehCheckbox.checked && prelimHaserCheck(sv[0], varText)) isHidden = true;
 
-                                let variantHTML = '';
-                                if (first) {
-                                    variantHTML += `<b>${sv[0]}`;
-                                    if(sv[1]){
-                                        variantHTML += ` ${sv[1]}`;
-                                    }
-                                    variantHTML += `</b> |`;
-                                    if (affirmingWitnesses) {
-                                        variantHTML += ` כ׳׳ה ${affirmingWitnesses}.`;
-                                    }
-                                }
-                                variantHTML += ` <span class="variant">${witnesses}</span>&nbsp;${varText} `;
-                                if (isHidden) {
-                                    hiddenVariantParagraph.innerHTML += variantHTML;
+                            // Build SV header fragment (inline)
+                            let svFrag = `<b>${sv[0]}`;
+                            if (sv[1]) {
+                                svFrag += ` ${sv[1]}`;
+                            }
+                            svFrag += `</b>`;
+                            if (affirmingWitnesses) {
+                                svFrag += ` <span class="note-affirming">כ׳׳ה ${affirmingWitnesses}.</span>`;
+                            }
+
+                            // Classify each variant reading as visible or hidden
+                            const multiwitness = isMultiWitness(vars);
+                            const visibleParts = [];
+                            const hiddenParts = [];
+
+                            vars.forEach(([witnesses, varText]) => {
+                                const decision = shouldHideVariant(
+                                    sv[0],
+                                    varText,
+                                    {
+                                        hideSingleWitness: multiwitnessCheckbox.checked,
+                                        hiddenCategories,
+                                        hiddenReasonDetails
+                                    },
+                                    multiwitness
+                                );
+
+                                const part = `<span class="variant">${witnesses}</span>&nbsp;${varText}`;
+
+                                if (decision.hidden) {
+                                    hiddenParts.push(part);
                                     hidden_count++;
                                 } else {
-                                    variantParagraph.innerHTML += variantHTML;
+                                    visibleParts.push(part);
                                 }
-                                first = false;
                                 total_count++;
                             });
-                            variantParagraph.innerHTML += '․ <spacer>';
-                            hiddenVariantParagraph.innerHTML += '․ <spacer>';
+
+                            // Render visible note (compact inline span with SV + readings)
+                            if (visibleParts.length > 0) {
+                                variantParagraph.innerHTML +=
+                                    `<span class="note-span" data-note-id="${noteId}">${svFrag} | ${visibleParts.join(' ')}</span>` +
+                                    `<span class="note-sep">․</span> `;
+                            }
+
+                            // Track notes where every reading is hidden
+                            if (hiddenParts.length > 0 && visibleParts.length === 0) {
+                                fullyHiddenNotes.add(noteId);
+                            }
+
+                            // Render hidden note with SV context
+                            if (hiddenParts.length > 0) {
+                                if (visibleParts.length === 0) {
+                                    // All readings hidden — show full SV
+                                    hiddenVariantParagraph.innerHTML +=
+                                        `<span class="note-span" data-note-id="${noteId}">${svFrag} | ${hiddenParts.join(' ')}</span>` +
+                                        `<span class="note-sep">․</span> `;
+                                } else {
+                                    // Some visible, some hidden — dimmed SV echo
+                                    hiddenVariantParagraph.innerHTML +=
+                                        `<span class="note-span" data-note-id="${noteId}"><span class="note-sv-echo">${sv[0]}</span> | ${hiddenParts.join(' ')}</span>` +
+                                        `<span class="note-sep">․</span> `;
+                                }
+                            }
                         }
                     });
                 }
@@ -318,38 +775,41 @@ function displayTextAndVariants(textData, variantsData){
             });
         });
         document.getElementById('hidden_count').textContent = hidden_count;
-        document.getElementById('total_count').textContent = hidden_count + total_count;
-                // Show/hide hidden variants based on checkbox
+        document.getElementById('total_count').textContent = total_count;
+        // Show/hide hidden variants based on checkbox
         const hiddenVariants = document.getElementsByClassName('hidden-variant-content');
         for (let element of hiddenVariants) {
             element.style.display = showHiddenCheckbox.checked ? 'block' : 'none';
         }
+
+        // Hide sup letters whose notes are fully filtered (unless showing hidden column)
+        contentContainer.querySelectorAll('.note-ref').forEach(sup => {
+            if (fullyHiddenNotes.has(sup.dataset.noteId) && !showHiddenCheckbox.checked) {
+                sup.style.display = 'none';
+            } else {
+                sup.style.display = '';
+            }
+        });
     }
 
     // Initial display
     updateDisplay();
+    refreshCurrentDisplay = updateDisplay;
 
     // Add event listeners to checkboxes
-    abbreviationsCheckbox.addEventListener('change', updateDisplay);
-    mnCheckbox.addEventListener('change', updateDisplay);
-    vavHibburCheckbox.addEventListener('change', updateDisplay);
-    malehCheckbox.addEventListener('change', updateDisplay);
-    multiwitnessCheckbox.addEventListener('change', updateDisplay);
-    showHiddenCheckbox.addEventListener('change', updateDisplay);
+    [
+        multiwitnessCheckbox,
+        showHiddenCheckbox,
+        hideMinorOrthographyCheckbox,
+        hideNameOrthographyCheckbox,
+        hideMinorCheckbox,
+        hideOtherMinorCheckbox,
+        hideCitationScopeCheckbox
+    ].forEach(cb => {
+        cb.onchange = updateDisplay;
+    });
 
 }
-// Fetch both JSON files
-//         Promise.all([
-//             fetch('Tosefta_Megillah.json').then(response => response.json()),
-//             fetch('Variants_Megillah.json').then(response => response.json())
-//         ])
-//         .then(([textData, variantsData]) => {
-//             displayTextAndVariants(textData, variantsData);
-//         })
-//         .catch(error => {
-//             console.error('Error loading the JSON files:', error);
-//             document.getElementById('app').textContent = 'Error loading data';
-//         });
 
     </script>
 </body>

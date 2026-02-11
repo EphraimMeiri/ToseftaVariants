@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
+    <title>Tosefta with Variants</title>
+    <style>
+        body {
+            font-family: 'Noto Serif Hebrew', serif;
+            direction: rtl;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+        #app {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        #content-container {
+            display: flex;
+            flex-direction: column;
+        }
+        .paragraph-pair {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .text-content, .variant-content {
+            width: 48%;
+        }
+        sup {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div id="toggles">
+        <label for="abbreviations">קיצורים</label>
+        <input type="checkbox" id="abbreviations" name="abbreviations" value="abbreviations">
+    </div>
+
+    <div id="app">
+            <div id="content-container"></div>
+    </div>
+
+
+    <script>
+
+        function displayTextAndVariants(textData, variantsData) {
+            const contentContainer = document.getElementById('content-container');
+
+            const textArray = textData.text[0];
+            const variantsArray = variantsData.text[0];
+
+            textArray.forEach((textItem, index) => {
+                const paragraphPair = document.createElement('div');
+                paragraphPair.className = 'paragraph-pair';
+
+                // Display main text
+                const textParagraph = document.createElement('p');
+                textParagraph.className = 'text-content';
+                const updatedText = textItem.replace(/<i data-commentator="Variants" data-label="([^"]+)" data-order="\d+"><\/i>/g, '<sup>$1</sup>');
+                textParagraph.innerHTML = updatedText;
+
+                // Display corresponding variant
+                const variantParagraph = document.createElement('p');
+                variantParagraph.className = 'variant-content';
+                variantsArray[index].forEach(variantItem => {
+                    variantParagraph.innerHTML += variantItem + ' ';
+                });
+
+                paragraphPair.appendChild(textParagraph);
+                paragraphPair.appendChild(variantParagraph);
+                contentContainer.appendChild(paragraphPair);
+            });
+        }
+
+        // Fetch both JSON files
+        Promise.all([
+            fetch('Tosefta_Megillah.json').then(response => response.json()),
+            fetch('Variants_Megillah.json').then(response => response.json())
+        ])
+        .then(([textData, variantsData]) => {
+            displayTextAndVariants(textData, variantsData);
+        })
+        .catch(error => {
+            console.error('Error loading the JSON files:', error);
+            document.getElementById('app').textContent = 'Error loading data';
+        });
+
+    </script>
+</body>
+</html>

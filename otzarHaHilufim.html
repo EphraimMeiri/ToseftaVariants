@@ -1,295 +1,841 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="he">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Variants Table</title>
-    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.css">
-    <script type="text/javascript" src="https://code.jquery.com/jquery-3.5.1.js"></script>
-    <script type="text/javascript" src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.js"></script>
-        <style>
-        .rtl-container {
-            direction: rtl;
-            text-align: right;
-        }
-
-        .rtl-text {
-            unicode-bidi: bidi-override;
-        }
-
-        #variantDetails {
-            margin-top: 20px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        #variantDetails h3 {
-            margin-top: 0;
-        }
-
-        #variantDetails p {
-            margin: 5px 0;
-        }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+    <title>אוצר החילופים — תוספתא</title>
+    <script src="tosefta_parsing_tools.js"></script>
+    <script src="otzar_data.js"></script>
 </head>
 <body>
-    <div id="toggles">
-        <label for="abbreviations">קיצורים</label>
-        <input type="checkbox" id="abbreviations" name="abbreviations" value="abbreviations">
-        <label for="mn">חלופי ם/ן</label>
-        <input type="checkbox" id="mn" name="mn" value="mn">
-        <label for="vavHibbur">ו׳ החיבור</label>
-        <input type="checkbox" id="vavHibbur" name="vavHibbur" value="vavHibbur">
-        <label for="maleh">מלא/חסר (ראשוני, וגס מאוד)</label>
-        <input type="checkbox" id="maleh" name="maleh" value="maleh">
-        &nbsp&nbsp&nbsp&nbsp|
-        <a href="index.html">חזרה לנוסח התוספתא (עדיין בפיתוח)</a>
-    </div>
-    <table id="variantsTable" class="display">
-        <thead>
-            <tr>
-                <th>SV</th>
-                <th>Variant Text</th>
-                <!-- Witness columns will be added dynamically -->
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Table data will be inserted here -->
-        </tbody>
-    </table>
-    <div id="variantDetails"></div>
+    <header class="site-header">
+        <h1>אוצר החילופים</h1>
+        <div class="header-controls">
+            <nav><a href="index.html">תוספתא עם חילופי נוסח</a></nav>
+        </div>
+    </header>
 
-    <script src="tosefta_parsing_tools.js"></script>
+    <!-- Mobile sidebar toggle -->
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="פתח/סגור סרגל צד">☰</button>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <div class="page-layout">
+        <aside class="sidebar" id="sidebar">
+            <!-- Masechet selector -->
+            <div class="masechet-selector">
+                <label for="masechet-dropdown">בחירת מסכת:</label>
+                <select id="masechet-dropdown">
+                    <option value="">כל המסכתות</option>
+                </select>
+            </div>
+
+            <section class="filters-section">
+                <!-- Filter mode toggle -->
+                <div class="filter-mode-toggle">
+                    <label class="mode-label"><input type="radio" name="filterMode" value="hide" checked> הסתר מסומנים</label>
+                    <label class="mode-label"><input type="radio" name="filterMode" value="show"> הצג מסומנים בלבד</label>
+                </div>
+
+                <details open>
+                    <summary>כתיב</summary>
+                    <div class="filter-body">
+                        <label class="filter-parent"><input type="checkbox" id="hideMinorOrthography"> כתיב משני</label>
+                        <div class="filter-children" data-parent="hideMinorOrthography">
+                            <div class="detail-slot" data-category="minor_orthography"></div>
+                        </div>
+                        <label><input type="checkbox" id="hideNameOrthography"> כתיב שמות</label>
+                        <div class="filter-children" data-parent="hideNameOrthography">
+                            <div class="detail-slot" data-category="name_orthography"></div>
+                        </div>
+                    </div>
+                </details>
+
+                <details open>
+                    <summary>תוכן</summary>
+                    <div class="filter-body">
+                        <label class="filter-parent"><input type="checkbox" id="hideOtherMinor"> שוני משני</label>
+                        <div class="filter-children" data-parent="hideOtherMinor">
+                            <div class="detail-slot" data-category="other_minor"></div>
+                        </div>
+                        <label><input type="checkbox" id="hideMinor"> שוני קל</label>
+                        <div class="filter-children" data-parent="hideMinor">
+                            <div class="detail-slot" data-category="minor"></div>
+                        </div>
+                        <label><input type="checkbox" id="hideCitationScope"> היקף ציטוט</label>
+                        <div class="filter-children" data-parent="hideCitationScope">
+                            <div class="detail-slot" data-category="citation_scope"></div>
+                        </div>
+                    </div>
+                </details>
+
+                <div class="status-bar">
+                    מוצגות <strong><span id="visible-count">0</span></strong> שורות מתוך <strong><span id="total-count">0</span></strong>
+                </div>
+            </section>
+        </aside>
+
+        <div class="main-content">
+            <!-- Column search bar -->
+            <section class="card search-bar-section">
+                <div class="column-search-row">
+                    <div class="search-field">
+                        <label for="search-reading">חיפוש קריאה:</label>
+                        <input type="text" id="search-reading" placeholder="חיפוש בשתי הקריאות…" dir="rtl">
+                    </div>
+                    <div class="search-field search-field-narrow">
+                        <label for="search-reading2">קריאה שנייה:</label>
+                        <input type="text" id="search-reading2" placeholder="(אופציונלי)" dir="rtl">
+                    </div>
+                    <div class="search-field search-field-toggle">
+                        <label class="search-option"><input type="checkbox" id="search-startswith"> התחלה בלבד</label>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card" id="table-section">
+                <div id="loading-msg" style="text-align:center; padding:40px; color:#6b5b47;">טוען נתונים…</div>
+                <table id="otzar-table" class="display" style="display:none; width:100%">
+                    <thead>
+                        <tr id="otzar-thead-row">
+                            <!-- columns built dynamically from data -->
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </section>
+
+            <!-- Context modal -->
+            <div class="modal-overlay" id="modal-overlay">
+                <div class="modal-content" id="modal-content">
+                    <button class="modal-close" id="modal-close">&times;</button>
+                    <h3 id="modal-title"></h3>
+                    <div id="modal-body">
+                        <div class="modal-loading">טוען הקשר…</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-      // Function to parse notes and collect data
-      function parseNoteSwitches(variantsData,variantsMap=null, witnessesSet=null,variantsList=null) {
-          if (!variantsMap) {
-              variantsMap = new Map();
-          }
-          if (!witnessesSet) {
-              witnessesSet = new Set();
-          }
-            if (!variantsList) {
-                variantsList = new Map();
+    // --- Utility ---
+    function escapeHtml(text) {
+        return String(text ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    // --- Reason grouping (shared logic with main page) ---
+    function groupReason(reason) {
+        if (!reason) return null;
+        if (reason === 'both empty') return null;
+        if (reason === 'substantive variant - needs review') return null;
+        if (reason.includes('abbreviation')) return { key: 'abbreviation', hebrew: 'קיצורים' };
+        if (reason.includes('haser/maleh')) return { key: 'haser_maleh', hebrew: 'מלא/חסר' };
+        if (reason.includes('mem/nun')) return { key: 'mem_nun', hebrew: 'חלופי ם/ן' };
+        if (reason.startsWith('prefix difference:')) return { key: 'prefix_diff', hebrew: 'הבדלי תחיליות' };
+        if (reason.startsWith('prefix swap:')) return { key: 'prefix_swap', hebrew: 'חילופי תחיליות' };
+        if (reason.startsWith('orthography')) return { key: 'orthography', hebrew: 'כתיב חלופי' };
+        if (reason === 'rabbi name variant') return { key: 'rabbi_name', hebrew: 'שמות חכמים' };
+        if (reason.startsWith('citation_scope:')) return { key: 'citation_scope', hebrew: 'היקף ציטוט' };
+        if (reason.startsWith('minor addition/omission:')) return { key: 'minor_add_omit', hebrew: 'תוספת/השמטה קלה' };
+        if (reason.startsWith('addition/omission:')) return { key: 'add_omit', hebrew: 'תוספת/השמטה' };
+        if (reason === 'single letter difference') return { key: 'single_letter', hebrew: 'הבדל אות בודדת' };
+        if (reason.startsWith('word order')) return { key: 'word_order', hebrew: 'סדר מילים' };
+        return { key: reason, hebrew: reason };
+    }
+
+    function reasonToHebrew(reason) {
+        if (reason === 'abbreviation (kitzur)') return 'קיצור';
+        if (reason === 'abbreviation + haser/maleh') return 'קיצור + מלא/חסר';
+        if (reason === 'haser/maleh spelling') return 'כתיב מלא/חסר';
+        if (reason === 'haser/maleh + mem/nun') return 'מלא/חסר + ם/ן';
+        if (reason === 'mem/nun final swap') return 'חלופי ם/ן';
+        if (reason.startsWith('prefix difference: ')) return 'תחילית: ' + reason.split(': ')[1];
+        if (reason.startsWith('prefix swap: ')) return 'חילוף: ' + reason.split(': ')[1];
+        if (reason === 'orthography') return 'כתיב';
+        if (reason.startsWith('orthography: ')) return 'כתיב: ' + reason.split(': ')[1];
+        if (reason === 'rabbi name variant') return 'שמות חכמים';
+        if (reason.startsWith('citation_scope: marker only')) {
+            const match = reason.match(/\((.+)\)/);
+            return 'סמן: ' + (match ? match[1] : '');
+        }
+        if (reason.startsWith('minor addition/omission: ')) return 'תוספת/השמטה: ' + reason.split(': ')[1];
+        if (reason.startsWith('addition/omission: ')) return 'תוספת/השמטה: ' + reason.split(': ')[1];
+        if (reason === 'single letter difference') return 'הבדל אות בודדת';
+        if (reason === 'word order difference') return 'סדר מילים';
+        if (reason === 'word order difference (with prefixes)') return 'סדר מילים (עם תחיליות)';
+        return reason;
+    }
+
+    const CATEGORY_HEBREW = {
+        minor_orthography: 'כתיב משני',
+        name_orthography: 'כתיב שמות',
+        other_minor: 'שוני משני',
+        minor: 'שוני קל',
+        citation_scope: 'היקף ציטוט',
+        major: 'שוני מהותי',
+        skip: 'דילוג'
+    };
+
+    // --- Global state ---
+    let allData = [];        // full array from JSON
+    let dataTable = null;
+    const masechetDropdown = document.getElementById('masechet-dropdown');
+
+    // --- Sidebar mobile toggle ---
+    const sidebarEl = document.getElementById('sidebar');
+    const sidebarToggleBtn = document.getElementById('sidebar-toggle');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    function toggleSidebar() {
+        sidebarEl.classList.toggle('open');
+        sidebarOverlay.classList.toggle('visible');
+    }
+    sidebarToggleBtn.addEventListener('click', toggleSidebar);
+    sidebarOverlay.addEventListener('click', toggleSidebar);
+
+    // --- Parent/child filter interaction ---
+    document.querySelectorAll('.filter-children[data-parent]').forEach(childrenContainer => {
+        const parentId = childrenContainer.dataset.parent;
+        const parentCb = document.getElementById(parentId);
+        if (!parentCb) return;
+        function syncChildren() {
+            childrenContainer.classList.toggle('disabled', parentCb.checked);
+        }
+        parentCb.addEventListener('change', syncChildren);
+        syncChildren();
+    });
+
+    // --- Build detail reason checkboxes from loaded data ---
+    function buildDetailFilters(rows) {
+        // Count reasons per category
+        const byCat = new Map();
+        rows.forEach(row => {
+            for (const [reason, count] of Object.entries(row.reasons)) {
+                const grp = groupReason(reason);
+                if (!grp) continue;
+                const cat = row.category;
+                if (!byCat.has(cat)) byCat.set(cat, new Map());
+                const catMap = byCat.get(cat);
+                if (!catMap.has(grp.key)) catMap.set(grp.key, { hebrew: grp.hebrew, total: 0, reasons: [] });
+                const g = catMap.get(grp.key);
+                g.total += count;
+                if (!g.reasons.includes(reason)) g.reasons.push(reason);
             }
-          witnessesSet.add("sv");
-          masechet= variantsData.title.split("Variants on ")[1];
-          variantsData.text.forEach((variantPerek,perek_i) => {
-            variantPerek.forEach((variantHalakah,halakah_i) => {
-                variantHalakah.forEach((variantItem,item_i) =>{
-                loc=[masechet,perek_i,halakah_i,item_i];
-                // console.log('loc',loc)
-               const parsedNote = parseNote3(variantItem,loc);
-                if (parsedNote) {
-                    let sv, vars, affirmingWitnesses;
-                    if(parsedNote.length === 2){
-                        sv = parsedNote[0][0];
-                        vars = parsedNote[1];
-                    }else if(parsedNote.length === 3){
-                        sv = parsedNote[0];
-                        vars = parsedNote[1];
-                        affirmingWitnesses = parsedNote[2];
-                    }else{
-                        return;
-                    }
-                    vars.forEach(([witnesses,varText]) => {
-                        const key = `${sv}|${varText}`;
-                        const invkey= `${varText}|${sv}`;
-                        if (!variantsMap.has(key) && !variantsMap.has(invkey)){ //
-                            variantsMap.set(key, [new Map(),new Map()]);
-                            variantsList.set(key, [[loc,variantItem]]);
-                        }
-                        if (variantsMap.has(key)){
-                            const oldCounts = variantsMap.get(key);
-                            const oldList = variantsList.get(key);
-                            variantsList.set(key, [...oldList,[loc,variantItem]]);
-                            if(affirmingWitnesses){
-                                affirmingWitnesses.split(" ").forEach(wit =>{
-                                    oldCounts[1].set(wit, (oldCounts[1].get(wit) || 0) + 1);
-                                    witnessesSet.add(wit);
-                                });
-                            }else{
-                                oldCounts[0].set("sv", (oldCounts[0].get("sv") || 0) + 1);
-                            }
-                            witnesses.split(" ").forEach(wit =>{
-                                oldCounts[1].set(wit, (oldCounts[1].get(wit) || 0) + 1);
-                                witnessesSet.add(wit);
-                            });
-                            variantsMap.set(key, oldCounts);
-                        }else if (variantsMap.has(invkey)){
-                            // console.log('invkey', invkey)
-                            const oldCounts = variantsMap.get(invkey);
-                            if(affirmingWitnesses){
-                                affirmingWitnesses.split(" ").forEach(wit =>{
-                                    oldCounts[0].set(wit, (oldCounts[0].get(wit) || 0) + 1);
-                                    witnessesSet.add(wit);
-                                });
-                            }else{
-                                oldCounts[1].set("sv", (oldCounts[1].get("sv") || 0) + 1);
-                            }
-                            witnesses.split(" ").forEach(wit =>{
-                                oldCounts[0].set(wit, (oldCounts[0].get(wit) || 0) + 1);
-                                witnessesSet.add(wit);
-                            });
-                            variantsMap.set(invkey, oldCounts);
-                        }
+        });
+
+        document.querySelectorAll('.detail-slot').forEach(slot => { slot.innerHTML = ''; });
+        const selected = getHiddenReasonDetailsSet();
+
+        let globalIdx = 0;
+        for (const [category, groups] of byCat) {
+            const slot = document.querySelector(`.detail-slot[data-category="${category}"]`);
+            if (!slot) continue;
+
+            const sorted = [...groups.values()].sort((a, b) => b.total - a.total);
+            sorted.forEach(({ hebrew, total, reasons }) => {
+                const groupId = `dg_${globalIdx++}`;
+                const allChecked = reasons.every(r => selected.has(r));
+
+                if (reasons.length === 1) {
+                    const reasonsJson = escapeHtml(JSON.stringify(reasons));
+                    const checked = allChecked ? 'checked' : '';
+                    slot.innerHTML += `<label><input class="detail-reason-toggle" type="checkbox" id="${groupId}" data-reasons="${reasonsJson}" ${checked}> ${escapeHtml(hebrew)} <span class="detail-count">(${total})</span></label>`;
+                } else {
+                    const reasonsJson = escapeHtml(JSON.stringify(reasons));
+                    const checked = allChecked ? 'checked' : '';
+                    let html = `<div class="detail-group"><div class="detail-group-header">`;
+                    html += `<label><input class="detail-reason-group-toggle" type="checkbox" data-reasons="${reasonsJson}" data-group="${groupId}" ${checked}> ${escapeHtml(hebrew)} <span class="detail-count">(${total})</span></label>`;
+                    html += `<span class="detail-expand" data-target="${groupId}">◂</span></div>`;
+                    html += `<div class="detail-group-children" id="${groupId}">`;
+                    reasons.sort((a, b) => {
+                        const ca = rows.reduce((s, r) => s + (r.reasons[a] || 0), 0);
+                        const cb = rows.reduce((s, r) => s + (r.reasons[b] || 0), 0);
+                        return cb - ca;
                     });
+                    reasons.forEach((reason, idx) => {
+                        const cnt = rows.reduce((s, r) => s + (r.reasons[reason] || 0), 0);
+                        const childId = `${groupId}_${idx}`;
+                        const childReasons = escapeHtml(JSON.stringify([reason]));
+                        const childChecked = selected.has(reason) ? 'checked' : '';
+                        html += `<label><input class="detail-reason-toggle" type="checkbox" id="${childId}" data-reasons="${childReasons}" data-parent-group="${groupId}" ${childChecked}> ${escapeHtml(reasonToHebrew(reason))} <span class="detail-count">(${cnt})</span></label>`;
+                    });
+                    html += `</div></div>`;
+                    slot.innerHTML += html;
                 }
-                });
+            });
+        }
+
+        // Set indeterminate state
+        document.querySelectorAll('.detail-reason-group-toggle').forEach(groupCb => {
+            const groupId = groupCb.dataset.group;
+            const children = document.querySelectorAll(`[data-parent-group="${groupId}"]`);
+            const checkedCount = [...children].filter(c => c.checked).length;
+            if (checkedCount > 0 && checkedCount < children.length) {
+                groupCb.indeterminate = true;
+                groupCb.checked = false;
+            }
+        });
+
+        // Expand/collapse handlers
+        document.querySelectorAll('.detail-expand').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = document.getElementById(btn.dataset.target);
+                if (target) {
+                    const isOpen = target.classList.toggle('open');
+                    btn.textContent = isOpen ? '▾' : '◂';
+                    btn.classList.toggle('open', isOpen);
+                }
             });
         });
-          return { variantsMap, witnessesSet,variantsList };
-      }
 
-      // Function to generate table data
-       const abbreviationsCheckbox = document.getElementById('abbreviations');
-       const mnCheckbox = document.getElementById('mn');
-       const vavHibburCheckbox = document.getElementById('vavHibbur');
-       const malehCheckbox = document.getElementById('maleh');
-      function generateTableData(variantsMap, witnesses) {
+        // Group checkbox → sync children
+        document.querySelectorAll('.detail-reason-group-toggle').forEach(groupCb => {
+            groupCb.addEventListener('change', () => {
+                const groupId = groupCb.dataset.group;
+                document.querySelectorAll(`[data-parent-group="${groupId}"]`).forEach(child => {
+                    child.checked = groupCb.checked;
+                });
+                groupCb.indeterminate = false;
+                applyFilters();
+            });
+        });
 
-          const tableData = [];
-          for (const [key, witnessCount] of variantsMap.entries()) {
-              const [sv, varText] = key.split('|');
-              if (abbreviationsCheckbox.checked && isKitzur(sv,varText)) {
-                  continue;
-              }if(mnCheckbox.checked && isMN(sv,varText)){
-                  continue;
-              }if(vavHibburCheckbox.checked && isVavHaChiburDiff(sv,varText)){
-                  continue;
-              }if(malehCheckbox.checked && prelimHaserCheck(sv,varText)){
-                  continue;
-              }
-              const row = [sv, varText];
-              witnesses.forEach(witness => {
-                  row.push(witnessCount[0].get(witness) || 0);
-              });
-              witnesses.forEach(witness => {
-                  row.push(witnessCount[1].get(witness) || 0);
-              });
-              tableData.push(row);
-          }
-          return tableData;
-      }
+        // Child checkbox → sync group parent
+        document.querySelectorAll('.detail-reason-toggle[data-parent-group]').forEach(childCb => {
+            childCb.addEventListener('change', () => {
+                const groupId = childCb.dataset.parentGroup;
+                const siblings = document.querySelectorAll(`[data-parent-group="${groupId}"]`);
+                const groupToggle = document.querySelector(`.detail-reason-group-toggle[data-group="${groupId}"]`);
+                if (groupToggle) {
+                    const allChecked = [...siblings].every(s => s.checked);
+                    const someChecked = [...siblings].some(s => s.checked);
+                    groupToggle.checked = allChecked;
+                    groupToggle.indeterminate = someChecked && !allChecked;
+                }
+                applyFilters();
+            });
+        });
 
-      // Main function to create and populate the table
-      let dataTable;
-      let varList;
-      async function createVariantsTableAll() {
-          allvars = new Map();
-          allwits = new Set();
-          varList = new Map();
-            await Promise.all(locations.map(async masechet => {
-                console.log('loading', masechet);
-                const variantsData = await getToseftavariants(masechet);
-                const result = parseNoteSwitches(variantsData, allvars, allwits, varList);
-                allvars = result.variantsMap;
-                allwits = result.witnessesSet;
-                varList = result.variantsList;
-            }));
-          const tableData = generateTableData(allvars, allwits);
+        // Simple detail toggles
+        document.querySelectorAll('.detail-reason-toggle:not([data-parent-group])').forEach(input => {
+            input.onchange = applyFilters;
+        });
+    }
 
-          // Add witness columns dynamically
-          const table = $('#variantsTable');
-          allwits.forEach(witness => {
-              table.find('thead tr').append(`<th>${witness}</th>`);
-          });
-          allwits.forEach(witness => {
-              table.find('thead tr').append(`<th>${witness}1</th>`);
-          });
+    // --- Filter state readers ---
+    function getHiddenCategoriesSet() {
+        const hidden = new Set();
+        if (document.getElementById('hideMinorOrthography').checked) hidden.add('minor_orthography');
+        if (document.getElementById('hideNameOrthography').checked) hidden.add('name_orthography');
+        if (document.getElementById('hideMinor').checked) hidden.add('minor');
+        if (document.getElementById('hideOtherMinor').checked) hidden.add('other_minor');
+        if (document.getElementById('hideCitationScope').checked) hidden.add('citation_scope');
+        return hidden;
+    }
 
+    function getHiddenReasonDetailsSet() {
+        const hidden = new Set();
+        document.querySelectorAll('.detail-reason-toggle:checked').forEach(input => {
+            const reasons = input.dataset.reasons;
+            if (reasons) {
+                try { JSON.parse(reasons).forEach(r => hidden.add(r)); } catch (e) {}
+            }
+        });
+        return hidden;
+    }
 
-        // Initialize DataTable if it doesn't exist, otherwise just update data
-        if (!dataTable) {
-            dataTable = table.DataTable({
-                data: generateTableData(allvars, allwits),
-                columns: [
-                    { title: 'S1' },
-                    { title: 'S2' },
-                    ...Array.from(allwits).map(witness => ({ title: witness })),
-                    ...Array.from(allwits).map(witness => ({ title: witness + "1" }))
-                ],
-                createdRow: function(row, data, dataIndex) {
-                    $(row).on('click', function() {
-                        handleRowClick(data);
+    function getFilterMode() {
+        return document.querySelector('input[name="filterMode"]:checked')?.value || 'hide';
+    }
+
+    // --- Column search inputs ---
+    const searchReadingInput = document.getElementById('search-reading');
+    const searchReading2Input = document.getElementById('search-reading2');
+    const searchStartsWith = document.getElementById('search-startswith');
+
+    // Debounce helper
+    function debounce(fn, delay) {
+        let timer;
+        return function(...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), delay);
+        };
+    }
+
+    // --- Custom DataTables search ---
+    function applyFilters() {
+        if (dataTable) {
+            dataTable.draw();
+        }
+        updateStatusBar();
+    }
+
+    const debouncedApply = debounce(applyFilters, 200);
+    searchReadingInput.addEventListener('input', debouncedApply);
+    searchReading2Input.addEventListener('input', debouncedApply);
+    searchStartsWith.addEventListener('change', applyFilters);
+
+    // Register custom search function
+    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+        if (settings.nTable.id !== 'otzar-table') return true;
+
+        const row = allData[dataIndex];
+        if (!row) return true;
+
+        // Masechet filter — row.masekhtot is an object keyed by Hebrew masechet name
+        const selectedMasechet = masechetDropdown.value;
+        if (selectedMasechet && !row.masekhtot[selectedMasechet]) return false;
+
+        // Column search: reading pair search
+        const q1 = searchReadingInput.value.trim();
+        const q2 = searchReading2Input.value.trim();
+        const prefix = searchStartsWith.checked;
+
+        if (q1 || q2) {
+            const matchFn = prefix
+                ? (text, term) => text.startsWith(term)
+                : (text, term) => text.includes(term);
+
+            if (q1 && !q2) {
+                // Single term: match in either reading
+                if (!matchFn(row.left, q1) && !matchFn(row.right, q1)) return false;
+            } else if (q1 && q2) {
+                // Pair search: one term in each reading, either direction
+                const fwd = matchFn(row.left, q1) && matchFn(row.right, q2);
+                const rev = matchFn(row.left, q2) && matchFn(row.right, q1);
+                if (!fwd && !rev) return false;
+            } else if (!q1 && q2) {
+                if (!matchFn(row.left, q2) && !matchFn(row.right, q2)) return false;
+            }
+        }
+
+        const hiddenCategories = getHiddenCategoriesSet();
+        const hiddenReasonDetails = getHiddenReasonDetailsSet();
+        const mode = getFilterMode();
+        const rowReasons = Object.keys(row.reasons);
+
+        // Category match
+        const categoryMatch = hiddenCategories.has(row.category);
+
+        // Detail reason match: any of the row's reasons matches a hidden detail reason
+        const detailMatch = rowReasons.some(r => hiddenReasonDetails.has(r));
+
+        const anyFilterActive = hiddenCategories.size > 0 || hiddenReasonDetails.size > 0;
+
+        if (mode === 'hide') {
+            if (categoryMatch || detailMatch) return false;
+            return true;
+        } else {
+            if (!anyFilterActive) return true;
+            if (categoryMatch || detailMatch) return true;
+            return false;
+        }
+    });
+
+    function updateStatusBar() {
+        if (!dataTable) return;
+        const info = dataTable.page.info();
+        document.getElementById('visible-count').textContent = info.recordsDisplay;
+        document.getElementById('total-count').textContent = info.recordsTotal;
+    }
+
+    // --- Format helpers ---
+    function formatReasons(reasons) {
+        return Object.entries(reasons)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 2)
+            .map(([r, c]) => `${reasonToHebrew(r)} (${c})`)
+            .join(' | ');
+    }
+
+    function formatWitnesses(witnesses) {
+        return Object.entries(witnesses)
+            .sort((a, b) => b[1] - a[1])
+            .map(([w, c]) => `${w}:${c}`)
+            .join(' ');
+    }
+
+    // Ordered witness sigla — discovered from data at init time
+    let WITNESS_SIGLA = [];
+
+    // --- Modal ---
+    const modalOverlay = document.getElementById('modal-overlay');
+    const modalContent = document.getElementById('modal-content');
+    const modalClose = document.getElementById('modal-close');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+
+    function closeModal() {
+        modalOverlay.classList.remove('visible');
+    }
+    modalClose.addEventListener('click', closeModal);
+    modalOverlay.addEventListener('click', (e) => {
+        if (e.target === modalOverlay) closeModal();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeModal();
+    });
+
+    // Check if a variant note mentions a specific witness siglum
+    function noteHasWitness(witnessStr, siglum) {
+        // witnessStr is something like "א ד" or "ב"
+        const sigla = String(witnessStr || '')
+            .split(/\s+/)
+            .map(w => w.replace(/[^\u0590-\u05FF]/g, ''))
+            .filter(Boolean);
+        return sigla.includes(siglum);
+    }
+
+    // filterWitness: null = show all, string = only notes citing this witness
+    async function showModal(row, filterWitness) {
+        const masNames = Object.keys(row.masekhtot || {});
+        const titleSuffix = filterWitness ? ` — עד ${filterWitness}` : '';
+        modalTitle.textContent = `${row.left} / ${row.right}${titleSuffix}`;
+        modalOverlay.classList.add('visible');
+
+        // Build summary section
+        let html = `<div class="modal-summary">`;
+        html += `<span><strong>מסכתות:</strong> ${escapeHtml(masNames.join(', '))}</span>`;
+        html += ` &nbsp; <span><strong>סיווג:</strong> ${escapeHtml(CATEGORY_HEBREW[row.category] || row.category)}</span>`;
+        html += ` &nbsp; <span><strong>מספר:</strong> ${row.count}</span>`;
+        html += ` &nbsp; <span><strong>עדים:</strong> ${escapeHtml(formatWitnesses(row.witnesses))}</span>`;
+        html += `</div>`;
+
+        html += `<div class="modal-reasons"><strong>סיבות:</strong> `;
+        html += Object.entries(row.reasons).sort((a, b) => b[1] - a[1]).map(([r, c]) => `${escapeHtml(reasonToHebrew(r))} (${c})`).join(' | ');
+        html += `</div>`;
+
+        html += `<div class="modal-contexts" id="modal-contexts"><div class="modal-loading">טוען הקשר מן המקורות…</div></div>`;
+        modalBody.innerHTML = html;
+
+        // Fetch context per masechet
+        try {
+            let contextsHtml = '';
+            let shownRefs = 0;
+            const maxFullText = 10;
+            // Confirmed refs (all that match, including beyond the full-text limit)
+            const confirmedRefs = [];
+
+            // Helper: check a single ref for matching notes, returns { matchingNotes, matchingOrderSv }
+            function checkRef(varResp, masName, perek, halakha) {
+                let allNotes = [];
+                if (varResp.text && varResp.text[perek] && varResp.text[perek][halakha]) {
+                    allNotes = varResp.text[perek][halakha];
+                }
+                const matchingNotes = [];
+                const matchingOrderSv = new Map();
+                let markerOrder = 0; // tracks marker order, skipping paragraph-variant notes
+                allNotes.forEach((note, noteIdx) => {
+                    if (typeof note !== 'string' || !note.includes('|')) return;
+                    markerOrder++;
+                    const parsed = parseNote3(note, [masName, perek, halakha, noteIdx]);
+                    if (!Array.isArray(parsed) || parsed.length < 2) return;
+                    const sv = parsed[0];
+                    const vars = parsed[1];
+                    if (!Array.isArray(vars)) return;
+                    vars.forEach(([witnesses, varText]) => {
+                        const key = createPairKey(sv[0], varText);
+                        const rowKey = createPairKey(row.left, row.right);
+                        const rowKey2 = createPairKey(row.right, row.left);
+                        if (key === rowKey || key === rowKey2) {
+                            const witStr = String(witnesses || '').trim();
+                            if (filterWitness && !noteHasWitness(witStr, filterWitness)) return;
+                            matchingNotes.push({ sv: sv[0], varText, witnesses: witStr });
+                            matchingOrderSv.set(markerOrder, sv[0]);
+                        }
+                    });
+                });
+                return { matchingNotes, matchingOrderSv };
+            }
+
+            // Helper: highlight text using marker positions
+            function highlightText(toseftaText, matchingOrderSv) {
+                let displayText = toseftaText;
+                if (matchingOrderSv.size === 0) return displayText;
+                const markerRegex = /<i\s+data-commentator="Variants"\s+data-label="[^"]*"\s+data-order="(\d+)"[^>]*><\/i>/g;
+                const markers = [];
+                let m;
+                while ((m = markerRegex.exec(displayText)) !== null) {
+                    markers.push({ order: parseInt(m[1]), index: m.index, fullMatch: m[0] });
+                }
+                for (let i = markers.length - 1; i >= 0; i--) {
+                    const mk = markers[i];
+                    const sv = matchingOrderSv.get(mk.order);
+                    if (!sv) continue;
+                    // Handle ellipsis / וכו' / וגו' SVs: only match words before the truncation
+                    let svForMatch = sv.trim();
+                    if (/\.{3}|…/.test(svForMatch)) svForMatch = svForMatch.split(/\.{3}|…/)[0].trim();
+                    svForMatch = svForMatch.replace(/\s+וכו[׳']*$/, '').replace(/\s+וגו[׳']*$/, '').trim();
+                    // Strip trailing (N) occurrence markers and (ב"פ) "twice" markers
+                    let wordMultiplier = 1;
+                    const bpMatch = svForMatch.match(/\s*\(?ב["״]פ\)?\s*$/);
+                    if (bpMatch) {
+                        svForMatch = svForMatch.slice(0, -bpMatch[0].length).trim();
+                        wordMultiplier = 2;
+                    } else {
+                        svForMatch = svForMatch.replace(/\s*\(\d+\)\s*$/, '').trim();
+                    }
+                    const svWordCount = svForMatch.split(/\s+/).length * wordMultiplier;
+                    const afterPos = mk.index + mk.fullMatch.length;
+                    const after = displayText.substring(afterPos);
+                    // Strip other markers so we can match words past them
+                    const afterClean = after.replace(/<i\s+data-commentator="Variants"[^>]*><\/i>/g, '');
+                    const wordPat = '[\\u0590-\\u05FF\\u0027\\u2019\\u05F3\\u05F4"\\u2026.\\[\\]()]+';
+                    const nWordsRegex = new RegExp('^\\s*(' + wordPat + '(?:\\s+' + wordPat + '){0,' + (svWordCount - 1) + '})');
+                    const wordMatch = afterClean.match(nWordsRegex);
+                    if (wordMatch) {
+                        // Map matched text length back to positions in the original (with markers)
+                        const cleanMatchEnd = wordMatch[0].trimStart().length;
+                        // Walk original `after` string, skipping <i...></i> tags, to find real end position
+                        let origPos = 0, cleanPos = 0;
+                        const tagRe = /^<i\s+data-commentator="Variants"[^>]*><\/i>/;
+                        // Skip leading whitespace in original
+                        while (origPos < after.length && /\s/.test(after[origPos])) origPos++;
+                        const wordStartOrig = afterPos + origPos;
+                        while (cleanPos < cleanMatchEnd && origPos < after.length) {
+                            const tagMatch = after.substring(origPos).match(tagRe);
+                            if (tagMatch) {
+                                origPos += tagMatch[0].length;
+                                continue;
+                            }
+                            origPos++;
+                            cleanPos++;
+                        }
+                        const wordEndOrig = afterPos + origPos;
+                        displayText = displayText.substring(0, wordStartOrig)
+                            + '<mark>' + displayText.substring(wordStartOrig, wordEndOrig) + '</mark>'
+                            + displayText.substring(wordEndOrig);
+                    }
+                }
+                return displayText;
+            }
+
+            for (const [masName, mData] of Object.entries(row.masekhtot || {})) {
+                const loc = mData.loc;
+                if (!loc) continue;
+
+                const textUrl = url1 + loc + url2;
+                const variantUrl = variant_url1 + loc.replace("Tosefta%20", "Variants%20on%20") + variants_url2;
+
+                let textResp, varResp;
+                try {
+                    [textResp, varResp] = await Promise.all([
+                        fetch(textUrl).then(r => r.ok ? r.json() : null),
+                        fetch(variantUrl).then(r => r.ok ? r.json() : null)
+                    ]);
+                } catch (e) {
+                    continue;
+                }
+                if (!textResp || !varResp) continue;
+
+                // Check ALL refs in this masechet for matching notes
+                for (const [perek, halakha] of mData.refs) {
+                    const { matchingNotes, matchingOrderSv } = checkRef(varResp, masName, perek, halakha);
+
+                    // When filtering by witness, skip refs with no match
+                    if (filterWitness && matchingNotes.length === 0) continue;
+
+                    // This ref is confirmed relevant
+                    confirmedRefs.push({ masName, perek, halakha });
+
+                    // Show full text context for up to maxFullText refs
+                    if (shownRefs < maxFullText) {
+                        let toseftaText = '';
+                        if (textResp.text && textResp.text[perek] && textResp.text[perek][halakha]) {
+                            toseftaText = textResp.text[perek][halakha];
+                        }
+
+                        const displayText = highlightText(toseftaText, matchingOrderSv);
+
+                        contextsHtml += `<div class="modal-context-item">`;
+                        contextsHtml += `<div class="modal-context-ref">${escapeHtml(masName)} ${perek+1}:${halakha+1}</div>`;
+                        contextsHtml += `<div class="modal-context-text">${displayText}</div>`;
+                        if (matchingNotes.length > 0) {
+                            contextsHtml += `<div class="modal-context-variants">`;
+                            matchingNotes.forEach(mn => {
+                                contextsHtml += `<div class="modal-variant-note">`;
+                                contextsHtml += `<span class="modal-sv">${escapeHtml(mn.sv)}</span>`;
+                                contextsHtml += ` ← <span class="modal-var">${escapeHtml(mn.varText)}</span>`;
+                                if (mn.witnesses) contextsHtml += ` <span class="modal-wit">(${escapeHtml(mn.witnesses)})</span>`;
+                                contextsHtml += `</div>`;
+                            });
+                            contextsHtml += `</div>`;
+                        }
+                        contextsHtml += `</div>`;
+                        shownRefs++;
+                    }
+                }
+            }
+
+            // Full ref listing — only confirmed refs (witness-filtered when applicable)
+            if (confirmedRefs.length > shownRefs) {
+                contextsHtml += `<div class="modal-all-refs">`;
+                contextsHtml += `<div class="modal-all-refs-header">כל המיקומים (${confirmedRefs.length})</div>`;
+                contextsHtml += `<div class="modal-all-refs-list">`;
+                const byMas = {};
+                confirmedRefs.forEach(r => {
+                    if (!byMas[r.masName]) byMas[r.masName] = [];
+                    byMas[r.masName].push(r);
+                });
+                for (const [masName, refs] of Object.entries(byMas)) {
+                    const refStrs = refs.map(r => `${r.perek+1}:${r.halakha+1}`).join(', ');
+                    contextsHtml += `<span class="modal-ref-group"><strong>${escapeHtml(masName)}</strong> ${refStrs}</span>`;
+                }
+                contextsHtml += `</div></div>`;
+            }
+
+            document.getElementById('modal-contexts').innerHTML = contextsHtml || '<p>לא נמצאו הקשרים.</p>';
+        } catch (err) {
+            console.error('Error fetching context:', err);
+            document.getElementById('modal-contexts').innerHTML = '<p>שגיאה בטעינת ההקשר.</p>';
+        }
+    }
+
+    // --- Load data and init table ---
+    function init() {
+        try {
+            allData = OTZAR_DATA.rows;
+
+            // Populate masechet dropdown from merged masekhtot keys
+            const masekhtotSet = new Set();
+            allData.forEach(r => Object.keys(r.masekhtot || {}).forEach(m => masekhtotSet.add(m)));
+            const masekhtot = [...masekhtotSet];
+            masekhtot.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                masechetDropdown.appendChild(opt);
+            });
+
+            // Check URL param for pre-selected masechet
+            const urlParams = new URLSearchParams(window.location.search);
+            const preselect = urlParams.get('masechet');
+            if (preselect && masekhtot.includes(preselect)) {
+                masechetDropdown.value = preselect;
+            }
+
+            // Discover all witness sigla and sort by total frequency
+            const witTotals = {};
+            allData.forEach(r => {
+                for (const [w, c] of Object.entries(r.witnesses)) {
+                    witTotals[w] = (witTotals[w] || 0) + c;
+                }
+            });
+            WITNESS_SIGLA = Object.keys(witTotals).sort((a, b) => witTotals[b] - witTotals[a]);
+
+            // Build dynamic <thead> columns
+            const theadRow = document.getElementById('otzar-thead-row');
+            const fixedHeaders = ['קריאה א׳', 'קריאה ב׳', 'סה״כ', 'סיווג', 'סיבות'];
+            fixedHeaders.forEach(h => {
+                const th = document.createElement('th');
+                th.textContent = h;
+                theadRow.appendChild(th);
+            });
+            WITNESS_SIGLA.forEach(w => {
+                const th = document.createElement('th');
+                th.textContent = w;
+                theadRow.appendChild(th);
+            });
+
+            // Build table data: fixed cols + one col per witness
+            const tableData = allData.map(row => {
+                const base = [
+                    row.left,
+                    row.right,
+                    row.count,
+                    CATEGORY_HEBREW[row.category] || row.category,
+                    formatReasons(row.reasons)
+                ];
+                WITNESS_SIGLA.forEach(w => {
+                    base.push(row.witnesses[w] || 0);
+                });
+                return base;
+            });
+
+            document.getElementById('loading-msg').style.display = 'none';
+            document.getElementById('otzar-table').style.display = '';
+
+            // Column definitions — witness columns are numeric
+            const columnDefs = [];
+            const witnessStartIdx = 5;
+            WITNESS_SIGLA.forEach((w, i) => {
+                columnDefs.push({
+                    targets: witnessStartIdx + i,
+                    className: 'dt-center witness-col'
+                });
+            });
+
+            dataTable = $('#otzar-table').DataTable({
+                data: tableData,
+                pageLength: 50,
+                order: [[2, 'desc']],
+                columnDefs: columnDefs,
+                language: {
+                    search: 'חיפוש:',
+                    lengthMenu: 'הצג _MENU_ שורות',
+                    info: 'מציג _START_–_END_ מתוך _TOTAL_',
+                    infoFiltered: '(מסונן מתוך _MAX_ שורות)',
+                    paginate: { first: 'ראשון', last: 'אחרון', next: 'הבא', previous: 'הקודם' },
+                    emptyTable: 'לא נמצאו נתונים',
+                    zeroRecords: 'לא נמצאו שורות תואמות'
+                },
+                createdRow: function(tr, data, dataIndex) {
+                    $(tr).css('cursor', 'pointer');
+                    // Mark witness cells with data attribute
+                    const cells = tr.cells;
+                    for (let i = 0; i < WITNESS_SIGLA.length; i++) {
+                        const cellIdx = witnessStartIdx + i;
+                        if (cells[cellIdx]) {
+                            cells[cellIdx].dataset.witness = WITNESS_SIGLA[i];
+                        }
+                    }
+                    $(tr).on('click', function(e) {
+                        const td = e.target.closest('td');
+                        const wit = td && td.dataset.witness;
+                        if (wit && allData[dataIndex].witnesses[wit]) {
+                            showModal(allData[dataIndex], wit);
+                        } else {
+                            showModal(allData[dataIndex], null);
+                        }
                     });
                 }
             });
-        } else {
-            dataTable.clear().rows.add(generateTableData(allvars, allwits)).draw();
-        }
-      }
 
-function handleRowClick(rowData) {
-    console.log("Row clicked", rowData);
-    const variant = rowData[0]+"|"+rowData[1]; // Assuming the variant identifier is in the first column
-    let variantDetails = varList.get(variant);
+            // Build detail filters from data
+            buildDetailFilters(allData);
 
-    if (variantDetails) {
-        // De-duplicate the variant details
-        variantDetails = Array.from(new Set(variantDetails.map(JSON.stringify)), JSON.parse);
+            updateStatusBar();
 
-        const detailsHtml = variantDetails.map(([location, text]) =>
-            `<p><strong>${location}:</strong> <span class="rtl-text">${text}</span></p>`
-        ).join('');
-
-        $('#variantDetails').html(`
-            <h3>Details for Variant: ${variant}</h3>
-            <div class="rtl-container">
-                ${detailsHtml}
-            </div>
-        `);
-    } else {
-        $('#variantDetails').html(`<p>No details available for variant: ${variant}</p>`);
-    }
-}
-      async function createVariantsTableSingle(location=null) {
-          if (!location) {
-              createVariantsTableAll();
-          } else {
-            // console.log('loading', location);
-            const variantsData = await getToseftavariants(location);
-            // console.log('variantsData', variantsData);
-            const result = parseNoteSwitches(variantsData);
-                allvars = result.variantsMap;
-                allwits = result.witnessesSet;
-                varList = result.variantsList;
-          const tableData = generateTableData(allvars, allwits);
-
-          // Add witness columns dynamically
-          const table = $('#variantsTable');
-          allwits.forEach(witness => {
-              table.find('thead tr').append(`<th>${witness}</th>`);
-          });
-
-
-            // Add data to the table
-            table.DataTable({
-                data: tableData,
-                columns: [
-                    { title: 'SV' },
-                    { title: 'Variant Text' },
-                    ...Array.from(allwits).map(witness => ({ title: witness }))
-                ]
+            // Wire up filter controls
+            document.querySelectorAll('.filters-section input[type="checkbox"], .filters-section input[type="radio"]').forEach(input => {
+                if (!input.classList.contains('detail-reason-toggle') && !input.classList.contains('detail-reason-group-toggle')) {
+                    input.addEventListener('change', applyFilters);
+                }
             });
-          }
-      }
+            document.querySelectorAll('input[name="filterMode"]').forEach(r => {
+                r.addEventListener('change', applyFilters);
+            });
+            masechetDropdown.addEventListener('change', applyFilters);
 
-      // Fetch the variants data and create the table
-        createVariantsTableAll();
-
-      function updateTable() {
-        if (dataTable) {
-            dataTable.clear().rows.add(generateTableData(allvars, allwits)).draw();
+        } catch (err) {
+            console.error('Error loading data:', err);
+            document.getElementById('loading-msg').textContent = 'שגיאה בטעינת הנתונים.';
         }
-}
-        // Add event listeners to checkboxes
-        abbreviationsCheckbox.addEventListener('change', updateTable);
-        mnCheckbox.addEventListener('change', updateTable);
-        vavHibburCheckbox.addEventListener('change', updateTable);
-        malehCheckbox.addEventListener('change', updateTable);
+    }
 
+    init();
     </script>
 </body>
 </html>
