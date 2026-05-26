@@ -703,6 +703,56 @@ function displayTextAndVariants(textData, variantsData){
                 paragraphNumber.textContent = halachaIndex + 1;
                 paragraphPair.appendChild(paragraphNumber);
 
+                // Sotah notes mode: dedicated merged-apparatus renderer that
+                // anchors both the existing variant notes and the Erfurt diffs
+                // to Vienna word positions and merges co-located notes
+                // (ports sotah_footnoted.py).
+                if (chapterIsKiy && sotahMode === 'notes') {
+                    const halVars = variantsArray[perekIndex][halachaIndex] || [];
+                    const { viennaWords, mergedAt } = buildKiyMergedNotes(textItem, halVars);
+                    const sortedPos = [...mergedAt.keys()].sort((a, b) => a - b);
+                    const posLabel = new Map();
+                    sortedPos.forEach((pos, i) => posLabel.set(pos, i + 1));
+
+                    const textParagraph = document.createElement('p');
+                    textParagraph.className = 'text-content';
+                    let bodyHtml = '';
+                    viennaWords.forEach((word, wi) => {
+                        if (wi > 0) bodyHtml += ' ';
+                        if (mergedAt.has(wi)) {
+                            const noteId = `n-${perekIndex}-${halachaIndex}-k${wi}`;
+                            bodyHtml += `<sup class="note-ref" data-note-id="${noteId}">${posLabel.get(wi)}</sup>`;
+                        }
+                        bodyHtml += word;
+                    });
+                    textParagraph.innerHTML = bodyHtml;
+
+                    const variantParagraph = document.createElement('div');
+                    variantParagraph.className = 'variant-content';
+                    sortedPos.forEach(pos => {
+                        const noteId = `n-${perekIndex}-${halachaIndex}-k${pos}`;
+                        const label = posLabel.get(pos);
+                        mergedAt.get(pos).forEach(entry => {
+                            let inner;
+                            if (entry.raw !== undefined) {
+                                inner = `<sup>${label}</sup> ${entry.raw}`;
+                            } else {
+                                const svLabel = entry.suffix ? `${entry.sv} ${entry.suffix}` : entry.sv;
+                                const bodyStr = entry.merged
+                                    .map(([src, reading]) => `<span class="variant">${src}</span>&nbsp;${reading}`)
+                                    .join('. ');
+                                inner = `<sup>${label}</sup> <b>${svLabel}</b> | ${bodyStr}.`;
+                            }
+                            variantParagraph.innerHTML += `<span class="note-span" data-note-id="${noteId}">${inner}</span> `;
+                        });
+                    });
+
+                    paragraphPair.appendChild(textParagraph);
+                    paragraphPair.appendChild(variantParagraph);
+                    contentContainer.appendChild(paragraphPair);
+                    return;
+                }
+
                 // Pre-scan apparatus per halakha: identify
                 //   - note indices with פתוח readings (for line-break injection)
                 //   - eclectic swap candidates (note index → swap info)
@@ -774,11 +824,10 @@ function displayTextAndVariants(textData, variantsData){
                 );
                 textParagraph.innerHTML = updatedText;
 
-                // Sotah two-column mode: render Erfurt parallel as a sibling
-                // column. The Erfurt text lives in the first apparatus entry.
+                // Sotah two-column / marked modes: render Erfurt parallel as a
+                // sibling column. (Notes mode is handled by the early branch above.)
                 let erfurtParagraph = null;
-                let erfurtNotes = null;
-                if (chapterIsKiy && (sotahMode === 'two-col' || sotahMode === 'marked' || sotahMode === 'notes')) {
+                if (chapterIsKiy && (sotahMode === 'two-col' || sotahMode === 'marked')) {
                     const firstNote = variantsArray[perekIndex][halachaIndex] && variantsArray[perekIndex][halachaIndex][0];
                     const erfurtRaw = extractErfurtText(firstNote);
                     if (erfurtRaw) {
@@ -786,41 +835,17 @@ function displayTextAndVariants(textData, variantsData){
                             erfurtParagraph = document.createElement('p');
                             erfurtParagraph.className = 'erfurt-content';
                             erfurtParagraph.innerHTML = erfurtRaw;
-                        } else if (sotahMode === 'marked' || sotahMode === 'notes') {
+                        } else if (sotahMode === 'marked') {
                             // Tokenize both sides, ignoring the Vienna apparatus markers.
                             const viennaPlain = textItem.replace(/<i data-commentator="Variants"[^>]*><\/i>/g, '');
                             const viennaTokens = tokenizeHe(viennaPlain);
                             const erfurtTokens = tokenizeHe(erfurtRaw);
-                            // align Erfurt (a) against Vienna (b) — matchesA flags Erfurt tokens
-                            const { opcodes, matchesA } = alignSequencesHe(erfurtTokens, viennaTokens);
-
-                            if (sotahMode === 'marked') {
-                                erfurtParagraph = document.createElement('p');
-                                erfurtParagraph.className = 'erfurt-content marked';
-                                erfurtParagraph.innerHTML = erfurtTokens.map((tok, i) =>
-                                    matchesA[i] ? `<span class="erfurt-match">${tok}</span>` : `<span class="erfurt-diff">${tok}</span>`
-                                ).join(' ');
-                            } else {
-                                // Notes mode: build Erfurt-derived notes, each keyed
-                                // by its Vienna word position, to merge into the same
-                                // apparatus column as the existing variant notes.
-                                erfurtNotes = [];
-                                for (const [tag, i1, i2, j1, j2] of opcodes) {
-                                    if (tag === 'equal') continue;
-                                    const eText = erfurtTokens.slice(i1, i2).join(' ');
-                                    const vText = viennaTokens.slice(j1, j2).join(' ');
-                                    let inner;
-                                    if (tag === 'replace') {
-                                        inner = `<b>${vText}</b> <span class="variant">א</span>&nbsp;${eText}`;
-                                    } else if (tag === 'insert') {
-                                        // Vienna has words absent in Erfurt
-                                        inner = `<b>${vText}</b> <span class="variant">א</span>&nbsp;ח'`;
-                                    } else { // delete: Erfurt has extra words
-                                        inner = `<b>+</b> <span class="variant">א</span>&nbsp;${eText}`;
-                                    }
-                                    erfurtNotes.push({ pos: j1, html: `<span class="note-span erfurt-note">${inner}.</span> ` });
-                                }
-                            }
+                            const { matchesA } = alignSequencesHe(erfurtTokens, viennaTokens);
+                            erfurtParagraph = document.createElement('p');
+                            erfurtParagraph.className = 'erfurt-content marked';
+                            erfurtParagraph.innerHTML = erfurtTokens.map((tok, i) =>
+                                matchesA[i] ? `<span class="erfurt-match">${tok}</span>` : `<span class="erfurt-diff">${tok}</span>`
+                            ).join(' ');
                         }
                     }
                 }
@@ -962,12 +987,6 @@ function displayTextAndVariants(textData, variantsData){
                             }
                         }
                     });
-                }
-
-                // Notes mode: merge the Erfurt-derived notes into the same
-                // apparatus column as the existing variant notes.
-                if (erfurtNotes && erfurtNotes.length) {
-                    variantParagraph.innerHTML += erfurtNotes.map(n => n.html).join('');
                 }
 
                 paragraphPair.appendChild(textParagraph);

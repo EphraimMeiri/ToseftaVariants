@@ -845,8 +845,11 @@ function tokenizeHe(text) {
 // pairs, and prefix-only differences (ו/ב/ל/ה/מ/ש/כ).
 function wordsMatchHe(w1, w2) {
     if (w1 === w2) return true;
-    const a = stripPunctHe(w1);
-    const b = stripPunctHe(w2);
+    // Normalize markup/quotes but KEEP geresh/apostrophe — isKitzur and the
+    // matres-lectionis checks rely on the abbreviation marker. Only strip
+    // trailing sentence punctuation.
+    const a = normalizeQuotes(String(w1 || "").replace(/<[^>]+>/g, "")).trim().replace(/[.,;:!?]+$/, "");
+    const b = normalizeQuotes(String(w2 || "").replace(/<[^>]+>/g, "")).trim().replace(/[.,;:!?]+$/, "");
     if (!a || !b) return false;
     if (a === b) return true;
     if (isKitzur(a, b)) return true;
@@ -941,6 +944,219 @@ function extractErfurtText(firstVariant) {
     const slik = text.indexOf("<br>סליק");
     if (slik !== -1) text = text.substring(0, slik);
     return text.trim();
+}
+
+// --- Sotah כי"ע merged-apparatus builder (ports sotah_footnoted.py) ---
+
+const KIY_SOURCE_ORDER = "פדאג";
+const KIY_MARKER_RE = /<i data-commentator="Variants" data-label="[^"]*" data-order="\d+"><\/i>/g;
+
+function canonicalSourcesHe(srcs) {
+    const seen = [];
+    for (let s of srcs) {
+        s = String(s || "").trim();
+        if (s && !seen.includes(s)) seen.push(s);
+    }
+    seen.sort((a, b) => {
+        const ia = KIY_SOURCE_ORDER.indexOf(a[0] || "ת");
+        const ib = KIY_SOURCE_ORDER.indexOf(b[0] || "ת");
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    return seen.join("");
+}
+
+function makeAnchorSvHe(vSpan, maxWords = 4) {
+    const cleaned = vSpan.map(stripPunctHe);
+    if (cleaned.length > maxWords) return `${cleaned[0]}... ${cleaned[cleaned.length - 1]}`;
+    return cleaned.join(" ");
+}
+
+function isOmitReadingHe(reading) {
+    const r = String(reading || "").trim().replace(/\.$/, "");
+    return r === "ח'" || r === "ח׳";
+}
+
+// A diff is trivial if every word matches via spelling/abbreviation rules.
+function isTrivialDiffHe(sv, reading) {
+    if (!sv || !reading) return false;
+    if (isOmitReadingHe(reading)) return false;
+    if (sv.includes("...")) return false;
+    const svW = sv.split(/\s+/).filter(Boolean);
+    const rdW = reading.split(/\s+/).filter(Boolean);
+    if (svW.length !== rdW.length) return false;
+    // Pass raw words to wordsMatchHe so it can see abbreviation markers.
+    if (svW.every((s, i) => stripPunctHe(s) === stripPunctHe(rdW[i]))) return false; // identical — not a diff
+    return svW.every((s, i) => wordsMatchHe(s, rdW[i]));
+}
+
+function _wordEqHe(a, b) {
+    return stripPunctHe(a) === stripPunctHe(b) || wordsMatchHe(a, b);
+}
+
+function findSvRangeHe(svText, viennaWords, segStart, segEnd) {
+    if (segEnd <= segStart) return null;
+    svText = String(svText || "").trim();
+    if (!svText) return null;
+    const endBound = viennaWords.length;
+
+    if (svText.includes("...")) {
+        const parts = svText.split(/\.{3,}/);
+        const firstTok = parts[0].trim() ? parts[0].trim().split(/\s+/)[0] : null;
+        const lastArr = parts[parts.length - 1].trim() ? parts[parts.length - 1].trim().split(/\s+/) : null;
+        const lastTok = lastArr ? lastArr[lastArr.length - 1] : null;
+        if (!firstTok || !lastTok) return null;
+        for (let i = segStart; i < endBound; i++) {
+            if (_wordEqHe(viennaWords[i], firstTok)) {
+                for (let j = i; j < endBound; j++) {
+                    if (_wordEqHe(viennaWords[j], lastTok)) return [i, j];
+                }
+                break;
+            }
+        }
+        return null;
+    }
+
+    const svWords = svText.split(/\s+/).filter(Boolean);
+    const n = svWords.length;
+    const candidates = [segStart];
+    for (let s = segStart + 1; s < Math.max(segEnd, endBound) - n + 1; s++) candidates.push(s);
+    for (const start of candidates) {
+        if (start + n > endBound) continue;
+        let ok = true;
+        for (let k = 0; k < n; k++) {
+            if (!_wordEqHe(viennaWords[start + k], svWords[k])) { ok = false; break; }
+        }
+        if (ok) return [start, start + n - 1];
+    }
+    return null;
+}
+
+function erfurtDiffsToEntriesHe(viennaWords, erfurtWords, opcodes) {
+    const entries = [];
+    for (const [tag, i1, i2, j1, j2] of opcodes) {
+        const eSpan = erfurtWords.slice(i1, i2);
+        const vSpan = viennaWords.slice(j1, j2);
+        if (tag === "equal") {
+            for (let k = 0; k < (i2 - i1); k++) {
+                const ew = erfurtWords[i1 + k], vw = viennaWords[j1 + k];
+                if (ew !== vw && !wordsMatchHe(ew, vw)) {
+                    const sv = stripPunctHe(vw), rd = stripPunctHe(ew);
+                    if (sv !== rd) entries.push({ sv, sv_range: [j1 + k, j1 + k], attach: j1 + k, sources: [["א", rd]] });
+                }
+            }
+        } else if (tag === "replace") {
+            const sv = makeAnchorSvHe(vSpan);
+            const reading = eSpan.map(stripPunctHe).join(" ");
+            if (sv === reading) continue;
+            entries.push({ sv, sv_range: [j1, j2 - 1], attach: j1, sources: [["א", reading]] });
+        } else if (tag === "insert") {
+            // Vienna has words missing in Erfurt
+            const sv = makeAnchorSvHe(vSpan);
+            entries.push({ sv, sv_range: [j1, j2 - 1], attach: j1, sources: [["א", "ח'"]] });
+        } else if (tag === "delete") {
+            // Erfurt has extra words not in Vienna
+            const extra = eSpan.map(stripPunctHe).join(" ");
+            const attach = j1 < viennaWords.length ? j1 : viennaWords.length - 1;
+            entries.push({ raw_text: `+א: ${extra}.`, attach });
+        }
+    }
+    return entries;
+}
+
+function _mergeEntriesAtPositionHe(entries) {
+    const grouped = [];
+    const seenKeys = new Map();
+    for (const e of entries) {
+        if (e.raw !== undefined) { grouped.push(e); continue; }
+        const key = `${(e.sv || "").trim()} ${(e.suffix || "").trim()}`;
+        if (seenKeys.has(key)) {
+            grouped[seenKeys.get(key)].sources.push(...e.sources);
+        } else {
+            seenKeys.set(key, grouped.length);
+            grouped.push({ sv: e.sv, sv_range: e.sv_range, suffix: e.suffix || "", sources: e.sources.slice() });
+        }
+    }
+    for (const g of grouped) {
+        if (g.raw !== undefined) continue;
+        const order = [];
+        const byReading = new Map();
+        for (const [src, reading] of g.sources) {
+            const r = String(reading || "").trim();
+            if (!byReading.has(r)) { byReading.set(r, []); order.push(r); }
+            byReading.get(r).push(src);
+        }
+        g.merged = order.map(r => [canonicalSourcesHe(byReading.get(r)), r]);
+    }
+    return grouped;
+}
+
+// Build the merged apparatus for one כי"ע halakha.
+// Returns { viennaWords, mergedAt } where mergedAt maps a Vienna word index to
+// an ordered list of note entries ({sv, suffix, merged:[[srcStr,reading]]} or {raw}).
+function buildKiyMergedNotes(bodyText, halakhaVars) {
+    const erfurtText = extractErfurtText(halakhaVars && halakhaVars[0]) || "";
+    const viennaWords = tokenizeHe(bodyText);
+    const erfurtWords = tokenizeHe(erfurtText);
+    const { opcodes } = alignSequencesHe(erfurtWords, viennaWords);
+
+    let erfurtEntries = erfurtDiffsToEntriesHe(viennaWords, erfurtWords, opcodes);
+    erfurtEntries = erfurtEntries.filter(e =>
+        e.raw_text !== undefined || !isTrivialDiffHe(e.sv, e.sources[0][1]));
+
+    // Segment the body by markers to map existing notes to word positions.
+    const textParts = bodyText.split(KIY_MARKER_RE);
+    const cumWords = [0];
+    for (const seg of textParts) {
+        const clean = String(seg).replace(/<[^>]+>/g, "").trim();
+        const count = clean ? clean.split(/\s+/).filter(Boolean).length : 0;
+        cumWords.push(cumWords[cumWords.length - 1] + count);
+    }
+
+    const entriesAt = new Map();
+    const pushAt = (pos, entry) => {
+        if (!entriesAt.has(pos)) entriesAt.set(pos, []);
+        entriesAt.get(pos).push(entry);
+    };
+
+    const VAR_OFFSET = 1; // skip the כי"ע block
+    for (let p = 0; p < textParts.length; p++) {
+        const varIdx = p + VAR_OFFSET;
+        if (varIdx >= halakhaVars.length || !halakhaVars[varIdx]) continue;
+        const note = halakhaVars[varIdx];
+        if (typeof note !== "string" || !note.includes("|")) continue;
+        const attachWord = (p + 1) < cumWords.length ? cumWords[p + 1] : cumWords[cumWords.length - 1];
+        const segStart = attachWord;
+        const segEnd = (p + 2) < cumWords.length ? cumWords[p + 2] : cumWords[cumWords.length - 1];
+
+        const parsed = parseNote3(note, null);
+        if (typeof parsed === "string") { pushAt(attachWord, { raw: parsed }); continue; }
+        if (!Array.isArray(parsed) || parsed.length < 2) continue;
+        const sv = parsed[0];
+        const vars = parsed[1];
+        const svText = String(sv[0] || "").trim();
+        const suffix = sv[1] ? String(sv[1]).trim() : "";
+
+        const sources = [];
+        for (const entry of vars) {
+            if (!Array.isArray(entry) || entry.length !== 2) continue;
+            const src = String(entry[0] || "").trim();
+            const reading = String(entry[1] || "").trim();
+            if (isTrivialDiffHe(svText, reading)) continue;
+            sources.push([src, reading]);
+        }
+        if (!sources.length) continue;
+        const svRange = findSvRangeHe(svText, viennaWords, segStart, segEnd);
+        pushAt(attachWord, { sv: svText, sv_range: svRange, suffix, sources });
+    }
+
+    for (const e of erfurtEntries) {
+        if (e.raw_text !== undefined) { pushAt(e.attach, { raw: e.raw_text }); continue; }
+        pushAt(e.attach, { sv: e.sv, sv_range: e.sv_range, suffix: "", sources: e.sources });
+    }
+
+    const mergedAt = new Map();
+    for (const [pos, lst] of entriesAt) mergedAt.set(pos, _mergeEntriesAtPositionHe(lst));
+    return { viennaWords, mergedAt };
 }
 
 const ECLECTIC_FULL_WITNESSES = new Set(["א", "ד", "ל"]);
