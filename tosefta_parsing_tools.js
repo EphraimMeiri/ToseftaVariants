@@ -574,6 +574,12 @@ function classifyVariantPair(v1, v2) {
         return { category: "skip", confidence: "high", reason: "both empty" };
     }
 
+    // פתוח/סתום (and combinations) are paratextual notes — manuscript
+    // paragraph/section breaks at this location, not textual variants.
+    if (/^(פתוח|סתום)(\s+(פתוח|סתום))*$/.test(b)) {
+        return { category: "paragraph_break", confidence: "high", reason: `paragraph_break: ${b}` };
+    }
+
     if (!a || !b) {
         const added = b || a;
         if (TRUNCATION_MARKERS.has(added)) {

@@ -36,6 +36,12 @@
 
                 <div class="filter-body">
                     <details class="filter-collapse">
+                        <summary><label class="filter-parent"><input type="checkbox" id="hideParagraphBreak" checked onclick="event.stopPropagation()"> הסתר ציוני פתוח/סתום</label></summary>
+                        <div class="filter-children" data-parent="hideParagraphBreak">
+                            <label><input type="checkbox" id="paragraphBreakLineBreaks"> הצג שורה חדשה במקום פתוח</label>
+                        </div>
+                    </details>
+                    <details class="filter-collapse">
                         <summary><label class="filter-parent"><input type="checkbox" id="hideSoleWitness" onclick="event.stopPropagation()"> הסתר חילופים של עד בודד</label></summary>
                         <div class="filter-children" data-parent="hideSoleWitness">
                             <label><input type="checkbox" class="hide-sole-witness-siglum" data-siglum="א"> רק א <span class="detail-count">(ערפורט)</span></label>
@@ -226,6 +232,7 @@ if (reason === 'word order difference') return 'סדר מילים';
             if (document.getElementById('hideMinor').checked) hidden.add('minor');
             if (document.getElementById('hideOtherMinor').checked) hidden.add('other_minor');
             if (document.getElementById('hideCitationScope').checked) hidden.add('citation_scope');
+            if (document.getElementById('hideParagraphBreak').checked) hidden.add('paragraph_break');
             return hidden;
         }
 
@@ -669,6 +676,23 @@ function displayTextAndVariants(textData, variantsData){
                 paragraphNumber.textContent = halachaIndex + 1;
                 paragraphPair.appendChild(paragraphNumber);
 
+                // Pre-scan apparatus to find note indices that mark פתוח —
+                // when the user enables the line-break option we inject a <br>
+                // at those markers in the body text.
+                const showPatuachLineBreaks = document.getElementById('paragraphBreakLineBreaks').checked;
+                const patuachNoteIdxs = new Set();
+                if (showPatuachLineBreaks && variantsArray[perekIndex] && Array.isArray(variantsArray[perekIndex][halachaIndex])) {
+                    variantsArray[perekIndex][halachaIndex].forEach((variantItem, idx) => {
+                        if (typeof variantItem !== "string" || !variantItem.includes("|")) return;
+                        const parsed = parseNote3(variantItem, [masechet, perekIndex, halachaIndex]);
+                        if (!Array.isArray(parsed)) return;
+                        const vars = parsed[1];
+                        if (!Array.isArray(vars)) return;
+                        const hasPatuach = vars.some(([, t]) => /^\s*פתוח\s*$/.test(String(t || "").replace(/<[^>]+>/g, "")));
+                        if (hasPatuach) patuachNoteIdxs.add(idx);
+                    });
+                }
+
                 // Display main text — inject data-note-id on each sup
                 const textParagraph = document.createElement('p');
                 textParagraph.className = 'text-content';
@@ -677,8 +701,9 @@ function displayTextAndVariants(textData, variantsData){
                     /<i data-commentator="Variants" data-label="([^"]+)" data-order="\d+"><\/i>/g,
                     (match, label) => {
                         const noteId = `n-${perekIndex}-${halachaIndex}-${supIndex}`;
+                        const prefix = patuachNoteIdxs.has(supIndex) ? '<br>' : '';
                         supIndex++;
-                        return `<sup class="note-ref" data-note-id="${noteId}">${label}</sup>`;
+                        return `${prefix}<sup class="note-ref" data-note-id="${noteId}">${label}</sup>`;
                     }
                 );
                 textParagraph.innerHTML = updatedText;
@@ -823,7 +848,9 @@ function displayTextAndVariants(textData, variantsData){
         hideMinorCheckbox,
         hideOtherMinorCheckbox,
         hideCitationScopeCheckbox,
-        document.getElementById('hideSoleWitness')
+        document.getElementById('hideSoleWitness'),
+        document.getElementById('hideParagraphBreak'),
+        document.getElementById('paragraphBreakLineBreaks')
     ].forEach(cb => {
         cb.onchange = updateDisplay;
     });
