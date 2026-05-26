@@ -354,53 +354,54 @@ body {
     cursor: pointer;
 }
 
-/* Sotah two-column layout: Vienna right, Erfurt left, apparatus below.
-   In RTL the first named grid column sits on the right, so 'text' (Vienna)
-   is on the right and 'erfurt' on the left. */
+/* Sotah synoptic layout (two-col / marked): the aligned table stacks above
+   the apparatus, which spans full width below it. */
 .paragraph-pair.two-col-kiy {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 24px;
-    grid-template-areas:
-        "text erfurt"
-        "variants variants"
-        "hidden hidden";
-    align-items: start;
+    display: block;
 }
 
-/* The base .text-content / .variant-content rules set width: 48% for the
-   default flex layout; in the grid that fights the tracks, so reset them. */
-.paragraph-pair.two-col-kiy > .text-content,
-.paragraph-pair.two-col-kiy > .erfurt-content,
 .paragraph-pair.two-col-kiy > .variant-content,
 .paragraph-pair.two-col-kiy > .hidden-variant-content {
     width: auto;
 }
 
-.paragraph-pair.two-col-kiy > .text-content { grid-area: text; }
-.paragraph-pair.two-col-kiy > .erfurt-content { grid-area: erfurt; }
-.paragraph-pair.two-col-kiy > .variant-content { grid-area: variants; }
-.paragraph-pair.two-col-kiy > .hidden-variant-content { grid-area: hidden; }
+/* Synoptic table: one grid row per aligned segment so Vienna (right) and
+   Erfurt (left) stay parallel line-to-line. */
+.kiy-synoptic {
+    margin-bottom: 10px;
+    border: 1px solid #e0dbd4;
+    border-radius: 4px;
+    overflow: hidden;
+}
 
-/* Erfurt column matches the Vienna body font/size exactly. */
-.erfurt-content {
+.syn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 24px;
+    align-items: start;
+    padding: 1px 10px;
+}
+
+.syn-row:nth-child(even) {
+    background: #faf8f4;
+}
+
+/* Both columns share the Vienna body font/size for an exact match. */
+.syn-v, .syn-e {
     font-family: 'Noto Serif Hebrew', serif;
     line-height: 1.7;
     color: #3a2e20;
-    border-right: 2px solid #c8b9a0;
+}
+
+.syn-e {
+    border-right: 2px solid #e0dbd4;
     padding-right: 12px;
-    margin: 0;
 }
 
-/* Marked mode: Erfurt words matching Vienna are dimmed; differing words pop. */
-.erfurt-content.marked .erfurt-match {
-    color: #b8a890;
-}
-
-.erfurt-content.marked .erfurt-diff {
-    color: #2d7a3e;
-    font-weight: 600;
-}
+/* Marked coloring */
+.syn-e.syn-match { color: #b8a890; }
+.syn-e.syn-diff { color: #2d7a3e; font-weight: 600; }
+.syn-v.syn-vonly { color: #2456a6; font-weight: 600; }
 
 /* Notes mode: Erfurt-derived notes merged into the apparatus column */
 .note-span.erfurt-note .variant {

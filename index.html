@@ -824,29 +824,35 @@ function displayTextAndVariants(textData, variantsData){
                 );
                 textParagraph.innerHTML = updatedText;
 
-                // Sotah two-column / marked modes: render Erfurt parallel as a
-                // sibling column. (Notes mode is handled by the early branch above.)
-                let erfurtParagraph = null;
+                // Sotah two-column / marked modes: render Vienna and Erfurt as a
+                // synoptic table of aligned rows so the columns stay parallel
+                // line-to-line. (Notes mode is handled by the early branch above.)
+                let synopticEl = null;
                 if (chapterIsKiy && (sotahMode === 'two-col' || sotahMode === 'marked')) {
                     const firstNote = variantsArray[perekIndex][halachaIndex] && variantsArray[perekIndex][halachaIndex][0];
                     const erfurtRaw = extractErfurtText(firstNote);
                     if (erfurtRaw) {
-                        if (sotahMode === 'two-col') {
-                            erfurtParagraph = document.createElement('p');
-                            erfurtParagraph.className = 'erfurt-content';
-                            erfurtParagraph.innerHTML = erfurtRaw;
-                        } else if (sotahMode === 'marked') {
-                            // Tokenize both sides, ignoring the Vienna apparatus markers.
-                            const viennaPlain = textItem.replace(/<i data-commentator="Variants"[^>]*><\/i>/g, '');
-                            const viennaTokens = tokenizeHe(viennaPlain);
-                            const erfurtTokens = tokenizeHe(erfurtRaw);
-                            const { matchesA } = alignSequencesHe(erfurtTokens, viennaTokens);
-                            erfurtParagraph = document.createElement('p');
-                            erfurtParagraph.className = 'erfurt-content marked';
-                            erfurtParagraph.innerHTML = erfurtTokens.map((tok, i) =>
-                                matchesA[i] ? `<span class="erfurt-match">${tok}</span>` : `<span class="erfurt-diff">${tok}</span>`
-                            ).join(' ');
-                        }
+                        const viennaPlain = textItem.replace(/<i data-commentator="Variants"[^>]*><\/i>/g, '');
+                        const viennaTokens = tokenizeHe(viennaPlain);
+                        const erfurtTokens = tokenizeHe(erfurtRaw);
+                        const rows = buildAlignedRows(erfurtTokens, viennaTokens);
+                        const marked = sotahMode === 'marked';
+                        synopticEl = document.createElement('div');
+                        synopticEl.className = 'kiy-synoptic';
+                        synopticEl.innerHTML = rows.map(row => {
+                            const vText = row.v.join(' ');
+                            const eText = row.e.join(' ');
+                            let vCls = 'syn-v', eCls = 'syn-e';
+                            if (marked) {
+                                if (row.tag === 'equal') { eCls += ' syn-match'; }
+                                else if (row.tag === 'insert') { vCls += ' syn-vonly'; }
+                                else { eCls += ' syn-diff'; }
+                            }
+                            return `<div class="syn-row syn-${row.tag}">` +
+                                `<div class="${vCls}">${vText}</div>` +
+                                `<div class="${eCls}">${eText}</div>` +
+                                `</div>`;
+                        }).join('');
                     }
                 }
 
@@ -989,8 +995,13 @@ function displayTextAndVariants(textData, variantsData){
                     });
                 }
 
-                paragraphPair.appendChild(textParagraph);
-                if (erfurtParagraph) paragraphPair.appendChild(erfurtParagraph);
+                // In synoptic modes the aligned table replaces the V/E body;
+                // the apparatus (other witnesses) still renders below it.
+                if (synopticEl) {
+                    paragraphPair.appendChild(synopticEl);
+                } else {
+                    paragraphPair.appendChild(textParagraph);
+                }
                 paragraphPair.appendChild(variantParagraph);
                 paragraphPair.appendChild(hiddenVariantParagraph);
                 contentContainer.appendChild(paragraphPair);

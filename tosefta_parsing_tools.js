@@ -929,6 +929,19 @@ function alignSequencesHe(a, b, eqFn) {
     return { opcodes: merged, matchesA };
 }
 
+// Build aligned synoptic rows from Erfurt/Vienna word alignment. Each row is
+// one alignment segment so the two columns stay parallel line-to-line:
+//   { tag, v: [vienna words], e: [erfurt words] }
+// tag ∈ equal | replace | insert (Vienna-only) | delete (Erfurt-only).
+function buildAlignedRows(erfurtWords, viennaWords) {
+    const { opcodes } = alignSequencesHe(erfurtWords, viennaWords);
+    return opcodes.map(([tag, i1, i2, j1, j2]) => ({
+        tag,
+        v: viennaWords.slice(j1, j2),
+        e: erfurtWords.slice(i1, i2),
+    }));
+}
+
 // Detect a chapter that uses the כי"ע format (Sotah 3-15): every halakha's
 // first apparatus entry is a single block holding the entire Erfurt parallel
 // text rather than ordinary `LEMMA | witness reading` notes.
