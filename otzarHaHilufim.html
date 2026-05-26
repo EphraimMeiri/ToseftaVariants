@@ -146,6 +146,7 @@
         if (reason.startsWith('citation_scope:')) return { key: 'citation_scope', hebrew: 'היקף ציטוט' };
         if (reason.startsWith('minor addition/omission:')) return { key: 'minor_add_omit', hebrew: 'תוספת/השמטה קלה' };
         if (reason.startsWith('addition/omission:')) return { key: 'add_omit', hebrew: 'תוספת/השמטה' };
+        if (reason === 'omission') return { key: 'omission', hebrew: 'חסר' };
         if (reason.startsWith('word order')) return { key: 'word_order', hebrew: 'סדר מילים' };
         return { key: reason, hebrew: reason };
     }

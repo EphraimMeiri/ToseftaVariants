@@ -580,6 +580,12 @@ function classifyVariantPair(v1, v2) {
         return { category: "paragraph_break", confidence: "high", reason: `paragraph_break: ${b}` };
     }
 
+    // ח' / חסר mark the word as absent in this witness — a substantive
+    // omission, not a literal reading.
+    if (isOmissionMarker(b)) {
+        return { category: "major", confidence: "high", reason: "omission" };
+    }
+
     if (!a || !b) {
         const added = b || a;
         if (TRUNCATION_MARKERS.has(added)) {
@@ -819,6 +825,18 @@ function isMultiWitness(vars) {
 
 const ECLECTIC_FULL_WITNESSES = new Set(["א", "ד", "ל"]);
 
+// Recognize apparatus shorthand meaning "the word is absent in this witness":
+// ח' / ח׳ (with apostrophe or geresh), חסר, or a count modifier like "2 ח'".
+// Not a literal textual reading — the lemma simply doesn't appear.
+function isOmissionMarker(text) {
+    const t = String(text || "").replace(/<[^>]+>/g, "").trim().replace(/[׳']/g, "'");
+    if (!t) return false;
+    if (t === "חסר") return true;
+    if (/^\d*\s*ח'$/.test(t)) return true;
+    if (/^ח'\s*\(.*\)$/.test(t)) return true; // e.g. "ח' (אסור)" — still primarily an omission marker
+    return false;
+}
+
 // Returns the first alternate reading that meets the eclectic-swap rule:
 // - affirmingWitnesses is empty (Vienna alone supports the body)
 // - the alt's witnesses include ≥2 non-fragmentary sigla (א/ד/ל)
@@ -845,7 +863,7 @@ function findEclecticSwap(sv, vars, affirmingWitnesses) {
         const fullCount = wits.filter(w => ECLECTIC_FULL_WITNESSES.has(w)).length;
         if (fullCount < 2) continue;
 
-        return { lemma, altText: stripped, altWitnesses: witStr };
+        return { lemma, altText: stripped, altWitnesses: witStr, isOmission: isOmissionMarker(varText) };
     }
     return null;
 }

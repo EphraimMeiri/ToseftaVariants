@@ -195,6 +195,10 @@
             if (reason.startsWith('addition/omission:')) {
                 return { key: 'add_omit', hebrew: 'תוספת/השמטה' };
             }
+            // Word missing in witness (ח' / חסר)
+            if (reason === 'omission') {
+                return { key: 'omission', hebrew: 'חסר' };
+            }
 // Word order
             if (reason.startsWith('word order')) {
                 return { key: 'word_order', hebrew: 'סדר מילים' };
@@ -722,14 +726,20 @@ function displayTextAndVariants(textData, variantsData){
                         const swap = swapMap.get(idx);
                         const sup = `<sup class="note-ref" data-note-id="${noteId}">${label}</sup>`;
                         const suffix = isPatuach ? '<br>' : '';
-                        // For eclectic swaps, the lemma in the body has exactly the
-                        // word in swap.lemma — replace it with the alt in green.
+                        // Eclectic swap: the lemma in the body matches swap.lemma.
+                        // - Normal swap: replace with alt text in green.
+                        // - Omission swap (alt = ח'/חסר): drop the lemma word from
+                        //   the body entirely. The sup marker remains, floating
+                        //   without an attached word, and the apparatus note carries
+                        //   the explanation.
                         if (swap && lemmaToken) {
-                            // Strip trailing punctuation/spaces for the comparison
                             const tokenWord = lemmaToken.replace(/[,.;:!?׳״]+$/, '');
                             const tokenPunct = lemmaToken.slice(tokenWord.length);
                             if (tokenWord === swap.lemma) {
                                 swap.applied = true;
+                                if (swap.isOmission) {
+                                    return `${sup}${tokenPunct}${suffix}`;
+                                }
                                 return `${sup}<span class="eclectic-swap" data-note-id="${noteId}">${swap.altText}</span>${tokenPunct}${suffix}`;
                             }
                         }
@@ -775,12 +785,16 @@ function displayTextAndVariants(textData, variantsData){
                             }
 
                             // Apparatus inversion: when an eclectic swap has been
-                            // applied for this note, swap the lemma and the alt
-                            // reading. The new lemma is the alt text; the new
+                            // applied AND the swap is not an omission (which has no
+                            // word to make a new lemma from), swap the lemma and the
+                            // alt reading. The new lemma is the alt text; the new
                             // reading is the body text (Vienna's reading), cited
                             // for ב alone since by definition only ב supported it.
+                            // For omission swaps we keep the original apparatus —
+                            // the existing 'LEMMA | ד א ח'.' format already reads
+                            // naturally for the deletion case.
                             const swap = swapMap.get(currentNoteIdx);
-                            if (swap && swap.applied) {
+                            if (swap && swap.applied && !swap.isOmission) {
                                 const origLemma = sv[0];
                                 vars = vars.map(([w, t]) => {
                                     if (w === swap.altWitnesses && (t || '').replace(/<[^>]+>/g, '').trim() === swap.altText) {
