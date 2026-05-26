@@ -296,8 +296,54 @@ body {
     font-weight: 600;
 }
 
+/* Flat first-level expandable filter row (no box, arrow at end) */
+.filters-section details.filter-collapse {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    margin-bottom: 0;
+    overflow: visible;
+}
+
+.filters-section details.filter-collapse > summary {
+    background: transparent;
+    border-bottom: none;
+    padding: 2px 0;
+    font-weight: 600;
+    font-size: 0.85em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.filters-section details.filter-collapse > summary::before {
+    content: none;
+}
+
+.filters-section details.filter-collapse > summary::after {
+    content: "◂";
+    font-size: 0.8em;
+    color: #8b7d6b;
+}
+
+.filters-section details.filter-collapse[open] > summary::after {
+    content: "▾";
+}
+
 /* Indented child filters */
 .filter-children {
+    padding-right: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 2px;
+}
+
+/* Like filter-children, but independent of the parent — not dimmed when
+   the parent checkbox is checked. Use for orthogonal render options
+   that live under the same expand arrow (e.g. line break on פתוח). */
+.filter-extra {
     padding-right: 22px;
     display: flex;
     flex-direction: column;
