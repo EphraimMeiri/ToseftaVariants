@@ -773,7 +773,7 @@ function displayTextAndVariants(textData, variantsData){
                 // Sotah two-column mode: render Erfurt parallel as a sibling
                 // column. The Erfurt text lives in the first apparatus entry.
                 let erfurtParagraph = null;
-                let kiyNotesPanel = null;
+                let erfurtNotes = null;
                 if (chapterIsKiy && (sotahMode === 'two-col' || sotahMode === 'marked' || sotahMode === 'notes')) {
                     const firstNote = variantsArray[perekIndex][halachaIndex] && variantsArray[perekIndex][halachaIndex][0];
                     const erfurtRaw = extractErfurtText(firstNote);
@@ -797,28 +797,25 @@ function displayTextAndVariants(textData, variantsData){
                                     matchesA[i] ? `<span class="erfurt-match">${tok}</span>` : `<span class="erfurt-diff">${tok}</span>`
                                 ).join(' ');
                             } else {
-                                // Notes mode: build a structured diff list keyed by Vienna position
-                                kiyNotesPanel = document.createElement('div');
-                                kiyNotesPanel.className = 'kiy-notes';
-                                const items = [];
+                                // Notes mode: build Erfurt-derived notes, each keyed
+                                // by its Vienna word position, to merge into the same
+                                // apparatus column as the existing variant notes.
+                                erfurtNotes = [];
                                 for (const [tag, i1, i2, j1, j2] of opcodes) {
                                     if (tag === 'equal') continue;
                                     const eText = erfurtTokens.slice(i1, i2).join(' ');
                                     const vText = viennaTokens.slice(j1, j2).join(' ');
-                                    let entry;
+                                    let inner;
                                     if (tag === 'replace') {
-                                        entry = `<b>${vText || '—'}</b>] <big>א</big> ${eText}`;
+                                        inner = `<b>${vText}</b> <span class="variant">א</span>&nbsp;${eText}`;
                                     } else if (tag === 'insert') {
-                                        // Vienna has words missing in Erfurt (a is shorter)
-                                        entry = `<b>${vText}</b>] <big>א</big> ח'`;
+                                        // Vienna has words absent in Erfurt
+                                        inner = `<b>${vText}</b> <span class="variant">א</span>&nbsp;ח'`;
                                     } else { // delete: Erfurt has extra words
-                                        entry = `<b>(+)</b> <big>א</big> ${eText}`;
+                                        inner = `<b>+</b> <span class="variant">א</span>&nbsp;${eText}`;
                                     }
-                                    items.push(`<span class="kiy-note-item">${entry}.</span>`);
+                                    erfurtNotes.push({ pos: j1, html: `<span class="note-span erfurt-note">${inner}.</span> ` });
                                 }
-                                kiyNotesPanel.innerHTML = items.length
-                                    ? `<div class="kiy-notes-label">ערפורט:</div>${items.join(' ')}`
-                                    : `<div class="kiy-notes-label">ערפורט זהה.</div>`;
                             }
                         }
                     }
@@ -963,9 +960,14 @@ function displayTextAndVariants(textData, variantsData){
                     });
                 }
 
+                // Notes mode: merge the Erfurt-derived notes into the same
+                // apparatus column as the existing variant notes.
+                if (erfurtNotes && erfurtNotes.length) {
+                    variantParagraph.innerHTML += erfurtNotes.map(n => n.html).join('');
+                }
+
                 paragraphPair.appendChild(textParagraph);
                 if (erfurtParagraph) paragraphPair.appendChild(erfurtParagraph);
-                if (kiyNotesPanel) paragraphPair.appendChild(kiyNotesPanel);
                 paragraphPair.appendChild(variantParagraph);
                 paragraphPair.appendChild(hiddenVariantParagraph);
                 contentContainer.appendChild(paragraphPair);

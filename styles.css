@@ -354,7 +354,9 @@ body {
     cursor: pointer;
 }
 
-/* Sotah two-column layout: Vienna right, Erfurt left, apparatus below */
+/* Sotah two-column layout: Vienna right, Erfurt left, apparatus below.
+   In RTL the first named grid column sits on the right, so 'text' (Vienna)
+   is on the right and 'erfurt' on the left. */
 .paragraph-pair.two-col-kiy {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -363,6 +365,16 @@ body {
         "text erfurt"
         "variants variants"
         "hidden hidden";
+    align-items: start;
+}
+
+/* The base .text-content / .variant-content rules set width: 48% for the
+   default flex layout; in the grid that fights the tracks, so reset them. */
+.paragraph-pair.two-col-kiy > .text-content,
+.paragraph-pair.two-col-kiy > .erfurt-content,
+.paragraph-pair.two-col-kiy > .variant-content,
+.paragraph-pair.two-col-kiy > .hidden-variant-content {
+    width: auto;
 }
 
 .paragraph-pair.two-col-kiy > .text-content { grid-area: text; }
@@ -370,8 +382,9 @@ body {
 .paragraph-pair.two-col-kiy > .variant-content { grid-area: variants; }
 .paragraph-pair.two-col-kiy > .hidden-variant-content { grid-area: hidden; }
 
+/* Erfurt column matches the Vienna body font/size exactly. */
 .erfurt-content {
-    font-family: 'Frank Ruhl Libre', 'Times New Roman', serif;
+    font-family: 'Noto Serif Hebrew', serif;
     line-height: 1.7;
     color: #3a2e20;
     border-right: 2px solid #c8b9a0;
@@ -389,30 +402,9 @@ body {
     font-weight: 600;
 }
 
-/* Notes mode panel: a bordered block under Vienna listing Erfurt diffs */
-.kiy-notes {
-    grid-column: 1 / -1;
-    margin: 6px 0 0;
-    padding: 8px 12px;
-    background: #faf8f4;
-    border-right: 3px solid #c8b9a0;
-    border-radius: 4px;
-    font-size: 0.92em;
-    line-height: 1.65;
-}
-
-.kiy-notes-label {
-    font-weight: 600;
-    color: #6b5b47;
-    margin-bottom: 4px;
-}
-
-.kiy-note-item {
-    margin-inline-end: 12px;
-}
-
-.kiy-note-item big {
-    font-size: 1.1em;
+/* Notes mode: Erfurt-derived notes merged into the apparatus column */
+.note-span.erfurt-note .variant {
+    color: #2d7a3e;
     font-weight: 700;
 }
 
