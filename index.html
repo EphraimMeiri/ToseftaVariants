@@ -742,7 +742,11 @@ function displayTextAndVariants(textData, variantsData){
                 const updatedText = textItem.replace(
                     /<i data-commentator="Variants" data-label="([^"]+)" data-order="\d+"><\/i>(\S+)?/g,
                     (match, label, lemmaToken) => {
-                        const idx = supIndex++;
+                        // In כי"ע chapters the apparatus has an extra leading note
+                        // (the כי"ע Erfurt block) with no body marker, so body
+                        // marker i corresponds to apparatus note i+1. Offset the
+                        // index so noteId / swap / patuach lookups stay aligned.
+                        const idx = (supIndex++) + (chapterIsKiy ? 1 : 0);
                         const noteId = `n-${perekIndex}-${halachaIndex}-${idx}`;
                         const isPatuach = patuachNoteIdxs.has(idx);
                         const swap = swapMap.get(idx);
