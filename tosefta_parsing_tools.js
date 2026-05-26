@@ -675,6 +675,13 @@ function shouldHideVariant(svText, varText, options, isMultiWitnessReading) {
         hideReasons.push("single-witness");
     }
 
+    if (options.hideSoleWitnessSigla instanceof Set && options.hideSoleWitnessSigla.size > 0) {
+        const witnesses = String(options.readingWitnesses || "").trim().split(/\s+/).filter(Boolean);
+        if (witnesses.length === 1 && options.hideSoleWitnessSigla.has(witnesses[0])) {
+            hideReasons.push(`sole-witness:${witnesses[0]}`);
+        }
+    }
+
     if (options.hideAbbreviations && classification.reason.includes("abbreviation")) {
         hideReasons.push("abbreviation");
     }
