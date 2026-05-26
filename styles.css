@@ -220,6 +220,21 @@ body {
     background: #6b5b47;
 }
 
+#export-docx {
+    margin-top: 6px;
+    background: #fff;
+    color: #6b5b47;
+}
+
+#export-docx:hover {
+    background: #ece7de;
+}
+
+#export-docx:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
 /* --- Filter sections (using <details>) --- */
 .filters-section details {
     background: #fff;

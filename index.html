@@ -29,6 +29,7 @@
                 <label for="masechet-dropdown">בחירת מסכת:</label>
                 <select id="masechet-dropdown"></select>
                 <button id="load-masechet">טען</button>
+                <button id="export-docx">ייצוא ל‑Word</button>
             </div>
 
             <section class="filters-section sotah-panel" id="sotah-panel" hidden>
@@ -599,6 +600,193 @@ function getHideSoleWitnessSigla() {
     });
     return sigla;
 }
+
+// --- DOCX export (lazy-loads docx.js from CDN on first use) ---
+
+let _docxLibPromise = null;
+function loadDocxLib() {
+    if (window.docx) return Promise.resolve(window.docx);
+    if (_docxLibPromise) return _docxLibPromise;
+    _docxLibPromise = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/docx@9.0.2/build/index.umd.js';
+        s.onload = () => window.docx ? resolve(window.docx) : reject(new Error('docx global missing'));
+        s.onerror = () => reject(new Error('failed to load docx library'));
+        document.head.appendChild(s);
+    });
+    return _docxLibPromise;
+}
+
+function getExportSettings() {
+    return {
+        hiddenCategories: getHiddenCategoriesSet(),
+        hiddenReasonDetails: getHiddenReasonDetailsSet(),
+        hideSoleWitnessSigla: getHideSoleWitnessSigla(),
+        eclectic: document.getElementById('eclecticText').checked,
+    };
+}
+
+// Build the footnote text for one apparatus note, honoring the active filters
+// and the eclectic inversion. Returns null when the note has no visible content.
+function buildFootnotePlain(note, settings, swap) {
+    if (typeof note !== 'string') return null;
+    if (!note.includes('|')) {
+        if (note.startsWith('<b>כי"ע</b>')) return null; // Sotah Erfurt block — ignored
+        const t = stripMarkup(note).trim();
+        return t || null;
+    }
+    const parsed = parseNote3(note, null);
+    if (typeof parsed === 'string') return stripMarkup(parsed).trim() || null;
+    if (!Array.isArray(parsed) || parsed.length < 2) return null;
+    let sv = parsed[0], vars = parsed[1];
+    const affirming = parsed.length === 3 ? parsed[2] : null;
+    if (!Array.isArray(vars)) return null;
+
+    if (swap && swap.applied && !swap.isOmission) {
+        const origLemma = sv[0];
+        vars = vars.map(([w, t]) =>
+            (w === swap.altWitnesses && stripMarkup(t).trim() === swap.altText) ? ['ב', origLemma] : [w, t]);
+        sv = [swap.altText, sv[1]];
+    }
+
+    const multi = isMultiWitness(vars);
+    const visible = [];
+    vars.forEach(([wit, vt]) => {
+        const d = shouldHideVariant(sv[0], vt, {
+            hideSoleWitnessSigla: settings.hideSoleWitnessSigla,
+            readingWitnesses: wit,
+            hiddenCategories: settings.hiddenCategories,
+            hiddenReasonDetails: settings.hiddenReasonDetails,
+        }, multi);
+        if (!d.hidden) visible.push(`${stripMarkup(wit)} ${stripMarkup(vt)}`.trim());
+    });
+    if (!visible.length) return null;
+
+    let svLabel = stripMarkup(sv[0]).trim();
+    if (sv[1]) svLabel += ' ' + stripMarkup(sv[1]).trim();
+    if (affirming) svLabel += ' כ״ה ' + stripMarkup(affirming).trim() + '.';
+    return `${svLabel} | ${visible.join('. ')}.`;
+}
+
+// Build the runs for one halakha paragraph (Vienna text + footnote refs +
+// eclectic-swap coloring). ctx = { docx, settings, footnotes, fnId }.
+function buildHalakhaRuns(bodyText, halakhaVars, hi, isKiy, ctx) {
+    const { docx, settings } = ctx;
+    const runs = [new docx.TextRun({ text: `${hi + 1}. `, bold: true, rightToLeft: true })];
+    const offset = isKiy ? 1 : 0;
+
+    const swapByNote = new Map();
+    if (settings.eclectic) {
+        halakhaVars.forEach((vi, idx) => {
+            if (typeof vi !== 'string' || !vi.includes('|')) return;
+            const parsed = parseNote3(vi, null);
+            if (!Array.isArray(parsed)) return;
+            const swap = findEclecticSwap(parsed[0], parsed[1], parsed.length === 3 ? parsed[2] : null);
+            if (swap) swapByNote.set(idx, swap);
+        });
+    }
+
+    const segs = bodyText.split(/<i data-commentator="Variants" data-label="[^"]*" data-order="\d+"><\/i>/);
+    segs.forEach((seg, si) => {
+        let segText = stripMarkup(seg);
+        // Eclectic lemma: the swapped lemma is the first word of this segment
+        // (the marker for note si-1 sits just before it).
+        const lemmaNoteIdx = (si - 1) + offset;
+        const swap = si > 0 ? swapByNote.get(lemmaNoteIdx) : null;
+        if (swap && segText.trim()) {
+            const m = segText.match(/^(\s*)(\S+)([\s\S]*)$/);
+            const firstWord = m ? m[2].replace(/[.,;:!?׳״]+$/, '') : null;
+            if (m && firstWord === swap.lemma) {
+                swap.applied = true;
+                if (m[1]) runs.push(new docx.TextRun({ text: m[1], rightToLeft: true }));
+                if (swap.isOmission) {
+                    runs.push(new docx.TextRun({ text: m[3].replace(/^\s*/, ''), rightToLeft: true }));
+                } else {
+                    runs.push(new docx.TextRun({ text: swap.altText, color: '2D7A3E', rightToLeft: true }));
+                    runs.push(new docx.TextRun({ text: m[3], rightToLeft: true }));
+                }
+            } else if (segText) {
+                runs.push(new docx.TextRun({ text: segText, rightToLeft: true }));
+            }
+        } else if (segText) {
+            runs.push(new docx.TextRun({ text: segText, rightToLeft: true }));
+        }
+
+        // Footnote at the marker following this segment.
+        if (si < segs.length - 1) {
+            const note = halakhaVars[si + offset];
+            const fnText = buildFootnotePlain(note, settings, swapByNote.get(si + offset));
+            if (fnText) {
+                const id = ++ctx.fnId;
+                ctx.footnotes[id] = {
+                    children: [new docx.Paragraph({
+                        bidirectional: true,
+                        children: [new docx.TextRun({ text: fnText, rightToLeft: true })],
+                    })],
+                };
+                runs.push(new docx.FootnoteReferenceRun(id));
+            }
+        }
+    });
+    return runs;
+}
+
+async function exportToDocx() {
+    if (!currentTextData || !currentVariantsData) { alert('יש לטעון מסכת תחילה.'); return; }
+    const btn = document.getElementById('export-docx');
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = 'מייצא…';
+    try {
+        const docx = await loadDocxLib();
+        const settings = getExportSettings();
+        const ctx = { docx, settings, footnotes: {}, fnId: 0 };
+        const title = currentTextData.heTitle || (currentVariantsData.title || '').replace('Variants on ', '');
+
+        const children = [new docx.Paragraph({
+            heading: docx.HeadingLevel.HEADING_1,
+            bidirectional: true,
+            alignment: docx.AlignmentType.CENTER,
+            children: [new docx.TextRun({ text: title, bold: true, rightToLeft: true })],
+        })];
+
+        currentTextData.text.forEach((perek, pi) => {
+            const chapterVars = (currentVariantsData.text && currentVariantsData.text[pi]) || [];
+            const isKiy = isKiyChapter(chapterVars);
+            children.push(new docx.Paragraph({
+                heading: docx.HeadingLevel.HEADING_2,
+                bidirectional: true,
+                alignment: docx.AlignmentType.CENTER,
+                children: [new docx.TextRun({ text: 'פרק ' + convert_number(pi + 1), bold: true, rightToLeft: true })],
+            }));
+            perek.forEach((bodyText, hi) => {
+                const halakhaVars = chapterVars[hi] || [];
+                children.push(new docx.Paragraph({
+                    bidirectional: true,
+                    spacing: { after: 120 },
+                    children: buildHalakhaRuns(bodyText, halakhaVars, hi, isKiy, ctx),
+                }));
+            });
+        });
+
+        const doc = new docx.Document({ footnotes: ctx.footnotes, sections: [{ properties: {}, children }] });
+        const blob = await docx.Packer.toBlob(doc);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = (title || 'tosefta').replace(/\s+/g, '_') + '.docx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.error(e);
+        alert('שגיאה בייצוא ל‑Word: ' + e.message);
+    } finally {
+        btn.disabled = false; btn.textContent = orig;
+    }
+}
+
+document.getElementById('export-docx').addEventListener('click', exportToDocx);
 
 function displayTextAndVariants(textData, variantsData){
     const contentContainer = document.getElementById('content-container');
