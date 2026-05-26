@@ -146,7 +146,6 @@
         if (reason.startsWith('citation_scope:')) return { key: 'citation_scope', hebrew: 'היקף ציטוט' };
         if (reason.startsWith('minor addition/omission:')) return { key: 'minor_add_omit', hebrew: 'תוספת/השמטה קלה' };
         if (reason.startsWith('addition/omission:')) return { key: 'add_omit', hebrew: 'תוספת/השמטה' };
-        if (reason === 'single letter difference') return { key: 'single_letter', hebrew: 'הבדל אות בודדת' };
         if (reason.startsWith('word order')) return { key: 'word_order', hebrew: 'סדר מילים' };
         return { key: reason, hebrew: reason };
     }
@@ -168,7 +167,6 @@
         }
         if (reason.startsWith('minor addition/omission: ')) return 'תוספת/השמטה: ' + reason.split(': ')[1];
         if (reason.startsWith('addition/omission: ')) return 'תוספת/השמטה: ' + reason.split(': ')[1];
-        if (reason === 'single letter difference') return 'הבדל אות בודדת';
         if (reason === 'word order difference') return 'סדר מילים';
         if (reason === 'word order difference (with prefixes)') return 'סדר מילים (עם תחיליות)';
         return reason;

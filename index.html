@@ -177,11 +177,7 @@
             if (reason.startsWith('addition/omission:')) {
                 return { key: 'add_omit', hebrew: 'תוספת/השמטה' };
             }
-            // Single letter difference
-            if (reason === 'single letter difference') {
-                return { key: 'single_letter', hebrew: 'הבדל אות בודדת' };
-            }
-            // Word order
+// Word order
             if (reason.startsWith('word order')) {
                 return { key: 'word_order', hebrew: 'סדר מילים' };
             }
@@ -207,8 +203,7 @@
             }
             if (reason.startsWith('minor addition/omission: ')) return 'תוספת/השמטה: ' + reason.split(': ')[1];
             if (reason.startsWith('addition/omission: ')) return 'תוספת/השמטה: ' + reason.split(': ')[1];
-            if (reason === 'single letter difference') return 'הבדל אות בודדת';
-            if (reason === 'word order difference') return 'סדר מילים';
+if (reason === 'word order difference') return 'סדר מילים';
             if (reason === 'word order difference (with prefixes)') return 'סדר מילים (עם תחיליות)';
             return reason;
         }

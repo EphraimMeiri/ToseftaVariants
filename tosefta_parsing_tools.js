@@ -637,28 +637,6 @@ function classifyVariantPair(v1, v2) {
         }
     }
 
-    if (Math.abs(a.length - b.length) <= 1 && Math.max(a.length, b.length) <= 8) {
-        const longer = a.length >= b.length ? a : b;
-        const shorter = a.length >= b.length ? b : a;
-
-        let diffCount = 0;
-        let j = 0;
-
-        for (let i = 0; i < longer.length; i++) {
-            if (j < shorter.length && longer[i] === shorter[j]) {
-                j += 1;
-            } else {
-                diffCount += 1;
-            }
-        }
-
-        diffCount += shorter.length - j;
-
-        if (diffCount === 1) {
-            return { category: "other_minor", confidence: "medium", reason: "single letter difference" };
-        }
-    }
-
     const wordsA = a.split(/\s+/).filter(Boolean);
     const wordsB = b.split(/\s+/).filter(Boolean);
     if (wordsA.length === wordsB.length) {
