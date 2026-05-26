@@ -31,6 +31,13 @@
                 <button id="load-masechet">טען</button>
             </div>
 
+            <section class="filters-section sotah-panel" id="sotah-panel" hidden>
+                <div class="panel-title">תצוגת סוטה (כי״ע)</div>
+                <label><input type="radio" name="sotahMode" value="default" checked> רגיל</label>
+                <label><input type="radio" name="sotahMode" value="collapse"> כיווץ קטע ערפורט</label>
+                <label><input type="radio" name="sotahMode" value="two-col"> שתי עמודות</label>
+            </section>
+
             <section class="filters-section">
                 <label class="filter-toggle"><input type="checkbox" id="showHidden"> הצג חילופים מוסתרים</label>
 
@@ -662,6 +669,14 @@ function displayTextAndVariants(textData, variantsData){
         const textArray = textData.text;
         const variantsArray = variantsData.text;
         const masechet = variantsData.title.split("Variants on ")[1];
+
+        // Detect כי"ע chapters and reveal the Sotah panel only when relevant.
+        const anyKiyChapter = variantsArray.some(ch => isKiyChapter(ch));
+        const sotahPanel = document.getElementById('sotah-panel');
+        sotahPanel.hidden = !anyKiyChapter;
+        const sotahModeInput = document.querySelector('input[name="sotahMode"]:checked');
+        const sotahMode = sotahModeInput ? sotahModeInput.value : 'default';
+
         textArray.forEach((textPerek, perekIndex) => {
             // Add chapter header
             const chapterHeader = document.createElement('h2');
@@ -670,9 +685,14 @@ function displayTextAndVariants(textData, variantsData){
             chapterHeader.textContent = `פרק ${ convert_number(perekIndex + 1)}`;
             contentContainer.appendChild(chapterHeader);
 
+            const chapterIsKiy = isKiyChapter(variantsArray[perekIndex]);
+
             textPerek.forEach((textItem, halachaIndex) => {
                 const paragraphPair = document.createElement('div');
                 paragraphPair.className = 'paragraph-pair';
+                if (chapterIsKiy && sotahMode === 'two-col') {
+                    paragraphPair.classList.add('two-col-kiy');
+                }
                 paragraphPair.id = `hal-${perekIndex}-${halachaIndex}`;
 
                 // Add paragraph (halacha) number
@@ -748,6 +768,19 @@ function displayTextAndVariants(textData, variantsData){
                 );
                 textParagraph.innerHTML = updatedText;
 
+                // Sotah two-column mode: render Erfurt parallel as a sibling
+                // column. The Erfurt text lives in the first apparatus entry.
+                let erfurtParagraph = null;
+                if (chapterIsKiy && sotahMode === 'two-col') {
+                    const firstNote = variantsArray[perekIndex][halachaIndex] && variantsArray[perekIndex][halachaIndex][0];
+                    const erfurtText = extractErfurtText(firstNote);
+                    if (erfurtText) {
+                        erfurtParagraph = document.createElement('p');
+                        erfurtParagraph.className = 'erfurt-content';
+                        erfurtParagraph.innerHTML = erfurtText;
+                    }
+                }
+
                 // Containers for visible and hidden variants
                 const variantParagraph = document.createElement('div');
                 variantParagraph.className = 'variant-content';
@@ -767,6 +800,20 @@ function displayTextAndVariants(textData, variantsData){
 
                         const loc = [masechet, perekIndex, halachaIndex];
                         if (!variantItem.includes("|")) {
+                            // Special-case the כי"ע Erfurt block: in Sotah 3-15 the
+                            // first apparatus entry is the entire Erfurt parallel.
+                            if (chapterIsKiy && typeof variantItem === 'string' && variantItem.startsWith('<b>כי"ע</b>')) {
+                                if (sotahMode === 'two-col') {
+                                    // The Erfurt text is shown in its own column;
+                                    // omit it from the apparatus to avoid duplication.
+                                    return;
+                                }
+                                if (sotahMode === 'collapse') {
+                                    const erfurtText = extractErfurtText(variantItem) || '';
+                                    variantParagraph.innerHTML += `<details class="kiy-block"><summary>כי"ע (קטע ערפורט)</summary><div>${erfurtText}</div></details> `;
+                                    return;
+                                }
+                            }
                             console.log("No pipe",loc,variantItem);
                             variantParagraph.innerHTML += `<span class="note-span" data-note-id="${noteId}"><sup>*</sup> ${variantItem}</span> `;
                             return;
@@ -875,6 +922,7 @@ function displayTextAndVariants(textData, variantsData){
                 }
 
                 paragraphPair.appendChild(textParagraph);
+                if (erfurtParagraph) paragraphPair.appendChild(erfurtParagraph);
                 paragraphPair.appendChild(variantParagraph);
                 paragraphPair.appendChild(hiddenVariantParagraph);
                 contentContainer.appendChild(paragraphPair);
@@ -919,6 +967,9 @@ function displayTextAndVariants(textData, variantsData){
     });
     document.querySelectorAll('.hide-sole-witness-siglum').forEach(cb => {
         cb.onchange = updateDisplay;
+    });
+    document.querySelectorAll('input[name="sotahMode"]').forEach(rb => {
+        rb.onchange = updateDisplay;
     });
 
 }

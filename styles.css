@@ -337,6 +337,70 @@ body {
     font-weight: 600;
 }
 
+/* Sotah display panel */
+.sotah-panel .panel-title {
+    font-weight: 600;
+    font-size: 0.9em;
+    margin-bottom: 4px;
+    color: #3a2e20;
+}
+
+.sotah-panel label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85em;
+    padding: 2px 0;
+    cursor: pointer;
+}
+
+/* Sotah two-column layout: Vienna right, Erfurt left, apparatus below */
+.paragraph-pair.two-col-kiy {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 24px;
+    grid-template-areas:
+        "text erfurt"
+        "variants variants"
+        "hidden hidden";
+}
+
+.paragraph-pair.two-col-kiy > .text-content { grid-area: text; }
+.paragraph-pair.two-col-kiy > .erfurt-content { grid-area: erfurt; }
+.paragraph-pair.two-col-kiy > .variant-content { grid-area: variants; }
+.paragraph-pair.two-col-kiy > .hidden-variant-content { grid-area: hidden; }
+
+.erfurt-content {
+    font-family: 'Frank Ruhl Libre', 'Times New Roman', serif;
+    line-height: 1.7;
+    color: #3a2e20;
+    border-right: 2px solid #c8b9a0;
+    padding-right: 12px;
+    margin: 0;
+}
+
+/* Collapsed כי"ע block in default-mode apparatus */
+.kiy-block {
+    background: #f7f4ef;
+    border: 1px solid #e0dbd4;
+    border-radius: 4px;
+    padding: 6px 10px;
+    margin: 4px 0;
+    font-size: 0.92em;
+}
+
+.kiy-block > summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #3a2e20;
+}
+
+.kiy-block > div {
+    padding-top: 6px;
+    border-top: 1px solid #e0dbd4;
+    margin-top: 6px;
+}
+
 /* Indented child filters */
 .filter-children {
     padding-right: 22px;

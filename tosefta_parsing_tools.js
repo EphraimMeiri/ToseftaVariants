@@ -823,6 +823,23 @@ function isMultiWitness(vars) {
     return vars.length > 1 || String(vars[0][0] || "").includes(" ");
 }
 
+// Detect a chapter that uses the כי"ע format (Sotah 3-15): every halakha's
+// first apparatus entry is a single block holding the entire Erfurt parallel
+// text rather than ordinary `LEMMA | witness reading` notes.
+function isKiyChapter(variantsChapter) {
+    if (!Array.isArray(variantsChapter) || variantsChapter.length === 0) return false;
+    return variantsChapter.every(h => Array.isArray(h) && h.length > 0
+        && typeof h[0] === "string" && h[0].startsWith('<b>כי"ע</b>'));
+}
+
+function extractErfurtText(firstVariant) {
+    if (typeof firstVariant !== "string" || !firstVariant.startsWith('<b>כי"ע</b>')) return null;
+    let text = firstVariant.replace(/^<b>כי"ע<\/b>(<br>)?/, "");
+    const slik = text.indexOf("<br>סליק");
+    if (slik !== -1) text = text.substring(0, slik);
+    return text.trim();
+}
+
 const ECLECTIC_FULL_WITNESSES = new Set(["א", "ד", "ל"]);
 
 // Recognize apparatus shorthand meaning "the word is absent in this witness":
