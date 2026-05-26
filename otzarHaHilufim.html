@@ -44,37 +44,28 @@
                     <label class="mode-label"><input type="radio" name="filterMode" value="show"> הצג מסומנים בלבד</label>
                 </div>
 
-                <details open>
-                    <summary>כתיב</summary>
-                    <div class="filter-body">
-                        <label class="filter-parent"><input type="checkbox" id="hideMinorOrthography"> כתיב משני</label>
-                        <div class="filter-children" data-parent="hideMinorOrthography">
-                            <div class="detail-slot" data-category="minor_orthography"></div>
-                        </div>
-                        <label><input type="checkbox" id="hideNameOrthography"> כתיב שמות</label>
-                        <div class="filter-children" data-parent="hideNameOrthography">
-                            <div class="detail-slot" data-category="name_orthography"></div>
-                        </div>
+                <div class="filter-body">
+                    <label class="filter-parent"><input type="checkbox" id="hideMinorOrthography"> כתיב חלופי</label>
+                    <div class="filter-children" data-parent="hideMinorOrthography">
+                        <div class="detail-slot" data-category="minor_orthography"></div>
                     </div>
-                </details>
-
-                <details open>
-                    <summary>תוכן</summary>
-                    <div class="filter-body">
-                        <label class="filter-parent"><input type="checkbox" id="hideOtherMinor"> שוני משני</label>
-                        <div class="filter-children" data-parent="hideOtherMinor">
-                            <div class="detail-slot" data-category="other_minor"></div>
-                        </div>
-                        <label><input type="checkbox" id="hideMinor"> שוני קל</label>
-                        <div class="filter-children" data-parent="hideMinor">
-                            <div class="detail-slot" data-category="minor"></div>
-                        </div>
-                        <label><input type="checkbox" id="hideCitationScope"> היקף ציטוט</label>
-                        <div class="filter-children" data-parent="hideCitationScope">
-                            <div class="detail-slot" data-category="citation_scope"></div>
-                        </div>
+                    <label class="filter-parent"><input type="checkbox" id="hideNameOrthography"> כתיב שמות</label>
+                    <div class="filter-children" data-parent="hideNameOrthography">
+                        <div class="detail-slot" data-category="name_orthography"></div>
                     </div>
-                </details>
+                    <label class="filter-parent"><input type="checkbox" id="hideMinor"> חילופי אותיות</label>
+                    <div class="filter-children" data-parent="hideMinor">
+                        <div class="detail-slot" data-category="minor"></div>
+                    </div>
+                    <label class="filter-parent"><input type="checkbox" id="hideOtherMinor"> שינויים בינוניים</label>
+                    <div class="filter-children" data-parent="hideOtherMinor">
+                        <div class="detail-slot" data-category="other_minor"></div>
+                    </div>
+                    <label class="filter-parent"><input type="checkbox" id="hideCitationScope"> היקף ציטוט</label>
+                    <div class="filter-children" data-parent="hideCitationScope">
+                        <div class="detail-slot" data-category="citation_scope"></div>
+                    </div>
+                </div>
 
                 <div class="status-bar">
                     מוצגות <strong><span id="visible-count">0</span></strong> שורות מתוך <strong><span id="total-count">0</span></strong>
@@ -146,6 +137,10 @@
         if (reason.includes('mem/nun')) return { key: 'mem_nun', hebrew: 'חלופי ם/ן' };
         if (reason.startsWith('prefix difference:')) return { key: 'prefix_diff', hebrew: 'הבדלי תחיליות' };
         if (reason.startsWith('prefix swap:')) return { key: 'prefix_swap', hebrew: 'חילופי תחיליות' };
+        if (reason === 'orthography') return { key: 'ortho_pair', hebrew: 'חילוף ידוע' };
+        if (reason === 'orthography: אי/יי') return { key: 'ortho_alef_yod', hebrew: 'אי/יי' };
+        if (reason === 'orthography: ת/ה final') return { key: 'ortho_tav_heh', hebrew: 'ת/ה סופית' };
+        if (reason === 'orthography: ה/ן final') return { key: 'ortho_heh_nun', hebrew: 'ה/ן סופית' };
         if (reason.startsWith('orthography')) return { key: 'orthography', hebrew: 'כתיב חלופי' };
         if (reason === 'rabbi name variant') return { key: 'rabbi_name', hebrew: 'שמות חכמים' };
         if (reason.startsWith('citation_scope:')) return { key: 'citation_scope', hebrew: 'היקף ציטוט' };
@@ -180,10 +175,10 @@
     }
 
     const CATEGORY_HEBREW = {
-        minor_orthography: 'כתיב משני',
+        minor_orthography: 'כתיב חלופי',
         name_orthography: 'כתיב שמות',
-        other_minor: 'שוני משני',
-        minor: 'שוני קל',
+        other_minor: 'שינויים בינוניים',
+        minor: 'חילופי אותיות',
         citation_scope: 'היקף ציטוט',
         major: 'שוני מהותי',
         skip: 'דילוג'

@@ -35,37 +35,28 @@
                 <label class="filter-toggle"><input type="checkbox" id="showHidden"> הצג חילופים מוסתרים</label>
                 <label class="filter-toggle"><input type="checkbox" id="multiwitness"> הסתר חילופים מעד יחיד</label>
 
-                <details open>
-                    <summary>כתיב</summary>
-                    <div class="filter-body">
-                        <label class="filter-parent"><input type="checkbox" id="hideMinorOrthography"> כתיב משני</label>
-                        <div class="filter-children" data-parent="hideMinorOrthography">
-                            <div class="detail-slot" data-category="minor_orthography"></div>
-                        </div>
-                        <label><input type="checkbox" id="hideNameOrthography"> כתיב שמות</label>
-                        <div class="filter-children" data-parent="hideNameOrthography">
-                            <div class="detail-slot" data-category="name_orthography"></div>
-                        </div>
+                <div class="filter-body">
+                    <label class="filter-parent"><input type="checkbox" id="hideMinorOrthography"> כתיב חלופי</label>
+                    <div class="filter-children" data-parent="hideMinorOrthography">
+                        <div class="detail-slot" data-category="minor_orthography"></div>
                     </div>
-                </details>
-
-                <details open>
-                    <summary>תוכן</summary>
-                    <div class="filter-body">
-                        <label class="filter-parent"><input type="checkbox" id="hideOtherMinor"> שוני משני</label>
-                        <div class="filter-children" data-parent="hideOtherMinor">
-                            <div class="detail-slot" data-category="other_minor"></div>
-                        </div>
-                        <label><input type="checkbox" id="hideMinor"> שוני קל</label>
-                        <div class="filter-children" data-parent="hideMinor">
-                            <div class="detail-slot" data-category="minor"></div>
-                        </div>
-                        <label><input type="checkbox" id="hideCitationScope"> היקף ציטוט</label>
-                        <div class="filter-children" data-parent="hideCitationScope">
-                            <div class="detail-slot" data-category="citation_scope"></div>
-                        </div>
+                    <label class="filter-parent"><input type="checkbox" id="hideNameOrthography"> כתיב שמות</label>
+                    <div class="filter-children" data-parent="hideNameOrthography">
+                        <div class="detail-slot" data-category="name_orthography"></div>
                     </div>
-                </details>
+                    <label class="filter-parent"><input type="checkbox" id="hideMinor"> חילופי אותיות</label>
+                    <div class="filter-children" data-parent="hideMinor">
+                        <div class="detail-slot" data-category="minor"></div>
+                    </div>
+                    <label class="filter-parent"><input type="checkbox" id="hideOtherMinor"> שינויים בינוניים</label>
+                    <div class="filter-children" data-parent="hideOtherMinor">
+                        <div class="detail-slot" data-category="other_minor"></div>
+                    </div>
+                    <label class="filter-parent"><input type="checkbox" id="hideCitationScope"> היקף ציטוט</label>
+                    <div class="filter-children" data-parent="hideCitationScope">
+                        <div class="detail-slot" data-category="citation_scope"></div>
+                    </div>
+                </div>
 
                 <div class="status-bar">
                     הוסתרו <strong><span id="hidden_count">0</span></strong> חילופים מתוך <strong><span id="total_count">0</span></strong>
@@ -154,7 +145,19 @@
             if (reason.startsWith('prefix swap:')) {
                 return { key: 'prefix_swap', hebrew: 'חילופי תחיליות' };
             }
-            // Orthography variants (minor category)
+            // Letter-swap orthography (minor category) — split per swap kind
+            if (reason === 'orthography') {
+                return { key: 'ortho_pair', hebrew: 'חילוף ידוע' };
+            }
+            if (reason === 'orthography: אי/יי') {
+                return { key: 'ortho_alef_yod', hebrew: 'אי/יי' };
+            }
+            if (reason === 'orthography: ת/ה final') {
+                return { key: 'ortho_tav_heh', hebrew: 'ת/ה סופית' };
+            }
+            if (reason === 'orthography: ה/ן final') {
+                return { key: 'ortho_heh_nun', hebrew: 'ה/ן סופית' };
+            }
             if (reason.startsWith('orthography')) {
                 return { key: 'orthography', hebrew: 'כתיב חלופי' };
             }
