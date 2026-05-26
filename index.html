@@ -35,6 +35,7 @@
                 <label class="filter-toggle"><input type="checkbox" id="showHidden"> הצג חילופים מוסתרים</label>
 
                 <div class="filter-body">
+                    <label class="filter-parent"><input type="checkbox" id="eclecticText"> טקסט אקלקטי <span class="detail-count">(החלף וינה כשעדים חולקים)</span></label>
                     <details class="filter-collapse">
                         <summary><label class="filter-parent"><input type="checkbox" id="hideParagraphBreak" checked onclick="event.stopPropagation()"> הסתר ציוני פתוח/סתום</label></summary>
                         <div class="filter-extra">
@@ -676,20 +677,32 @@ function displayTextAndVariants(textData, variantsData){
                 paragraphNumber.textContent = halachaIndex + 1;
                 paragraphPair.appendChild(paragraphNumber);
 
-                // Pre-scan apparatus to find note indices that mark פתוח —
-                // when the user enables the line-break option we inject a <br>
-                // at those markers in the body text.
+                // Pre-scan apparatus per halakha: identify
+                //   - note indices with פתוח readings (for line-break injection)
+                //   - eclectic swap candidates (note index → swap info)
                 const showPatuachLineBreaks = document.getElementById('paragraphBreakLineBreaks').checked;
+                const eclecticEnabled = document.getElementById('eclecticText').checked;
                 const patuachNoteIdxs = new Set();
-                if (showPatuachLineBreaks && variantsArray[perekIndex] && Array.isArray(variantsArray[perekIndex][halachaIndex])) {
+                const swapMap = new Map();  // idx → { lemma, altText, altWitnesses, origLemmaRaw }
+                if (variantsArray[perekIndex] && Array.isArray(variantsArray[perekIndex][halachaIndex])) {
                     variantsArray[perekIndex][halachaIndex].forEach((variantItem, idx) => {
                         if (typeof variantItem !== "string" || !variantItem.includes("|")) return;
                         const parsed = parseNote3(variantItem, [masechet, perekIndex, halachaIndex]);
                         if (!Array.isArray(parsed)) return;
+                        const sv = parsed[0];
                         const vars = parsed[1];
+                        const affirming = parsed.length === 3 ? parsed[2] : null;
                         if (!Array.isArray(vars)) return;
-                        const hasPatuach = vars.some(([, t]) => /^\s*פתוח\s*$/.test(String(t || "").replace(/<[^>]+>/g, "")));
-                        if (hasPatuach) patuachNoteIdxs.add(idx);
+
+                        if (showPatuachLineBreaks) {
+                            const hasPatuach = vars.some(([, t]) => /^\s*פתוח\s*$/.test(String(t || "").replace(/<[^>]+>/g, "")));
+                            if (hasPatuach) patuachNoteIdxs.add(idx);
+                        }
+
+                        if (eclecticEnabled) {
+                            const swap = findEclecticSwap(sv, vars, affirming);
+                            if (swap) swapMap.set(idx, swap);
+                        }
                     });
                 }
 
@@ -703,13 +716,24 @@ function displayTextAndVariants(textData, variantsData){
                 const updatedText = textItem.replace(
                     /<i data-commentator="Variants" data-label="([^"]+)" data-order="\d+"><\/i>(\S+)?/g,
                     (match, label, lemmaToken) => {
-                        const noteId = `n-${perekIndex}-${halachaIndex}-${supIndex}`;
-                        const isPatuach = patuachNoteIdxs.has(supIndex);
-                        supIndex++;
+                        const idx = supIndex++;
+                        const noteId = `n-${perekIndex}-${halachaIndex}-${idx}`;
+                        const isPatuach = patuachNoteIdxs.has(idx);
+                        const swap = swapMap.get(idx);
                         const sup = `<sup class="note-ref" data-note-id="${noteId}">${label}</sup>`;
-                        const tail = lemmaToken || '';
                         const suffix = isPatuach ? '<br>' : '';
-                        return sup + tail + suffix;
+                        // For eclectic swaps, the lemma in the body has exactly the
+                        // word in swap.lemma — replace it with the alt in green.
+                        if (swap && lemmaToken) {
+                            // Strip trailing punctuation/spaces for the comparison
+                            const tokenWord = lemmaToken.replace(/[,.;:!?׳״]+$/, '');
+                            const tokenPunct = lemmaToken.slice(tokenWord.length);
+                            if (tokenWord === swap.lemma) {
+                                swap.applied = true;
+                                return `${sup}<span class="eclectic-swap" data-note-id="${noteId}">${swap.altText}</span>${tokenPunct}${suffix}`;
+                            }
+                        }
+                        return sup + (lemmaToken || '') + suffix;
                     }
                 );
                 textParagraph.innerHTML = updatedText;
@@ -727,6 +751,7 @@ function displayTextAndVariants(textData, variantsData){
                     }
                     let noteIdx = 0;
                     variantsArray[perekIndex][halachaIndex].forEach(variantItem => {
+                        const currentNoteIdx = noteIdx;
                         const noteId = `n-${perekIndex}-${halachaIndex}-${noteIdx}`;
                         noteIdx++;
 
@@ -747,6 +772,23 @@ function displayTextAndVariants(textData, variantsData){
                                 total_count++;
                                 variantParagraph.innerHTML += `<span class="note-span" data-note-id="${noteId}">${variantItem}</span> `;
                                 return;
+                            }
+
+                            // Apparatus inversion: when an eclectic swap has been
+                            // applied for this note, swap the lemma and the alt
+                            // reading. The new lemma is the alt text; the new
+                            // reading is the body text (Vienna's reading), cited
+                            // for ב alone since by definition only ב supported it.
+                            const swap = swapMap.get(currentNoteIdx);
+                            if (swap && swap.applied) {
+                                const origLemma = sv[0];
+                                vars = vars.map(([w, t]) => {
+                                    if (w === swap.altWitnesses && (t || '').replace(/<[^>]+>/g, '').trim() === swap.altText) {
+                                        return ["ב", origLemma];
+                                    }
+                                    return [w, t];
+                                });
+                                sv = [swap.altText, sv[1]];
                             }
 
                             // Build SV header fragment (inline)
@@ -856,7 +898,8 @@ function displayTextAndVariants(textData, variantsData){
         hideCitationScopeCheckbox,
         document.getElementById('hideSoleWitness'),
         document.getElementById('hideParagraphBreak'),
-        document.getElementById('paragraphBreakLineBreaks')
+        document.getElementById('paragraphBreakLineBreaks'),
+        document.getElementById('eclecticText')
     ].forEach(cb => {
         cb.onchange = updateDisplay;
     });

@@ -817,6 +817,39 @@ function isMultiWitness(vars) {
     return vars.length > 1 || String(vars[0][0] || "").includes(" ");
 }
 
+const ECLECTIC_FULL_WITNESSES = new Set(["א", "ד", "ל"]);
+
+// Returns the first alternate reading that meets the eclectic-swap rule:
+// - affirmingWitnesses is empty (Vienna alone supports the body)
+// - the alt's witnesses include ≥2 non-fragmentary sigla (א/ד/ל)
+// - ב is not among the alt's witnesses
+// - the reading isn't a paragraph_break notation
+// - lemma is a single word (no ellipsis, no spaces)
+// Returns null if no swap should be performed.
+function findEclecticSwap(sv, vars, affirmingWitnesses) {
+    if (affirmingWitnesses) return null;
+    if (!Array.isArray(vars) || vars.length === 0) return null;
+    if (!sv || !sv[0]) return null;
+
+    const lemma = String(sv[0]).trim();
+    if (!lemma || lemma.includes("…")) return null;
+    if (lemma.split(/\s+/).length !== 1) return null;
+
+    for (const [witStr, varText] of vars) {
+        const stripped = String(varText || "").replace(/<[^>]+>/g, "").trim();
+        if (!stripped) continue;
+        if (/^(פתוח|סתום)(\s+(פתוח|סתום))*$/.test(stripped)) continue;
+
+        const wits = String(witStr || "").trim().split(/\s+/).filter(Boolean);
+        if (wits.includes("ב")) continue;
+        const fullCount = wits.filter(w => ECLECTIC_FULL_WITNESSES.has(w)).length;
+        if (fullCount < 2) continue;
+
+        return { lemma, altText: stripped, altWitnesses: witStr };
+    }
+    return null;
+}
+
 function parseNote3(noteTxt, loc = null) {
     let note = String(noteTxt || "");
 

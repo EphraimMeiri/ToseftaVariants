@@ -331,6 +331,12 @@ body {
     content: "▾";
 }
 
+/* Body-text word replaced by the eclectic-text swap */
+.eclectic-swap {
+    color: #2d7a3e;
+    font-weight: 600;
+}
+
 /* Indented child filters */
 .filter-children {
     padding-right: 22px;
