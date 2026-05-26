@@ -693,17 +693,23 @@ function displayTextAndVariants(textData, variantsData){
                     });
                 }
 
-                // Display main text — inject data-note-id on each sup
+                // Display main text — inject data-note-id on each sup, and
+                // for פתוח-tagged markers, inject a <br> AFTER the lemma word
+                // (the next non-whitespace token following the marker) so the
+                // line break visually corresponds to where the paragraph ends.
                 const textParagraph = document.createElement('p');
                 textParagraph.className = 'text-content';
                 let supIndex = 0;
                 const updatedText = textItem.replace(
-                    /<i data-commentator="Variants" data-label="([^"]+)" data-order="\d+"><\/i>/g,
-                    (match, label) => {
+                    /<i data-commentator="Variants" data-label="([^"]+)" data-order="\d+"><\/i>(\S+)?/g,
+                    (match, label, lemmaToken) => {
                         const noteId = `n-${perekIndex}-${halachaIndex}-${supIndex}`;
-                        const prefix = patuachNoteIdxs.has(supIndex) ? '<br>' : '';
+                        const isPatuach = patuachNoteIdxs.has(supIndex);
                         supIndex++;
-                        return `${prefix}<sup class="note-ref" data-note-id="${noteId}">${label}</sup>`;
+                        const sup = `<sup class="note-ref" data-note-id="${noteId}">${label}</sup>`;
+                        const tail = lemmaToken || '';
+                        const suffix = isPatuach ? '<br>' : '';
+                        return sup + tail + suffix;
                     }
                 );
                 textParagraph.innerHTML = updatedText;
