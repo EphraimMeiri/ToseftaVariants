@@ -21,13 +21,11 @@ const toolsCode = fs.readFileSync(toolsPath, 'utf-8');
 // not getToseftaText/getToseftavariants (we'll implement our own fetch below)
 vm.runInThisContext(toolsCode);
 
-// --- Fetch helpers using Node's native fetch ---
+// --- Load helpers (reads self-hosted JSONs from data/variants/) ---
 
 async function fetchVariantsData(location) {
-    const url = variant_url1 + location.replace("Tosefta%20", "Variants%20on%20") + variants_url2;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Failed to fetch ${url}: ${response.status}`);
-    const json = await response.json();
+    const filePath = path.join(__dirname, getVariantUrl(location));
+    const json = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 
     // Same ellipsis normalization as getToseftavariants
     for (let i = 0; i < json.text.length; i++) {

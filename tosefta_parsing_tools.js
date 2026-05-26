@@ -1,7 +1,5 @@
-const url1 = "https://raw.githubusercontent.com/Sefaria/Sefaria-Export/master/json/Tosefta/Lieberman%20Edition/";
-const url2 = "%20(Lieberman)/Hebrew/The%20Tosefta%20according%20to%20to%20codex%20Vienna.%20Third%20Augmented%20Edition%2C%20JTS%202001.json";
-const variant_url1 = "https://raw.githubusercontent.com/Sefaria/Sefaria-Export/master/json/Tosefta/Lieberman%20Edition/Commentary/Variants/";
-const variants_url2 = "/Hebrew/The%20Tosefta%20according%20to%20to%20codex%20Vienna.%20Third%20Augmented%20Edition%2C%20JTS%202001.json";
+const TOSEFTA_DATA_BASE = "data/tosefta/";
+const VARIANTS_DATA_BASE = "data/variants/";
 
 const locations = [
     "Seder%20Zeraim/Tosefta%20Berakhot", "Seder%20Zeraim/Tosefta%20Peah",
@@ -24,11 +22,13 @@ const locations = [
 ];
 
 function getVariantUrl(location) {
-    return variant_url1 + location.replace("Tosefta%20", "Variants%20on%20") + variants_url2;
+    const tractateSlug = location.split("/").pop().replace("Tosefta%20", "Variants_");
+    return VARIANTS_DATA_BASE + tractateSlug + ".json";
 }
 
 function getToseftaUrl(location) {
-    return url1 + location + url2;
+    const tractateSlug = location.split("/").pop();
+    return TOSEFTA_DATA_BASE + tractateSlug + ".json";
 }
 
 function getToseftaText(location) {

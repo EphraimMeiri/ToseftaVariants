@@ -626,8 +626,8 @@
                 const loc = mData.loc;
                 if (!loc) continue;
 
-                const textUrl = url1 + loc + url2;
-                const variantUrl = variant_url1 + loc.replace("Tosefta%20", "Variants%20on%20") + variants_url2;
+                const textUrl = getToseftaUrl(loc);
+                const variantUrl = getVariantUrl(loc);
 
                 let textResp, varResp;
                 try {
