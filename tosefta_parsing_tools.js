@@ -823,6 +823,109 @@ function isMultiWitness(vars) {
     return vars.length > 1 || String(vars[0][0] || "").includes(" ");
 }
 
+// --- Word-level diff helpers (used by Sotah marked/notes display) ---
+
+function stripPunctHe(w) {
+    return String(w || "").replace(/<[^>]+>/g, "").replace(/[,.;:!?״()\[\]"׳']/g, "").trim();
+}
+
+function tokenizeHe(text) {
+    return String(text || "")
+        .replace(/<br\s*\/?\s*>/g, " ")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/g, " ")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+}
+
+// True if two Hebrew words should be treated as equivalent for alignment.
+// Builds on the existing classifier rules so the matcher catches kitzur,
+// haser/maleh, מ/ן final, אי/יי, ת/ה final, ה/ן final, known orthographic
+// pairs, and prefix-only differences (ו/ב/ל/ה/מ/ש/כ).
+function wordsMatchHe(w1, w2) {
+    if (w1 === w2) return true;
+    const a = stripPunctHe(w1);
+    const b = stripPunctHe(w2);
+    if (!a || !b) return false;
+    if (a === b) return true;
+    if (isKitzur(a, b)) return true;
+    if (isMN(a, b)) return true;
+    if (isAlefYodSwap(a, b)) return true;
+    if (isTavHehSwap(a, b)) return true;
+    if (isHehNunFinalSwap(a, b)) return true;
+    if (MINOR_ORTHO_PAIRS.has(createPairKey(a, b))) return true;
+    // Catches haser/maleh, generic minor orthographic patterns
+    const [isMinor] = isMinorOrthographic(a, b);
+    if (isMinor) return true;
+    // Prefix-only differences (one of ו/ב/ל/ה/מ/ש/כ added/removed)
+    for (const pre of PREFIXES) {
+        if (a === pre + b || b === pre + a) return true;
+    }
+    return false;
+}
+
+// LCS-based sequence aligner producing opcodes and a per-A match flag list.
+// opcode tags: 'equal' | 'replace' | 'insert' (b has more) | 'delete' (a has more).
+// Returns { opcodes, matchesA } where matchesA[i] is true if a[i] is part of an
+// equal block (matches the aligned b[j]). Uses wordsMatchHe by default.
+function alignSequencesHe(a, b, eqFn) {
+    eqFn = eqFn || wordsMatchHe;
+    const n = a.length, m = b.length;
+    const dp = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
+    for (let i = 1; i <= n; i++) {
+        for (let j = 1; j <= m; j++) {
+            dp[i][j] = eqFn(a[i - 1], b[j - 1])
+                ? dp[i - 1][j - 1] + 1
+                : Math.max(dp[i - 1][j], dp[i][j - 1]);
+        }
+    }
+    // Walk back to collect matching pairs
+    const pairs = [];
+    let i = n, j = m;
+    while (i > 0 && j > 0) {
+        if (eqFn(a[i - 1], b[j - 1])) {
+            pairs.push([i - 1, j - 1]);
+            i--; j--;
+        } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+            i--;
+        } else {
+            j--;
+        }
+    }
+    pairs.reverse();
+
+    const matchesA = new Array(n).fill(false);
+    pairs.forEach(([ai]) => { matchesA[ai] = true; });
+
+    // Build opcodes by walking the matches
+    const opcodes = [];
+    let ai = 0, bi = 0;
+    for (const [pa, pb] of pairs) {
+        if (pa > ai || pb > bi) {
+            const tag = ai === pa ? "insert" : (bi === pb ? "delete" : "replace");
+            opcodes.push([tag, ai, pa, bi, pb]);
+        }
+        opcodes.push(["equal", pa, pa + 1, pb, pb + 1]);
+        ai = pa + 1; bi = pb + 1;
+    }
+    if (ai < n || bi < m) {
+        const tag = ai === n ? "insert" : (bi === m ? "delete" : "replace");
+        opcodes.push([tag, ai, n, bi, m]);
+    }
+    // Coalesce consecutive equal opcodes
+    const merged = [];
+    for (const op of opcodes) {
+        const last = merged[merged.length - 1];
+        if (last && last[0] === op[0] && last[2] === op[1] && last[4] === op[3]) {
+            last[2] = op[2]; last[4] = op[4];
+        } else {
+            merged.push([...op]);
+        }
+    }
+    return { opcodes: merged, matchesA };
+}
+
 // Detect a chapter that uses the כי"ע format (Sotah 3-15): every halakha's
 // first apparatus entry is a single block holding the entire Erfurt parallel
 // text rather than ordinary `LEMMA | witness reading` notes.

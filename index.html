@@ -36,6 +36,8 @@
                 <label><input type="radio" name="sotahMode" value="default" checked> רגיל</label>
                 <label><input type="radio" name="sotahMode" value="collapse"> כיווץ קטע ערפורט</label>
                 <label><input type="radio" name="sotahMode" value="two-col"> שתי עמודות</label>
+                <label><input type="radio" name="sotahMode" value="marked"> שתי עמודות עם סימון</label>
+                <label><input type="radio" name="sotahMode" value="notes"> הערות שוליים</label>
             </section>
 
             <section class="filters-section">
@@ -690,7 +692,7 @@ function displayTextAndVariants(textData, variantsData){
             textPerek.forEach((textItem, halachaIndex) => {
                 const paragraphPair = document.createElement('div');
                 paragraphPair.className = 'paragraph-pair';
-                if (chapterIsKiy && sotahMode === 'two-col') {
+                if (chapterIsKiy && (sotahMode === 'two-col' || sotahMode === 'marked')) {
                     paragraphPair.classList.add('two-col-kiy');
                 }
                 paragraphPair.id = `hal-${perekIndex}-${halachaIndex}`;
@@ -771,13 +773,54 @@ function displayTextAndVariants(textData, variantsData){
                 // Sotah two-column mode: render Erfurt parallel as a sibling
                 // column. The Erfurt text lives in the first apparatus entry.
                 let erfurtParagraph = null;
-                if (chapterIsKiy && sotahMode === 'two-col') {
+                let kiyNotesPanel = null;
+                if (chapterIsKiy && (sotahMode === 'two-col' || sotahMode === 'marked' || sotahMode === 'notes')) {
                     const firstNote = variantsArray[perekIndex][halachaIndex] && variantsArray[perekIndex][halachaIndex][0];
-                    const erfurtText = extractErfurtText(firstNote);
-                    if (erfurtText) {
-                        erfurtParagraph = document.createElement('p');
-                        erfurtParagraph.className = 'erfurt-content';
-                        erfurtParagraph.innerHTML = erfurtText;
+                    const erfurtRaw = extractErfurtText(firstNote);
+                    if (erfurtRaw) {
+                        if (sotahMode === 'two-col') {
+                            erfurtParagraph = document.createElement('p');
+                            erfurtParagraph.className = 'erfurt-content';
+                            erfurtParagraph.innerHTML = erfurtRaw;
+                        } else if (sotahMode === 'marked' || sotahMode === 'notes') {
+                            // Tokenize both sides, ignoring the Vienna apparatus markers.
+                            const viennaPlain = textItem.replace(/<i data-commentator="Variants"[^>]*><\/i>/g, '');
+                            const viennaTokens = tokenizeHe(viennaPlain);
+                            const erfurtTokens = tokenizeHe(erfurtRaw);
+                            // align Erfurt (a) against Vienna (b) — matchesA flags Erfurt tokens
+                            const { opcodes, matchesA } = alignSequencesHe(erfurtTokens, viennaTokens);
+
+                            if (sotahMode === 'marked') {
+                                erfurtParagraph = document.createElement('p');
+                                erfurtParagraph.className = 'erfurt-content marked';
+                                erfurtParagraph.innerHTML = erfurtTokens.map((tok, i) =>
+                                    matchesA[i] ? `<span class="erfurt-match">${tok}</span>` : `<span class="erfurt-diff">${tok}</span>`
+                                ).join(' ');
+                            } else {
+                                // Notes mode: build a structured diff list keyed by Vienna position
+                                kiyNotesPanel = document.createElement('div');
+                                kiyNotesPanel.className = 'kiy-notes';
+                                const items = [];
+                                for (const [tag, i1, i2, j1, j2] of opcodes) {
+                                    if (tag === 'equal') continue;
+                                    const eText = erfurtTokens.slice(i1, i2).join(' ');
+                                    const vText = viennaTokens.slice(j1, j2).join(' ');
+                                    let entry;
+                                    if (tag === 'replace') {
+                                        entry = `<b>${vText || '—'}</b>] <big>א</big> ${eText}`;
+                                    } else if (tag === 'insert') {
+                                        // Vienna has words missing in Erfurt (a is shorter)
+                                        entry = `<b>${vText}</b>] <big>א</big> ח'`;
+                                    } else { // delete: Erfurt has extra words
+                                        entry = `<b>(+)</b> <big>א</big> ${eText}`;
+                                    }
+                                    items.push(`<span class="kiy-note-item">${entry}.</span>`);
+                                }
+                                kiyNotesPanel.innerHTML = items.length
+                                    ? `<div class="kiy-notes-label">ערפורט:</div>${items.join(' ')}`
+                                    : `<div class="kiy-notes-label">ערפורט זהה.</div>`;
+                            }
+                        }
                     }
                 }
 
@@ -803,9 +846,8 @@ function displayTextAndVariants(textData, variantsData){
                             // Special-case the כי"ע Erfurt block: in Sotah 3-15 the
                             // first apparatus entry is the entire Erfurt parallel.
                             if (chapterIsKiy && typeof variantItem === 'string' && variantItem.startsWith('<b>כי"ע</b>')) {
-                                if (sotahMode === 'two-col') {
-                                    // The Erfurt text is shown in its own column;
-                                    // omit it from the apparatus to avoid duplication.
+                                if (sotahMode === 'two-col' || sotahMode === 'marked' || sotahMode === 'notes') {
+                                    // Erfurt is shown elsewhere — column or notes panel.
                                     return;
                                 }
                                 if (sotahMode === 'collapse') {
@@ -923,6 +965,7 @@ function displayTextAndVariants(textData, variantsData){
 
                 paragraphPair.appendChild(textParagraph);
                 if (erfurtParagraph) paragraphPair.appendChild(erfurtParagraph);
+                if (kiyNotesPanel) paragraphPair.appendChild(kiyNotesPanel);
                 paragraphPair.appendChild(variantParagraph);
                 paragraphPair.appendChild(hiddenVariantParagraph);
                 contentContainer.appendChild(paragraphPair);
