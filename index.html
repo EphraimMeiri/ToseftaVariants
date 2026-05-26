@@ -14,7 +14,12 @@
     <header class="site-header">
         <h1>תוספתא עם חילופי נוסח</h1>
         <div class="header-controls">
-            <nav><a href="otzarHaHilufim.html">אוצר החילופים</a></nav>
+            <nav>
+                <a href="otzarHaHilufim.html">אוצר החילופים</a>
+                <button id="export-docx" class="nav-export" title="ייצוא ל‑Word" aria-label="ייצוא ל‑Word">
+                    <span class="nav-export-w">W</span><span class="nav-export-arrow">↓</span>
+                </button>
+            </nav>
         </div>
     </header>
 
@@ -29,7 +34,6 @@
                 <label for="masechet-dropdown">בחירת מסכת:</label>
                 <select id="masechet-dropdown"></select>
                 <button id="load-masechet">טען</button>
-                <button id="export-docx">ייצוא ל‑Word</button>
             </div>
 
             <section class="filters-section sotah-panel" id="sotah-panel" hidden>
@@ -734,8 +738,7 @@ function buildHalakhaRuns(bodyText, halakhaVars, hi, isKiy, ctx) {
 async function exportToDocx() {
     if (!currentTextData || !currentVariantsData) { alert('יש לטעון מסכת תחילה.'); return; }
     const btn = document.getElementById('export-docx');
-    const orig = btn.textContent;
-    btn.disabled = true; btn.textContent = 'מייצא…';
+    btn.disabled = true; btn.classList.add('loading');
     try {
         const docx = await loadDocxLib();
         const settings = getExportSettings();
@@ -782,7 +785,7 @@ async function exportToDocx() {
         console.error(e);
         alert('שגיאה בייצוא ל‑Word: ' + e.message);
     } finally {
-        btn.disabled = false; btn.textContent = orig;
+        btn.disabled = false; btn.classList.remove('loading');
     }
 }
 

@@ -51,6 +51,9 @@ body {
 
 .site-header nav {
     font-size: 0.85em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .site-header nav a {
@@ -62,6 +65,50 @@ body {
 
 .site-header nav a:hover {
     color: #3a2e20;
+}
+
+/* Word-export icon button in the navbar */
+.nav-export {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 1px;
+    padding: 3px 7px;
+    border: 1px solid #2b579a;       /* Word blue */
+    border-radius: 4px;
+    background: #fff;
+    color: #2b579a;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-weight: 700;
+    cursor: pointer;
+    line-height: 1;
+    transition: background 0.15s, color 0.15s;
+}
+
+.nav-export:hover {
+    background: #2b579a;
+    color: #fff;
+}
+
+.nav-export-w {
+    font-size: 1.05em;
+}
+
+.nav-export-arrow {
+    font-size: 0.85em;
+}
+
+.nav-export.loading {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.nav-export.loading .nav-export-arrow {
+    animation: nav-export-bounce 0.8s ease-in-out infinite;
+}
+
+@keyframes nav-export-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(2px); }
 }
 
 /* --- Page layout: sidebar + content --- */
@@ -218,21 +265,6 @@ body {
 
 .masechet-selector button:hover {
     background: #6b5b47;
-}
-
-#export-docx {
-    margin-top: 6px;
-    background: #fff;
-    color: #6b5b47;
-}
-
-#export-docx:hover {
-    background: #ece7de;
-}
-
-#export-docx:disabled {
-    opacity: 0.6;
-    cursor: default;
 }
 
 /* --- Filter sections (using <details>) --- */
