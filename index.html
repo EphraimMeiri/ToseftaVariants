@@ -690,9 +690,17 @@ function buildHalakhaRuns(bodyText, halakhaVars, hi, isKiy, ctx) {
         });
     }
 
+    // Strip tags WITHOUT trimming so inter-segment spaces survive (a trailing
+    // space before a marker keeps the footnote / green word from gluing to the
+    // preceding word).
+    const stripKeepSpace = s => String(s || '')
+        .replace(/<br\s*\/?>/gi, ' ')
+        .replace(/<[^>]+>/g, '')
+        .replace(/[\[\]]/g, '');
+
     const segs = bodyText.split(/<i data-commentator="Variants" data-label="[^"]*" data-order="\d+"><\/i>/);
     segs.forEach((seg, si) => {
-        let segText = stripMarkup(seg);
+        let segText = stripKeepSpace(seg);
         // Eclectic lemma: the swapped lemma is the first word of this segment
         // (the marker for note si-1 sits just before it).
         const lemmaNoteIdx = (si - 1) + offset;
