@@ -29,7 +29,7 @@
                     <input type="checkbox" id="synopsisMode"> תצוגת סינופסיס (השוואת עדים בטבלה)
                 </label>
                 <label class="nav-manuscript-toggle" id="manuscript-toggle-panel" hidden>
-                    <input type="checkbox" id="manuscriptMode"> תצוגת כתב יד (ערפורט)
+                    <input type="checkbox" id="manuscriptMode"> תצוגת כתב יד
                 </label>
                 <button id="export-docx" class="nav-export" title="ייצוא ל‑Word" aria-label="ייצוא ל‑Word">
                     <span class="nav-export-w">W</span><span class="nav-export-arrow">↓</span>
@@ -603,15 +603,17 @@ if (reason === 'word order difference') return 'סדר מילים';
                 getToseftaText(selectedLocation),
                 getToseftavariants(selectedLocation),
                 getWitnessAlignment(selectedLocation),
-                getManuscriptImageData(selectedLocation)
+                ...MANUSCRIPT_WITNESS_SLUGS.map(slug => getManuscriptImageData(selectedLocation, slug))
             ])
-            .then(([textData, variantsData, witnessData, manuscriptData]) => {
+            .then(([textData, variantsData, witnessData, ...manuscriptDataList]) => {
                 currentTextData = textData;
                 currentVariantsData = variantsData;
                 currentWitnessData = witnessData;
-                currentManuscriptData = manuscriptData;
+                const manuscriptDataBySlug = {};
+                MANUSCRIPT_WITNESS_SLUGS.forEach((slug, i) => { manuscriptDataBySlug[slug] = manuscriptDataList[i]; });
+                currentManuscriptData = manuscriptDataBySlug;
                 renderClassificationDetailControls(variantsData);
-                displayTextAndVariants(textData, variantsData, witnessData, manuscriptData);
+                displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug);
                 buildTocNav(textData);
             })
             .catch(error => {
@@ -857,7 +859,7 @@ async function exportToDocx() {
 
 document.getElementById('export-docx').addEventListener('click', exportToDocx);
 
-function displayTextAndVariants(textData, variantsData, witnessData, manuscriptData){
+function displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug){
     const contentContainer = document.getElementById('content-container');
     const showHiddenCheckbox = document.getElementById('showHidden');
     const hideMinorOrthographyCheckbox = document.getElementById('hideMinorOrthography');
@@ -994,14 +996,27 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         return result;
     }
 
-    // --- Manuscript viewer footer: shows the Erfurt manuscript page for the
-    // word at a given baseIdx, with a highlight box on the matched region.
-    // Independent of synopsis mode (its own toggle/checkbox), but hooked into
-    // the exact same click sources via syncManuscriptTo alongside syncFooterTo.
+    // --- Manuscript viewer footer: shows the manuscript page (for whichever
+    // witness the click was about) for the word at a given baseIdx, with a
+    // highlight box on the matched region. Independent of synopsis mode (its
+    // own toggle/checkbox), but hooked into the exact same click sources via
+    // syncManuscriptTo alongside syncFooterTo.
     const manuscriptFooter = document.getElementById('manuscript-footer');
     const manuscriptFooterBody = document.getElementById('manuscript-footer-body');
     const manuscriptFooterLabel = document.getElementById('manuscript-footer-label');
-    let manuscriptState = { perekIndex: null, baseIdx: null };
+    let manuscriptState = { witnessSlug: null, perekIndex: null, baseIdx: null };
+
+    // Vienna is the site's base text (data-siglum-less .body-word / synopsis
+    // 'בסיס' row), so witness-neutral clicks resolve to it. Erfurt is a full
+    // secondary witness with its own images. Other sigla (ד/ל/ג/ש) have no
+    // manuscript-image data yet, so are simply absent from this map.
+    const SIGLUM_TO_WITNESS_SLUG = { 'א': 'Erfurt', 'ב': 'Vienna', 'ג': 'Geniza' };
+    const WITNESS_HEB_LABEL = { 'Erfurt': 'כתב יד ערפורט', 'Vienna': 'כתב יד וינה', 'Geniza': 'קטע גניזה' };
+
+    function witnessSlugForSynopsisSiglum(siglum) {
+        if (siglum === 'בסיס') return 'Vienna';
+        return SIGLUM_TO_WITNESS_SLUG[siglum] || null;
+    }
 
     // --- Pan/zoom: a CSS transform:scale() on .ms-page-wrap (inside the
     // scrolling .manuscript-footer-body) is enough on its own -- transformed
@@ -1018,7 +1033,8 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         return convert_number(perekIndex + 1);
     }
 
-    function lookupManuscriptWord(perekIndex, baseIdx) {
+    function lookupManuscriptWord(witnessSlug, perekIndex, baseIdx) {
+        const manuscriptData = manuscriptDataBySlug && manuscriptDataBySlug[witnessSlug];
         if (!manuscriptData) return null;
         const chapter = manuscriptData.chapters && manuscriptData.chapters[hebLabelFor(perekIndex)];
         return chapter ? (chapter[String(baseIdx)] || null) : null;
@@ -1132,18 +1148,20 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
     });
 
     function renderManuscriptFooter() {
-        const { perekIndex, baseIdx } = manuscriptState;
+        const { witnessSlug, perekIndex, baseIdx } = manuscriptState;
         manuscriptFooterBody.innerHTML = '';
         msWrapEl = null; msBoxEl = null;
-        if (baseIdx == null) {
+        if (baseIdx == null || !witnessSlug) {
             manuscriptFooterLabel.textContent = '';
             manuscriptFooterBody.innerHTML = '<div class="manuscript-footer-placeholder">לחצו על מילה בטקסט, בעד הנוסח או בהערת השוליים כדי להציג את כתב היד</div>';
             return;
         }
-        manuscriptFooterLabel.textContent = `פרק ${convert_number(perekIndex + 1)}`;
-        const word = lookupManuscriptWord(perekIndex, baseIdx);
+        const witnessLabel = WITNESS_HEB_LABEL[witnessSlug] || witnessSlug;
+        manuscriptFooterLabel.textContent = `${witnessLabel}, פרק ${convert_number(perekIndex + 1)}`;
+        const manuscriptData = manuscriptDataBySlug[witnessSlug];
+        const word = lookupManuscriptWord(witnessSlug, perekIndex, baseIdx);
         if (!word || !word.bbox || !manuscriptData.pages || !manuscriptData.pages[String(word.page)]) {
-            manuscriptFooterBody.innerHTML = '<div class="manuscript-footer-placeholder">המילה חסרה בכתב יד ערפורט במיקום זה (או שאין עדיין נתוני כתב יד לפרק זה)</div>';
+            manuscriptFooterBody.innerHTML = `<div class="manuscript-footer-placeholder">המילה חסרה ב${witnessLabel} במיקום זה (או שאין עדיין נתוני כתב יד לפרק זה)</div>`;
             return;
         }
         const page = manuscriptData.pages[String(word.page)];
@@ -1153,7 +1171,7 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         const img = document.createElement('img');
         img.className = 'ms-page-img';
         img.src = page.url;
-        img.alt = `MS Erfurt, עמ' ${word.page}`;
+        img.alt = `MS ${witnessLabel}, עמ' ${word.page}`;
         img.draggable = false;
         const box = document.createElement('div');
         box.className = 'ms-highlight-box';
@@ -1178,9 +1196,9 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         }
     }
 
-    function syncManuscriptTo(perekIndex, baseIdx) {
+    function syncManuscriptTo(witnessSlug, perekIndex, baseIdx) {
         if (!document.getElementById('manuscriptMode').checked) return;
-        manuscriptState = { perekIndex, baseIdx };
+        manuscriptState = { witnessSlug, perekIndex, baseIdx };
         renderManuscriptFooter();
     }
 
@@ -1205,10 +1223,13 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         synopsisFooterBody.querySelectorAll('.synw-active').forEach(el => el.classList.remove('synw-active'));
         synopsisFooterBody.querySelectorAll(`[data-base-idx="${baseIdx}"]`).forEach(el => el.classList.add('synw-active'));
 
-        // Only the Erfurt row should drive the (Erfurt-only) manuscript viewer.
+        // Drive the manuscript viewer with whichever witness this row is --
+        // 'בסיס' (the base row) resolves to Vienna, 'א' to Erfurt; rows for
+        // sigla with no manuscript-image data (ד/ל/ג/ש) don't drive it.
         const row = cell.closest('tr');
-        if (row && row.dataset.siglum === ERFURT_SIGLUM) {
-            syncManuscriptTo(perekIndex, Number(baseIdx));
+        const witnessSlug = row && witnessSlugForSynopsisSiglum(row.dataset.siglum);
+        if (witnessSlug) {
+            syncManuscriptTo(witnessSlug, perekIndex, Number(baseIdx));
         }
     });
 
@@ -1236,29 +1257,37 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         if (typeof refreshCurrentDisplay === 'function') refreshCurrentDisplay();
     });
 
-    // The manuscript viewer only ever shows Erfurt, so it should only be
-    // driven by clicks that are specifically about Erfurt (or witness-neutral
-    // base text) -- not by a click landing on some OTHER witness's reading,
-    // even though the shared baseIdx would technically still resolve.
-    const ERFURT_SIGLUM = 'א';
-
-    function noteInvolvesErfurt(noteId, e) {
+    // The manuscript viewer shows whichever witness a click is specifically
+    // about (Erfurt for an 'א' reading, Vienna for witness-neutral base text
+    // or an explicit 'ב' reading); a click landing on some OTHER witness's
+    // reading (ד/ל/ג/ש, no image data) doesn't drive it, even though the
+    // shared baseIdx would technically still resolve.
+    function resolveNoteManuscriptWitness(noteId, e) {
         // Sotah's merged "notes" mode (k-pattern) exists specifically to show
         // Erfurt's parallel text -- every note there is inherently Erfurt's.
-        if (/^n-\d+-\d+-k\d+$/.test(noteId)) return true;
+        if (/^n-\d+-\d+-k\d+$/.test(noteId)) return 'Erfurt';
         // If the click landed on one specific witness's reading within a
         // (possibly multi-witness) note, judge by THAT reading alone.
         const reading = e.target.closest('.variant-reading');
         if (reading && reading.dataset.witnesses !== undefined) {
-            return reading.dataset.witnesses.includes(ERFURT_SIGLUM);
+            for (const siglum of Object.keys(SIGLUM_TO_WITNESS_SLUG)) {
+                if (reading.dataset.witnesses.includes(siglum)) return SIGLUM_TO_WITNESS_SLUG[siglum];
+            }
+            return null;
         }
         // Otherwise (clicked the note-ref marker, or the lemma part rather
-        // than a specific reading) fall back to: does this note have an
-        // Erfurt reading anywhere among its witnesses?
+        // than a specific reading) fall back to: does this note have a
+        // reading from a witness we have images for? Priority order follows
+        // SIGLUM_TO_WITNESS_SLUG's insertion order (א > ב > ג): Erfurt is the
+        // most specific witness, Vienna is the base, Geniza is sparse/
+        // fragmentary so lowest priority among the three.
         const span = contentContainer.querySelector(`.note-span[data-note-id="${noteId}"]`);
-        if (!span) return false;
-        return [...span.querySelectorAll('.variant-reading[data-witnesses]')]
-            .some(r => r.dataset.witnesses.includes(ERFURT_SIGLUM));
+        if (!span) return null;
+        const readings = [...span.querySelectorAll('.variant-reading[data-witnesses]')];
+        for (const siglum of Object.keys(SIGLUM_TO_WITNESS_SLUG)) {
+            if (readings.some(r => r.dataset.witnesses.includes(siglum))) return SIGLUM_TO_WITNESS_SLUG[siglum];
+        }
+        return null;
     }
 
     // Click a body word, a witness-strip word, a footnote marker, or an
@@ -1271,12 +1300,13 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
             console.log('[synopsis] content click matched word/witness element', { text: wordEl.textContent, baseIdx: wordEl.dataset.baseIdx, pairId: pair && pair.id, matchedPairPattern: !!m });
             if (m) {
                 syncFooterTo(Number(m[1]), Number(m[2]), Number(wordEl.dataset.baseIdx));
-                // .body-word has no siglum (witness-neutral base text) -- always
-                // relevant to Erfurt's own position. .witness-word belongs to a
-                // specific witness strip; only sync the image for Erfurt's own.
+                // .body-word has no siglum (witness-neutral base text, i.e.
+                // Vienna). .witness-word belongs to a specific witness strip;
+                // only sync the image if that witness has manuscript data.
                 const strip = wordEl.closest('.witness-strip');
-                if (!strip || strip.dataset.siglum === ERFURT_SIGLUM) {
-                    syncManuscriptTo(Number(m[1]), Number(wordEl.dataset.baseIdx));
+                const witnessSlug = strip ? SIGLUM_TO_WITNESS_SLUG[strip.dataset.siglum] : 'Vienna';
+                if (witnessSlug) {
+                    syncManuscriptTo(witnessSlug, Number(m[1]), Number(wordEl.dataset.baseIdx));
                 }
             }
             return;
@@ -1287,8 +1317,9 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
             console.log('[synopsis] content click matched note element', { noteId: noteEl.dataset.noteId, resolved });
             if (resolved && resolved.baseIdx != null) {
                 syncFooterTo(resolved.perekIndex, resolved.halachaIndex, resolved.baseIdx);
-                if (noteInvolvesErfurt(noteEl.dataset.noteId, e)) {
-                    syncManuscriptTo(resolved.perekIndex, resolved.baseIdx);
+                const witnessSlug = resolveNoteManuscriptWitness(noteEl.dataset.noteId, e);
+                if (witnessSlug) {
+                    syncManuscriptTo(witnessSlug, resolved.perekIndex, resolved.baseIdx);
                 }
             }
         } else {
@@ -1339,7 +1370,10 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
             return 'מהדורת בארי (על פי צוקרמנדל, מנוקד)';
         }
         if (versionTitle.includes('In-house diplomatic')) {
-            return 'עריכה פנימית (כתב יד ערפורט)';
+            const m = versionTitle.match(/based on MS (\w+)/);
+            const msNamesHe = { Erfurt: 'ערפורט', Vienna: 'וינה' };
+            const msHe = m ? (msNamesHe[m[1]] || m[1]) : '';
+            return `עריכה פנימית (כתב יד ${msHe})`.trim();
         }
         if (versionTitle.includes('Machon Mamre') || versionTitle.includes('Vilna')) {
             return 'דפוס וילנא (מכון ממרא, דרך ספריא -- ללא חילופי נוסח)';
@@ -1393,7 +1427,10 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         // baseIdx-joined manuscript data at all (independent of hasWitnessData,
         // though in practice it's a subset -- some tractates have witness data
         // but no manuscript images yet).
-        const hasManuscriptData = !!(manuscriptData && manuscriptData.chapters && Object.keys(manuscriptData.chapters).length);
+        const hasManuscriptData = MANUSCRIPT_WITNESS_SLUGS.some(slug => {
+            const md = manuscriptDataBySlug && manuscriptDataBySlug[slug];
+            return md && md.chapters && Object.keys(md.chapters).length;
+        });
         document.getElementById('manuscript-toggle-panel').hidden = !hasManuscriptData;
         const manuscriptModeOn = hasManuscriptData && document.getElementById('manuscriptMode').checked;
         manuscriptFooter.hidden = !manuscriptModeOn;
