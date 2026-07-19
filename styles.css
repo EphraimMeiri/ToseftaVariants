@@ -74,20 +74,44 @@ body {
     color: #3a2e20;
 }
 
-.nav-synopsis-toggle {
-    display: flex;
+/* Compact push-button toggles (synopsis / manuscript view) -- same pill
+   shape and hover-invert language as .nav-export, so all three navbar
+   controls read as one family. .active marks the pressed/on state. */
+.nav-toggle-btn {
+    display: inline-flex;
     align-items: center;
-    gap: 5px;
+    justify-content: center;
+    padding: 3px 9px;
+    border: 1px solid #6b5b47;
+    border-radius: 4px;
+    background: #fff;
     color: #6b5b47;
     cursor: pointer;
-    white-space: nowrap;
+    line-height: 1;
+    transition: background 0.15s, color 0.15s;
 }
 
-.nav-synopsis-toggle input[type="checkbox"] {
-    width: 15px;
-    height: 15px;
-    cursor: pointer;
-    accent-color: #8b7d6b;
+.nav-toggle-btn:hover {
+    background: #6b5b47;
+    color: #fff;
+}
+
+.nav-toggle-btn.active {
+    background: #6b5b47;
+    color: #fff;
+}
+
+.nav-toggle-icon {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-weight: 700;
+}
+
+.nav-synopsis-icon {
+    font-size: 1.05em;
+}
+
+.nav-manuscript-icon {
+    font-size: 0.95em;
 }
 
 /* Word-export icon button in the navbar */

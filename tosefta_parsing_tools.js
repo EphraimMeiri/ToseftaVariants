@@ -6,9 +6,11 @@ const MANUSCRIPT_IMAGES_DATA_BASE = "data/manuscript_images/";
 // Vienna is the site's base text; Erfurt is a full secondary witness with its
 // own manuscript images. "Geniza" covers only the specific Cairo Genizah
 // fragments (Cambridge Or.1080 pieces) that have been imaged/aligned so far
-// -- most tractates/chapters simply have no Geniza entry. Other sigla
-// (ד/ל/ש) have no image data yet.
-const MANUSCRIPT_WITNESS_SLUGS = ["Erfurt", "Vienna", "Geniza"];
+// -- most tractates/chapters simply have no Geniza entry. "London" covers
+// only the Chullin/Seder Moed volume of the London ms (BL Add. 27296, imaged
+// via NLI's IIIF since the BL's own viewer is down) -- other sedarim of the
+// London ms aren't image-backed yet. Other sigla (ד/ש) have no image data yet.
+const MANUSCRIPT_WITNESS_SLUGS = ["Erfurt", "Vienna", "Geniza", "London"];
 
 const locations = [
     "Seder%20Zeraim/Tosefta%20Berakhot", "Seder%20Zeraim/Tosefta%20Peah",

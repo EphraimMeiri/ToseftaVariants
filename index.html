@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="stylesheet" href="styles.css?v=4">
     <title>תוספתא עם חילופי נוסח</title>
 </head>
 <body>
@@ -25,12 +25,14 @@
         <div class="header-controls">
             <nav>
                 <a href="otzarHaHilufim.html">אוצר החילופים</a>
-                <label class="nav-synopsis-toggle" id="synopsis-toggle-panel" hidden>
-                    <input type="checkbox" id="synopsisMode"> תצוגת סינופסיס (השוואת עדים בטבלה)
-                </label>
-                <label class="nav-manuscript-toggle" id="manuscript-toggle-panel" hidden>
-                    <input type="checkbox" id="manuscriptMode"> תצוגת כתב יד
-                </label>
+                <button type="button" class="nav-toggle-btn" id="synopsisMode" hidden aria-pressed="false"
+                        title="תצוגת סינופסיס (השוואת עדים בטבלה)" aria-label="תצוגת סינופסיס (השוואת עדים בטבלה)">
+                    <span class="nav-toggle-icon nav-synopsis-icon">▦</span>
+                </button>
+                <button type="button" class="nav-toggle-btn" id="manuscriptMode" hidden aria-pressed="false"
+                        title="תצוגת כתב יד" aria-label="תצוגת כתב יד">
+                    <span class="nav-toggle-icon nav-manuscript-icon">כ״י</span>
+                </button>
                 <button id="export-docx" class="nav-export" title="ייצוא ל‑Word" aria-label="ייצוא ל‑Word">
                     <span class="nav-export-w">W</span><span class="nav-export-arrow">↓</span>
                 </button>
@@ -154,7 +156,7 @@
         </div>
     </div>
 
-    <script src="tosefta_parsing_tools.js?v=3"></script>
+    <script src="tosefta_parsing_tools.js?v=4"></script>
     <script>
         let currentTextData = null;
         let currentVariantsData = null;
@@ -859,6 +861,19 @@ async function exportToDocx() {
 
 document.getElementById('export-docx').addEventListener('click', exportToDocx);
 
+// Push-button toggles (synopsisMode/manuscriptMode) replaced the old
+// checkbox+label controls; state lives in the 'active' class + aria-pressed
+// rather than .checked, but both toggles are still read as booleans all over
+// this file, so keep that check in one place.
+function isNavToggleOn(id) {
+    return document.getElementById(id).classList.contains('active');
+}
+function setNavToggleOn(id, on) {
+    const btn = document.getElementById(id);
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
+
 function displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug){
     const contentContainer = document.getElementById('content-container');
     const showHiddenCheckbox = document.getElementById('showHidden');
@@ -959,7 +974,7 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
     }
 
     function syncFooterTo(perekIndex, halachaIndex, baseIdx) {
-        const modeOn = document.getElementById('synopsisMode').checked;
+        const modeOn = isNavToggleOn('synopsisMode');
         console.log('[synopsis] syncFooterTo called', { perekIndex, halachaIndex, baseIdx, synopsisModeOn: modeOn });
         if (!modeOn) return;
         footerState = { perekIndex, halachaIndex };
@@ -1008,10 +1023,12 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
 
     // Vienna is the site's base text (data-siglum-less .body-word / synopsis
     // 'בסיס' row), so witness-neutral clicks resolve to it. Erfurt is a full
-    // secondary witness with its own images. Other sigla (ד/ל/ג/ש) have no
-    // manuscript-image data yet, so are simply absent from this map.
-    const SIGLUM_TO_WITNESS_SLUG = { 'א': 'Erfurt', 'ב': 'Vienna', 'ג': 'Geniza' };
-    const WITNESS_HEB_LABEL = { 'Erfurt': 'כתב יד ערפורט', 'Vienna': 'כתב יד וינה', 'Geniza': 'קטע גניזה' };
+    // secondary witness with its own images. London (ל) only has image data
+    // for the Chullin/Seder Moed volume (BL Add. 27296, via NLI's IIIF).
+    // Other sigla (ד/ש) have no manuscript-image data yet, so are simply
+    // absent from this map.
+    const SIGLUM_TO_WITNESS_SLUG = { 'א': 'Erfurt', 'ב': 'Vienna', 'ג': 'Geniza', 'ל': 'London' };
+    const WITNESS_HEB_LABEL = { 'Erfurt': 'כתב יד ערפורט', 'Vienna': 'כתב יד וינה', 'Geniza': 'קטע גניזה', 'London': 'כתב יד לונדון' };
 
     function witnessSlugForSynopsisSiglum(siglum) {
         if (siglum === 'בסיס') return 'Vienna';
@@ -1197,13 +1214,13 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
     }
 
     function syncManuscriptTo(witnessSlug, perekIndex, baseIdx) {
-        if (!document.getElementById('manuscriptMode').checked) return;
+        if (!isNavToggleOn('manuscriptMode')) return;
         manuscriptState = { witnessSlug, perekIndex, baseIdx };
         renderManuscriptFooter();
     }
 
     document.getElementById('manuscript-footer-close').addEventListener('click', () => {
-        document.getElementById('manuscriptMode').checked = false;
+        setNavToggleOn('manuscriptMode', false);
         if (typeof refreshCurrentDisplay === 'function') refreshCurrentDisplay();
     });
 
@@ -1253,7 +1270,7 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
     });
     synopsisShowChapterCheckbox.addEventListener('change', () => renderSynopsisFooter());
     document.getElementById('synopsis-footer-close').addEventListener('click', () => {
-        document.getElementById('synopsisMode').checked = false;
+        setNavToggleOn('synopsisMode', false);
         if (typeof refreshCurrentDisplay === 'function') refreshCurrentDisplay();
     });
 
@@ -1413,14 +1430,14 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         const hasWitnessData = !!(witnessData && Array.isArray(witnessData.chapters) && witnessData.chapters.length);
         const witnessPanel = document.getElementById('witness-panel');
         witnessPanel.hidden = !hasWitnessData;
-        document.getElementById('synopsis-toggle-panel').hidden = !hasWitnessData;
+        document.getElementById('synopsisMode').hidden = !hasWitnessData;
         const activeWitnessSigla = hasWitnessData
             ? [...document.querySelectorAll('.witness-strip-toggle:checked')].map(cb => cb.dataset.siglum)
             : [];
-        const synopsisModeOn = hasWitnessData && document.getElementById('synopsisMode').checked;
+        const synopsisModeOn = hasWitnessData && isNavToggleOn('synopsisMode');
         document.getElementById('synopsis-footer').hidden = !synopsisModeOn;
         document.body.classList.toggle('synopsis-footer-open', synopsisModeOn);
-        console.log('[synopsis] updateDisplay', { hasWitnessData, checkboxChecked: document.getElementById('synopsisMode').checked, synopsisModeOn, chaptersLen: hasWitnessData ? witnessData.chapters.length : 0 });
+        console.log('[synopsis] updateDisplay', { hasWitnessData, checkboxChecked: isNavToggleOn('synopsisMode'), synopsisModeOn, chaptersLen: hasWitnessData ? witnessData.chapters.length : 0 });
         if (synopsisModeOn) renderSynopsisFooter();
 
         // Manuscript-image panel: only relevant when this tractate has any
@@ -1431,8 +1448,8 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
             const md = manuscriptDataBySlug && manuscriptDataBySlug[slug];
             return md && md.chapters && Object.keys(md.chapters).length;
         });
-        document.getElementById('manuscript-toggle-panel').hidden = !hasManuscriptData;
-        const manuscriptModeOn = hasManuscriptData && document.getElementById('manuscriptMode').checked;
+        document.getElementById('manuscriptMode').hidden = !hasManuscriptData;
+        const manuscriptModeOn = hasManuscriptData && isNavToggleOn('manuscriptMode');
         manuscriptFooter.hidden = !manuscriptModeOn;
         document.body.classList.toggle('manuscript-footer-open', manuscriptModeOn);
         if (manuscriptModeOn) renderManuscriptFooter();
@@ -1830,8 +1847,17 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
     document.querySelectorAll('.witness-strip-toggle').forEach(cb => {
         cb.onchange = updateDisplay;
     });
-    document.getElementById('synopsisMode').onchange = updateDisplay;
-    document.getElementById('manuscriptMode').onchange = updateDisplay;
+    // .onclick (property assignment, not addEventListener) so re-running this
+    // on every tractate load overwrites the previous handler instead of
+    // stacking duplicates -- same safety the old .onchange assignment had.
+    document.getElementById('synopsisMode').onclick = () => {
+        setNavToggleOn('synopsisMode', !isNavToggleOn('synopsisMode'));
+        updateDisplay();
+    };
+    document.getElementById('manuscriptMode').onclick = () => {
+        setNavToggleOn('manuscriptMode', !isNavToggleOn('manuscriptMode'));
+        updateDisplay();
+    };
 
 }
 
