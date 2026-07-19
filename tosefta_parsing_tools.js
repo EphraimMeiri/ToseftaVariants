@@ -2,6 +2,13 @@ const TOSEFTA_DATA_BASE = "data/tosefta/";
 const VARIANTS_DATA_BASE = "data/variants/";
 const WITNESSES_DATA_BASE = "data/witnesses/";
 const MANUSCRIPT_IMAGES_DATA_BASE = "data/manuscript_images/";
+// Witnesses with manuscript-image data files (data/manuscript_images/<slug>_<Tractate>.json).
+// Vienna is the site's base text; Erfurt is a full secondary witness with its
+// own manuscript images. "Geniza" covers only the specific Cairo Genizah
+// fragments (Cambridge Or.1080 pieces) that have been imaged/aligned so far
+// -- most tractates/chapters simply have no Geniza entry. Other sigla
+// (ד/ל/ש) have no image data yet.
+const MANUSCRIPT_WITNESS_SLUGS = ["Erfurt", "Vienna", "Geniza"];
 
 const locations = [
     "Seder%20Zeraim/Tosefta%20Berakhot", "Seder%20Zeraim/Tosefta%20Peah",
@@ -59,13 +66,13 @@ function getWitnessAlignment(location) {
         .catch(() => null);
 }
 
-function getManuscriptImageUrl(location) {
-    const tractateSlug = location.split("/").pop().replace("Tosefta%20", "Erfurt_");
+function getManuscriptImageUrl(location, witnessSlug) {
+    const tractateSlug = location.split("/").pop().replace("Tosefta%20", witnessSlug + "_");
     return MANUSCRIPT_IMAGES_DATA_BASE + tractateSlug + ".json";
 }
 
-function getManuscriptImageData(location) {
-    return fetch(getManuscriptImageUrl(location))
+function getManuscriptImageData(location, witnessSlug) {
+    return fetch(getManuscriptImageUrl(location, witnessSlug))
         .then(response => response.ok ? response.json() : null)
         .catch(() => null);
 }
