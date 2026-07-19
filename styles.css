@@ -1,3 +1,4 @@
+@charset "UTF-8";
 /* =============================================
    Tosefta with Variants — Clean Academic Theme
    ============================================= */
@@ -33,6 +34,12 @@ body {
     z-index: 100;
 }
 
+.header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .site-header h1 {
     font-family: 'Suez One', serif;
     font-weight: 400;
@@ -65,6 +72,22 @@ body {
 
 .site-header nav a:hover {
     color: #3a2e20;
+}
+
+.nav-synopsis-toggle {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #6b5b47;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.nav-synopsis-toggle input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    accent-color: #8b7d6b;
 }
 
 /* Word-export icon button in the navbar */
@@ -132,25 +155,39 @@ body {
 }
 
 .sidebar-toggle {
-    display: none; /* shown on mobile */
-    position: fixed;
-    bottom: 16px;
-    right: 16px;
-    z-index: 200;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    border: 1px solid #8b7d6b;
-    background: #8b7d6b;
-    color: #fff;
-    font-size: 1.3em;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 5px;
+    border: 1px solid #c5bdb1;
+    background: #fff;
+    color: #3a2e20;
+    font-size: 1.2em;
+    line-height: 1;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: background 0.2s;
 }
 
 .sidebar-toggle:hover {
-    background: #6b5b47;
+    background: #f0ece4;
+}
+
+/* Sidebar is hidden; button reflects the "closed" state */
+body.sidebar-collapsed .sidebar-toggle {
+    background: #8b7d6b;
+    border-color: #8b7d6b;
+    color: #fff;
+}
+
+/* Desktop: fully hide the sidebar when collapsed (mobile has its own
+   off-canvas drawer behavior below, driven by .sidebar.open instead) */
+@media (min-width: 901px) {
+    body.sidebar-collapsed .sidebar {
+        display: none;
+    }
 }
 
 /* --- TOC nav (perek/halakha navigation) --- */
@@ -222,20 +259,18 @@ body {
     font-weight: 600;
 }
 
-/* --- Masechet selector (in sidebar) --- */
+/* --- Masechet selector (in the header) --- */
 .masechet-selector {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 8px;
-    margin-bottom: 16px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid #e0dbd4;
 }
 
 .masechet-selector label {
     font-weight: 600;
     font-size: 0.92em;
     color: #3a2e20;
+    white-space: nowrap;
 }
 
 .masechet-selector select {
@@ -247,7 +282,7 @@ body {
     background: #fff;
     color: #2c2c2c;
     cursor: pointer;
-    width: 100%;
+    max-width: 200px;
 }
 
 .masechet-selector button {
@@ -260,11 +295,23 @@ body {
     color: #fff;
     cursor: pointer;
     transition: background 0.2s;
-    width: 100%;
 }
 
 .masechet-selector button:hover {
     background: #6b5b47;
+}
+
+/* Which base-text edition is currently loaded (Lieberman / in-house
+   diplomatic / edBeeri-Zuckermandel / Sefaria Vilna fallback, etc.) --
+   base text sourcing varies per tractate, so this needs to be visible. */
+.edition-note {
+    font-size: 0.78em;
+    color: #8b7d6b;
+    white-space: nowrap;
+    padding: 3px 8px;
+    background: #f7f4ef;
+    border: 1px solid #e0dbd4;
+    border-radius: 10px;
 }
 
 /* --- Filter sections (using <details>) --- */
@@ -274,6 +321,14 @@ body {
     border-radius: 5px;
     margin-bottom: 8px;
     overflow: hidden;
+}
+
+/* Direct children set an unconditional `display` (flex, etc.) for their
+   open-state layout, which otherwise overrides the browser's native
+   `details:not([open]) > *:not(summary) { display: none }` collapse rule --
+   author CSS always wins over that UA rule regardless of specificity. */
+.filters-section details:not([open]) > *:not(summary) {
+    display: none;
 }
 
 .filters-section summary {
@@ -476,6 +531,303 @@ body {
     padding-top: 6px;
     border-top: 1px solid #e0dbd4;
     margin-top: 6px;
+}
+
+/* Witness-transcription panel (sidebar) */
+.witness-panel .panel-title {
+    font-weight: 600;
+    font-size: 0.9em;
+    margin-bottom: 4px;
+    color: #3a2e20;
+}
+
+.witness-panel label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85em;
+    padding: 2px 0;
+    cursor: pointer;
+}
+
+/* Full witness-text strips shown below a halakha's apparatus */
+.witness-strips {
+    margin-top: 6px;
+    border-top: 1px dashed #e0dbd4;
+    padding-top: 6px;
+}
+
+.witness-strip {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-family: 'Noto Serif Hebrew', serif;
+    line-height: 1.7;
+    color: #3a2e20;
+    padding: 1px 0;
+}
+
+.witness-strip-label {
+    flex: none;
+    font-weight: 700;
+    color: #7a6a52;
+    min-width: 1.2em;
+    text-align: center;
+}
+
+.witness-word {
+    color: inherit;
+}
+
+.witness-gap {
+    color: #b8a890;
+    font-style: italic;
+}
+
+/* General multi-witness synopsis (non-Sotah tractates), built directly from
+   Witnesses_<Tractate>.json's aligned words. A real <table>: one row per
+   source (base text, then each witness), one column per word position, so
+   word N sits at the same horizontal spot in every row (table columns
+   auto-size to their widest cell across all rows) and the whole block
+   scrolls horizontally as a word-by-word strip. The label column is sticky
+   so it stays visible while the words scroll underneath it. */
+.witness-synopsis-scroll {
+    overflow-x: auto;
+    margin-bottom: 16px;
+    border: 1px solid #e0dbd4;
+    border-radius: 4px;
+}
+
+.witness-synopsis {
+    border-collapse: separate;
+    border-spacing: 0;
+    direction: rtl;
+}
+
+.syn-strip td {
+    font-family: 'Noto Serif Hebrew', serif;
+    line-height: 1.8;
+    color: #3a2e20;
+    white-space: nowrap;
+    padding: 4px 8px;
+    border-bottom: 1px dashed #ece6da;
+}
+
+.syn-strip:last-child td {
+    border-bottom: none;
+}
+
+.syn-strip-base td {
+    font-weight: 600;
+    background: #f5f0e6;
+}
+
+.syn-strip-label {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    font-weight: 700;
+    color: #7a6a52;
+    text-align: center;
+    background: #fffdf9;
+    border-left: 1px solid #e0dbd4;
+}
+
+.syn-strip-base .syn-strip-label {
+    background: #f5f0e6;
+}
+
+.synw-match {
+    color: #b8a890;
+}
+
+.synw-diff {
+    color: #2d7a3e;
+    font-weight: 600;
+}
+
+.synw-gap {
+    color: #b8a890;
+    font-style: italic;
+}
+
+/* Highlighted word ("column") synced from a clicked word/marker/apparatus note */
+.synw.synw-active {
+    background: #fdf1d8;
+    outline: 2px solid #d8a94a;
+    outline-offset: -2px;
+}
+
+/* Persistent footer panels: synopsis + manuscript viewer, side by side.
+   Each is a flex child with no width of its own -- flexbox alone gives a
+   lone visible panel the full row and splits it 50/50 when both are open. */
+.bottom-panels {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 500;
+    display: flex;
+    flex-direction: row;
+}
+
+.synopsis-footer,
+.manuscript-footer {
+    flex: 1 1 0;
+    min-width: 0;
+    max-height: 42vh;
+    display: flex;
+    flex-direction: column;
+    background: #fffdf9;
+    border-top: 2px solid #d8ccb8;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.synopsis-footer + .manuscript-footer {
+    border-inline-start: 1px solid #d8ccb8;
+}
+
+.synopsis-footer[hidden],
+.manuscript-footer[hidden] {
+    display: none;
+}
+
+.synopsis-footer-header,
+.manuscript-footer-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px;
+    border-bottom: 1px solid #e0dbd4;
+    background: #f5f0e6;
+    flex: none;
+}
+
+.synopsis-footer-header button,
+.manuscript-footer-header button {
+    background: none;
+    border: 1px solid #c9bda4;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 2px 10px;
+    font-size: 0.95em;
+    color: #3a2e20;
+}
+
+.synopsis-footer-header button:hover,
+.manuscript-footer-header button:hover {
+    background: #e9e1d1;
+}
+
+.synopsis-footer-label,
+.manuscript-footer-label {
+    font-weight: 600;
+    color: #3a2e20;
+    font-size: 0.9em;
+}
+
+.manuscript-footer-label {
+    margin-inline-end: auto;
+}
+
+.manuscript-zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.manuscript-zoom-controls button {
+    min-width: 26px;
+}
+
+.synopsis-footer-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.85em;
+    color: #3a2e20;
+    cursor: pointer;
+    margin-inline-start: auto;
+}
+
+.synopsis-footer-close,
+.manuscript-footer-close {
+    font-weight: 700;
+}
+
+.synopsis-footer-body,
+.manuscript-footer-body {
+    overflow: auto;
+    padding: 8px 14px 14px;
+}
+
+.manuscript-footer-body {
+    cursor: grab;
+}
+
+.manuscript-footer-body.ms-dragging {
+    cursor: grabbing;
+}
+
+.synopsis-footer-body .witness-synopsis-scroll {
+    margin-bottom: 16px;
+}
+
+.synopsis-footer-body .synopsis-footer-halakha-label {
+    font-weight: 600;
+    color: #7a6a52;
+    font-size: 0.85em;
+    margin: 8px 0 4px;
+}
+
+/* Manuscript page image + percentage-positioned highlight box (positions are
+   computed as fractions of the page's known Sefaria pixel dimensions, so
+   they're correct immediately without waiting on <img> natural size). */
+.manuscript-footer-placeholder {
+    color: #a89880;
+    font-size: 0.92em;
+    text-align: center;
+    padding: 24px 10px;
+}
+
+.ms-page-wrap {
+    position: relative;
+    display: block;
+    width: 100%; /* zoom sets this to a percentage (e.g. 300%) via JS; see applyZoomWidth() */
+}
+
+.ms-page-img {
+    display: block;
+    width: 100%;
+    /* Panning drags the image itself; suppress the browser's native
+       ghost-image drag affordance so it doesn't fight our own handler. */
+    -webkit-user-drag: none;
+    user-select: none;
+}
+
+.ms-highlight-box {
+    position: absolute;
+    border: 2px solid #d1453a;
+    background: rgba(209, 69, 58, 0.18);
+    border-radius: 2px;
+    pointer-events: none;
+    /* Some single-character words have a degenerate (near-zero-width) cut box
+       from the source HTR data -- keep the highlight visible regardless. */
+    min-width: 8px;
+    min-height: 8px;
+}
+
+.ms-missing-note {
+    color: #a89880;
+    font-size: 0.85em;
+    text-align: center;
+    padding: 6px 10px 0;
+}
+
+/* Leave room so the fixed footer row never permanently covers content */
+body.synopsis-footer-open .main-content,
+body.manuscript-footer-open .main-content {
+    padding-bottom: 42vh;
 }
 
 /* Indented child filters */
@@ -724,6 +1076,12 @@ sup.note-ref.highlight {
     background: #f0e4cd;
 }
 
+/* Main-text word highlighted from clicking its column in the synopsis footer */
+.body-word.highlight {
+    background: #fce4b8;
+    border-radius: 2px;
+}
+
 /* --- Responsive --- */
 @media (max-width: 900px) {
     .sidebar {
@@ -740,12 +1098,6 @@ sup.note-ref.highlight {
 
     .sidebar.open {
         transform: translateX(0);
-    }
-
-    .sidebar-toggle {
-        display: flex;
-        align-items: center;
-        justify-content: center;
     }
 
     .sidebar-overlay {
@@ -768,8 +1120,16 @@ sup.note-ref.highlight {
         padding: 16px 12px 40px;
     }
 
+    .site-header {
+        flex-wrap: wrap;
+    }
+
     .site-header h1 {
         font-size: 1.2em;
+    }
+
+    .masechet-selector select {
+        max-width: 140px;
     }
 
     .paragraph-pair {

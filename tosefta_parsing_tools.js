@@ -1,5 +1,7 @@
 const TOSEFTA_DATA_BASE = "data/tosefta/";
 const VARIANTS_DATA_BASE = "data/variants/";
+const WITNESSES_DATA_BASE = "data/witnesses/";
+const MANUSCRIPT_IMAGES_DATA_BASE = "data/manuscript_images/";
 
 const locations = [
     "Seder%20Zeraim/Tosefta%20Berakhot", "Seder%20Zeraim/Tosefta%20Peah",
@@ -18,7 +20,18 @@ const locations = [
     "Seder%20Nashim/Tosefta%20Nazir", "Seder%20Nashim/Tosefta%20Sotah", "Seder%20Nashim/Tosefta%20Gittin",
     "Seder%20Nashim/Tosefta%20Kiddushin",
 
-    "Seder%20Nezikin/Tosefta%20Bava%20Kamma", "Seder%20Nezikin/Tosefta%20Bava%20Metzia", "Seder%20Nezikin/Tosefta%20Bava%20Batra"
+    "Seder%20Nezikin/Tosefta%20Bava%20Kamma", "Seder%20Nezikin/Tosefta%20Bava%20Metzia", "Seder%20Nezikin/Tosefta%20Bava%20Batra",
+    "Seder%20Nezikin/Tosefta%20Sanhedrin", "Seder%20Nezikin/Tosefta%20Makkot", "Seder%20Nezikin/Tosefta%20Shevuot",
+    "Seder%20Nezikin/Tosefta%20Eduyot", "Seder%20Nezikin/Tosefta%20Avodah%20Zarah", "Seder%20Nezikin/Tosefta%20Horayot",
+
+    "Seder%20Kodashim/Tosefta%20Zevachim", "Seder%20Kodashim/Tosefta%20Menachot", "Seder%20Kodashim/Tosefta%20Chullin",
+    "Seder%20Kodashim/Tosefta%20Bekhorot", "Seder%20Kodashim/Tosefta%20Arakhin", "Seder%20Kodashim/Tosefta%20Temurah",
+    "Seder%20Kodashim/Tosefta%20Keritot", "Seder%20Kodashim/Tosefta%20Meilah",
+
+    "Seder%20Tahorot/Tosefta%20Kelim", "Seder%20Tahorot/Tosefta%20Oholot", "Seder%20Tahorot/Tosefta%20Negaim",
+    "Seder%20Tahorot/Tosefta%20Parah", "Seder%20Tahorot/Tosefta%20Tahorot", "Seder%20Tahorot/Tosefta%20Mikvaot",
+    "Seder%20Tahorot/Tosefta%20Niddah", "Seder%20Tahorot/Tosefta%20Makhshirin", "Seder%20Tahorot/Tosefta%20Zavim",
+    "Seder%20Tahorot/Tosefta%20Tevul%20Yom", "Seder%20Tahorot/Tosefta%20Yadayim", "Seder%20Tahorot/Tosefta%20Oktzin"
 ];
 
 function getVariantUrl(location) {
@@ -33,6 +46,28 @@ function getToseftaUrl(location) {
 
 function getToseftaText(location) {
     return fetch(getToseftaUrl(location)).then(response => response.json());
+}
+
+function getWitnessUrl(location) {
+    const tractateSlug = location.split("/").pop().replace("Tosefta%20", "Witnesses_");
+    return WITNESSES_DATA_BASE + tractateSlug + ".json";
+}
+
+function getWitnessAlignment(location) {
+    return fetch(getWitnessUrl(location))
+        .then(response => response.ok ? response.json() : null)
+        .catch(() => null);
+}
+
+function getManuscriptImageUrl(location) {
+    const tractateSlug = location.split("/").pop().replace("Tosefta%20", "Erfurt_");
+    return MANUSCRIPT_IMAGES_DATA_BASE + tractateSlug + ".json";
+}
+
+function getManuscriptImageData(location) {
+    return fetch(getManuscriptImageUrl(location))
+        .then(response => response.ok ? response.json() : null)
+        .catch(() => null);
 }
 
 async function getToseftavariants(location) {
@@ -829,6 +864,166 @@ function stripPunctHe(w) {
     return String(w || "").replace(/<[^>]+>/g, "").replace(/[,.;:!?״()\[\]"׳']/g, "").trim();
 }
 
+const MARKER_SPLIT_RE = /<i data-commentator="Variants" data-label="[^"]+" data-order="(\d+)"><\/i>/g;
+
+// Per-halakha [start, end) word-index ranges within a chapter's flat token
+// sequence, using the same tokenization convention (strip tags, split on
+// whitespace) the offline witness-alignment pipeline uses to build
+// Witnesses_<Tractate>.json, so indices line up with that data. Also returns,
+// per halakha, the base-word-index immediately BEFORE each footnote marker
+// (in physical occurrence order), mirroring build_witness_alignments.py's
+// tokenize_base_chapter -- lets a clicked footnote marker resolve to the
+// base-word position of the lemma it annotates (lemma starts at idx+1).
+function computeChapterWordIndex(textPerek) {
+    let offset = 0;
+    const ranges = [];
+    const markerBaseIdx = [];
+    textPerek.forEach(halakhaHtml => {
+        const parts = halakhaHtml.split(MARKER_SPLIT_RE);
+        const markers = [];
+        let localCount = 0;
+        parts.forEach((part, i) => {
+            if (i % 2 === 1) {
+                markers.push(offset + localCount - 1);
+            } else {
+                localCount += tokenizeHe(part).length;
+            }
+        });
+        ranges.push([offset, offset + localCount]);
+        markerBaseIdx.push(markers);
+        offset += localCount;
+    });
+    return { ranges, markerBaseIdx };
+}
+
+// Wrap each body word inside `container` in a <span data-base-idx="N">,
+// skipping text inside <sup> (footnote-marker labels, not body words) so the
+// wrapped sequence matches computeChapterWordIndex's counting exactly.
+// startIdx is the halakha's chapter-wide base-word offset (range[0]).
+function annotateWordsWithBaseIdx(container, startIdx) {
+    let idx = startIdx;
+    function walk(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            if (!node.textContent.trim()) return;
+            const frag = document.createDocumentFragment();
+            node.textContent.split(/(\s+)/).forEach(part => {
+                if (!part) return;
+                if (/^\s+$/.test(part)) {
+                    frag.appendChild(document.createTextNode(part));
+                } else {
+                    const span = document.createElement('span');
+                    span.className = 'body-word';
+                    span.dataset.baseIdx = String(idx++);
+                    span.textContent = part;
+                    frag.appendChild(span);
+                }
+            });
+            node.replaceWith(frag);
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            if (node.tagName === 'SUP') return;
+            [...node.childNodes].forEach(walk);
+        }
+    }
+    [...container.childNodes].forEach(walk);
+}
+
+// Render one strip per active witness siglum, showing that witness's
+// continuous text for a halakha's [start, end) base-word range. Gaps
+// (witness omits the word / no data) render as a visible placeholder rather
+// than being silently skipped.
+function buildWitnessStrips(chapterWitness, range, sigla) {
+    if (!chapterWitness || !range || !sigla || !sigla.length) return null;
+    const [start, end] = range;
+    const container = document.createElement('div');
+    container.className = 'witness-strips';
+    sigla.forEach(siglum => {
+        const w = chapterWitness.witnesses && chapterWitness.witnesses[siglum];
+        if (!w) return;
+        const words = w.words.slice(start, end);
+        if (!words.some(Boolean)) return; // nothing for this witness in this halakha
+        const row = document.createElement('div');
+        row.className = 'witness-strip';
+        row.dataset.siglum = siglum;
+        const body = words.map((word, i) => {
+            const baseIdx = start + i;
+            const cls = word ? 'witness-word' : 'witness-gap';
+            return `<span class="${cls}" data-base-idx="${baseIdx}">${word || '⟨ ⟩'}</span>`;
+        }).join(' ');
+        row.innerHTML = `<span class="witness-strip-label">${siglum}</span><span class="witness-strip-body">${body}</span>`;
+        container.appendChild(row);
+    });
+    return container.children.length ? container : null;
+}
+
+const SYNOPSIS_WITNESS_ORDER = ["א", "ב", "ד", "ל", "ג", "ש"];
+
+// General multi-witness synopsis for a single halakha, built directly from
+// the already-aligned Witnesses_<Tractate>.json data (no LCS needed — the
+// offline pipeline already positioned every witness word against the
+// base-text word index). A real <table> — one row per source (base text
+// first, then every witness with data here), one column per word position —
+// so word N sits at the same horizontal spot in every row (table columns
+// naturally size to their widest cell across all rows) and the whole thing
+// scrolls horizontally as one word-by-word strip instead of each row
+// wrapping independently. Words that diverge from the base are colored;
+// every cell carries data-base-idx so the footer can highlight one aligned
+// column (the same position across every row).
+function buildSynopsisStrips(chapterWitness, range, halakhaHtml) {
+    if (!chapterWitness || !range) {
+        console.log('[synopsis] buildSynopsisStrips: missing chapterWitness or range', { hasChapterWitness: !!chapterWitness, range });
+        return null;
+    }
+    const [start, end] = range;
+    const n = end - start;
+    if (n <= 0) {
+        console.log('[synopsis] buildSynopsisStrips: empty/invalid range', range);
+        return null;
+    }
+    const baseWords = tokenizeHe(halakhaHtml).slice(0, n);
+    const sigla = SYNOPSIS_WITNESS_ORDER.filter(s => {
+        const w = chapterWitness.witnesses[s];
+        return w && w.words.slice(start, end).some(Boolean);
+    });
+    if (!sigla.length) {
+        console.log('[synopsis] buildSynopsisStrips: no witness has data in range', { range, availableSigla: Object.keys(chapterWitness.witnesses || {}) });
+        return null;
+    }
+
+    function buildRow(table, label, words, isBase) {
+        const tr = document.createElement('tr');
+        tr.className = 'syn-strip' + (isBase ? ' syn-strip-base' : '');
+        tr.dataset.siglum = label; // e.g. "א" (Erfurt) -- lets clicks distinguish which witness's row this is
+        const labelCell = document.createElement('td');
+        labelCell.className = 'syn-strip-label';
+        labelCell.textContent = label;
+        tr.appendChild(labelCell);
+        words.forEach((w, i) => {
+            const cell = document.createElement('td');
+            cell.className = 'synw';
+            cell.dataset.baseIdx = String(start + i);
+            if (!w) {
+                cell.classList.add('synw-gap');
+                cell.textContent = '⟨ ⟩';
+            } else {
+                cell.textContent = w;
+                if (!isBase) cell.classList.add(wordsMatchHe(baseWords[i], w) ? 'synw-match' : 'synw-diff');
+            }
+            tr.appendChild(cell);
+        });
+        table.appendChild(tr);
+    }
+
+    const table = document.createElement('table');
+    table.className = 'witness-synopsis';
+    buildRow(table, 'בסיס', baseWords, true);
+    sigla.forEach(sig => buildRow(table, sig, chapterWitness.witnesses[sig].words.slice(start, end), false));
+
+    const scroller = document.createElement('div');
+    scroller.className = 'witness-synopsis-scroll';
+    scroller.appendChild(table);
+    return scroller;
+}
+
 function tokenizeHe(text) {
     return String(text || "")
         .replace(/<br\s*\/?\s*>/g, " ")
@@ -1081,7 +1276,7 @@ function _mergeEntriesAtPositionHe(entries) {
     const seenKeys = new Map();
     for (const e of entries) {
         if (e.raw !== undefined) { grouped.push(e); continue; }
-        const key = `${(e.sv || "").trim()} ${(e.suffix || "").trim()}`;
+        const key = `${(e.sv || "").trim()}\0${(e.suffix || "").trim()}`;
         if (seenKeys.has(key)) {
             grouped[seenKeys.get(key)].sources.push(...e.sources);
         } else {

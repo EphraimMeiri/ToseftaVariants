@@ -7,15 +7,30 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=3">
     <title>תוספתא עם חילופי נוסח</title>
 </head>
 <body>
     <header class="site-header">
-        <h1>תוספתא עם חילופי נוסח</h1>
+        <div class="header-title">
+            <button class="sidebar-toggle" id="sidebar-toggle" aria-label="הצג/הסתר סרגל צד" title="הצג/הסתר סרגל צד">☰</button>
+            <h1>תוספתא עם חילופי נוסח</h1>
+        </div>
+        <div class="masechet-selector">
+            <label for="masechet-dropdown">בחירת מסכת:</label>
+            <select id="masechet-dropdown"></select>
+            <button id="load-masechet">טען</button>
+            <span class="edition-note" id="edition-note" hidden></span>
+        </div>
         <div class="header-controls">
             <nav>
                 <a href="otzarHaHilufim.html">אוצר החילופים</a>
+                <label class="nav-synopsis-toggle" id="synopsis-toggle-panel" hidden>
+                    <input type="checkbox" id="synopsisMode"> תצוגת סינופסיס (השוואת עדים בטבלה)
+                </label>
+                <label class="nav-manuscript-toggle" id="manuscript-toggle-panel" hidden>
+                    <input type="checkbox" id="manuscriptMode"> תצוגת כתב יד (ערפורט)
+                </label>
                 <button id="export-docx" class="nav-export" title="ייצוא ל‑Word" aria-label="ייצוא ל‑Word">
                     <span class="nav-export-w">W</span><span class="nav-export-arrow">↓</span>
                 </button>
@@ -23,19 +38,11 @@
         </div>
     </header>
 
-    <!-- Mobile sidebar toggle -->
-    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="פתח/סגור סרגל צד">☰</button>
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
     <div class="page-layout">
-        <!-- Sidebar: masechet selector + all filters -->
+        <!-- Sidebar: filters -->
         <aside class="sidebar" id="sidebar">
-            <div class="masechet-selector">
-                <label for="masechet-dropdown">בחירת מסכת:</label>
-                <select id="masechet-dropdown"></select>
-                <button id="load-masechet">טען</button>
-            </div>
-
             <section class="filters-section sotah-panel" id="sotah-panel" hidden>
                 <div class="panel-title">תצוגת סוטה (כי״ע)</div>
                 <label><input type="radio" name="sotahMode" value="default" checked> רגיל</label>
@@ -45,54 +52,67 @@
                 <label><input type="radio" name="sotahMode" value="notes"> הערות שוליים</label>
             </section>
 
+            <section class="filters-section witness-panel" id="witness-panel" hidden>
+                <div class="panel-title">עדי נוסח מלאים</div>
+                <label><input type="checkbox" class="witness-strip-toggle" data-siglum="א"> א <span class="detail-count">(ערפורט)</span></label>
+                <label><input type="checkbox" class="witness-strip-toggle" data-siglum="ב"> ב <span class="detail-count">(וינה)</span></label>
+                <label><input type="checkbox" class="witness-strip-toggle" data-siglum="ד"> ד <span class="detail-count">(דפוס)</span></label>
+                <label><input type="checkbox" class="witness-strip-toggle" data-siglum="ל"> ל <span class="detail-count">(לונדון)</span></label>
+                <label><input type="checkbox" class="witness-strip-toggle" data-siglum="ג"> ג <span class="detail-count">(קטעי גניזה)</span></label>
+                <label><input type="checkbox" class="witness-strip-toggle" data-siglum="ש"> ש <span class="detail-count">(שוקן, קטעי)</span></label>
+            </section>
+
             <section class="filters-section">
-                <label class="filter-toggle"><input type="checkbox" id="showHidden"> הצג חילופים מוסתרים</label>
+                <details open>
+                    <summary>סינון חילופים</summary>
+                    <label class="filter-toggle"><input type="checkbox" id="showHidden"> הצג חילופים מוסתרים</label>
 
-                <div class="filter-body">
-                    <label class="filter-parent"><input type="checkbox" id="eclecticText"> טקסט אקלקטי <span class="detail-count">(לא תכירו פְנים)</span></label>
-                    <details class="filter-collapse">
-                        <summary><label class="filter-parent"><input type="checkbox" id="hideParagraphBreak" checked onclick="event.stopPropagation()"> הסתר ציוני פתוח/סתום</label></summary>
-                        <div class="filter-extra">
-                            <label><input type="checkbox" id="paragraphBreakLineBreaks"> הצג שורה חדשה במקום פתוח</label>
+                    <div class="filter-body">
+                        <label class="filter-parent"><input type="checkbox" id="eclecticText"> טקסט אקלקטי <span class="detail-count">(לא תכירו פְנים)</span></label>
+                        <details class="filter-collapse">
+                            <summary><label class="filter-parent"><input type="checkbox" id="hideParagraphBreak" checked onclick="event.stopPropagation()"> הסתר ציוני פתוח/סתום</label></summary>
+                            <div class="filter-extra">
+                                <label><input type="checkbox" id="paragraphBreakLineBreaks"> הצג שורה חדשה במקום פתוח</label>
+                            </div>
+                        </details>
+                        <details class="filter-collapse">
+                            <summary><label class="filter-parent"><input type="checkbox" id="hideSoleWitness" onclick="event.stopPropagation()"> הסתר חילופים של עד בודד</label></summary>
+                            <div class="filter-children" data-parent="hideSoleWitness">
+                                <label><input type="checkbox" class="hide-sole-witness-siglum" data-siglum="א"> רק א <span class="detail-count">(ערפורט)</span></label>
+                                <label><input type="checkbox" class="hide-sole-witness-siglum" data-siglum="ד"> רק ד <span class="detail-count">(דפוס)</span></label>
+                                <label><input type="checkbox" class="hide-sole-witness-siglum" data-siglum="ל"> רק ל <span class="detail-count">(לונדון)</span></label>
+                                <label><input type="checkbox" class="hide-sole-witness-siglum" data-siglum="ג"> רק ג <span class="detail-count">(קטעי גניזה)</span></label>
+                                <label><input type="checkbox" class="hide-sole-witness-siglum" data-siglum="ש"> רק ש <span class="detail-count">(שוקן, קטעי)</span></label>
+                                <label><input type="checkbox" class="hide-sole-witness-siglum" data-siglum="ב"> רק ב <span class="detail-count">(וינה)</span></label>
+                            </div>
+                        </details>
+
+                        <label class="filter-parent"><input type="checkbox" id="hideMinorOrthography"> כתיב חלופי</label>
+                        <div class="filter-children" data-parent="hideMinorOrthography">
+                            <div class="detail-slot" data-category="minor_orthography"></div>
                         </div>
-                    </details>
-                    <details class="filter-collapse">
-                        <summary><label class="filter-parent"><input type="checkbox" id="hideSoleWitness" onclick="event.stopPropagation()"> הסתר חילופים של עד בודד</label></summary>
-                        <div class="filter-children" data-parent="hideSoleWitness">
-                            <label><input type="checkbox" class="hide-sole-witness-siglum" data-siglum="א"> רק א <span class="detail-count">(ערפורט)</span></label>
-                            <label><input type="checkbox" class="hide-sole-witness-siglum" data-siglum="ד"> רק ד <span class="detail-count">(דפוס)</span></label>
-                            <label><input type="checkbox" class="hide-sole-witness-siglum" data-siglum="ל"> רק ל <span class="detail-count">(לונדון)</span></label>
-                            <label><input type="checkbox" class="hide-sole-witness-siglum" data-siglum="ג"> רק ג <span class="detail-count">(קטעי גניזה)</span></label>
-                            <label><input type="checkbox" class="hide-sole-witness-siglum" data-siglum="ש"> רק ש <span class="detail-count">(שוקן, קטעי)</span></label>
-                            <label><input type="checkbox" class="hide-sole-witness-siglum" data-siglum="ב"> רק ב <span class="detail-count">(וינה)</span></label>
+                        <label class="filter-parent"><input type="checkbox" id="hideNameOrthography"> כתיב שמות</label>
+                        <div class="filter-children" data-parent="hideNameOrthography">
+                            <div class="detail-slot" data-category="name_orthography"></div>
                         </div>
-                    </details>
+                        <label class="filter-parent"><input type="checkbox" id="hideMinor"> חילופי אותיות</label>
+                        <div class="filter-children" data-parent="hideMinor">
+                            <div class="detail-slot" data-category="minor"></div>
+                        </div>
+                        <label class="filter-parent"><input type="checkbox" id="hideOtherMinor"> שינויים בינוניים</label>
+                        <div class="filter-children" data-parent="hideOtherMinor">
+                            <div class="detail-slot" data-category="other_minor"></div>
+                        </div>
+                        <label class="filter-parent"><input type="checkbox" id="hideCitationScope"> היקף ציטוט</label>
+                        <div class="filter-children" data-parent="hideCitationScope">
+                            <div class="detail-slot" data-category="citation_scope"></div>
+                        </div>
+                    </div>
 
-                    <label class="filter-parent"><input type="checkbox" id="hideMinorOrthography"> כתיב חלופי</label>
-                    <div class="filter-children" data-parent="hideMinorOrthography">
-                        <div class="detail-slot" data-category="minor_orthography"></div>
+                    <div class="status-bar">
+                        הוסתרו <strong><span id="hidden_count">0</span></strong> חילופים מתוך <strong><span id="total_count">0</span></strong>
                     </div>
-                    <label class="filter-parent"><input type="checkbox" id="hideNameOrthography"> כתיב שמות</label>
-                    <div class="filter-children" data-parent="hideNameOrthography">
-                        <div class="detail-slot" data-category="name_orthography"></div>
-                    </div>
-                    <label class="filter-parent"><input type="checkbox" id="hideMinor"> חילופי אותיות</label>
-                    <div class="filter-children" data-parent="hideMinor">
-                        <div class="detail-slot" data-category="minor"></div>
-                    </div>
-                    <label class="filter-parent"><input type="checkbox" id="hideOtherMinor"> שינויים בינוניים</label>
-                    <div class="filter-children" data-parent="hideOtherMinor">
-                        <div class="detail-slot" data-category="other_minor"></div>
-                    </div>
-                    <label class="filter-parent"><input type="checkbox" id="hideCitationScope"> היקף ציטוט</label>
-                    <div class="filter-children" data-parent="hideCitationScope">
-                        <div class="detail-slot" data-category="citation_scope"></div>
-                    </div>
-                </div>
-
-                <div class="status-bar">
-                    הוסתרו <strong><span id="hidden_count">0</span></strong> חילופים מתוך <strong><span id="total_count">0</span></strong>
-                </div>
+                </details>
             </section>
         </aside>
 
@@ -108,10 +128,38 @@
         </div>
     </div>
 
-    <script src="tosefta_parsing_tools.js"></script>
+    <div class="bottom-panels" id="bottom-panels">
+        <div class="synopsis-footer" id="synopsis-footer" hidden>
+            <div class="synopsis-footer-header">
+                <button type="button" id="synopsis-prev" title="הלכה קודמת">▶</button>
+                <span id="synopsis-footer-label" class="synopsis-footer-label"></span>
+                <button type="button" id="synopsis-next" title="הלכה הבאה">◀</button>
+                <label class="synopsis-footer-toggle"><input type="checkbox" id="synopsisShowChapter"> הצג פרק שלם</label>
+                <button type="button" id="synopsis-footer-close" class="synopsis-footer-close" title="סגור">✕</button>
+            </div>
+            <div class="synopsis-footer-body" id="synopsis-footer-body"></div>
+        </div>
+
+        <div class="manuscript-footer" id="manuscript-footer" hidden>
+            <div class="manuscript-footer-header">
+                <span id="manuscript-footer-label" class="manuscript-footer-label"></span>
+                <div class="manuscript-zoom-controls">
+                    <button type="button" id="manuscript-zoom-out" title="הקטן">－</button>
+                    <button type="button" id="manuscript-zoom-reset" title="התאם לרוחב">⤢</button>
+                    <button type="button" id="manuscript-zoom-in" title="הגדל">＋</button>
+                </div>
+                <button type="button" id="manuscript-footer-close" class="manuscript-footer-close" title="סגור">✕</button>
+            </div>
+            <div class="manuscript-footer-body" id="manuscript-footer-body"></div>
+        </div>
+    </div>
+
+    <script src="tosefta_parsing_tools.js?v=3"></script>
     <script>
         let currentTextData = null;
         let currentVariantsData = null;
+        let currentWitnessData = null;
+        let currentManuscriptData = null;
         let refreshCurrentDisplay = null;
 
         // --- Sidebar toggle (mobile) ---
@@ -120,8 +168,9 @@
         const sidebarOverlay = document.getElementById('sidebar-overlay');
 
         function toggleSidebar() {
-            sidebarEl.classList.toggle('open');
-            sidebarOverlay.classList.toggle('visible');
+            sidebarEl.classList.toggle('open'); // mobile: slide the drawer in/out
+            sidebarOverlay.classList.toggle('visible'); // mobile: dim backdrop
+            document.body.classList.toggle('sidebar-collapsed'); // desktop: hide/show entirely
         }
         sidebarToggleBtn.addEventListener('click', toggleSidebar);
         sidebarOverlay.addEventListener('click', toggleSidebar);
@@ -471,8 +520,13 @@ if (reason === 'word order difference') return 'סדר מילים';
         }
 
         if (masechet) {
-            document.getElementById('masechet-dropdown').value = findOptionValueByText(document.getElementById('masechet-dropdown'), masechet);
-            loadSelectedMasechet();
+            const matchedValue = findOptionValueByText(document.getElementById('masechet-dropdown'), masechet);
+            if (matchedValue) {
+                document.getElementById('masechet-dropdown').value = matchedValue;
+                loadSelectedMasechet();
+            } else {
+                console.warn('Unrecognized masechet in URL:', masechet);
+            }
         }
         function updateUrl(masechet) {
             var newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?masechet=' + encodeURIComponent(masechet);
@@ -547,13 +601,17 @@ if (reason === 'word order difference') return 'סדר מילים';
 
             Promise.all([
                 getToseftaText(selectedLocation),
-                getToseftavariants(selectedLocation)
+                getToseftavariants(selectedLocation),
+                getWitnessAlignment(selectedLocation),
+                getManuscriptImageData(selectedLocation)
             ])
-            .then(([textData, variantsData]) => {
+            .then(([textData, variantsData, witnessData, manuscriptData]) => {
                 currentTextData = textData;
                 currentVariantsData = variantsData;
+                currentWitnessData = witnessData;
+                currentManuscriptData = manuscriptData;
                 renderClassificationDetailControls(variantsData);
-                displayTextAndVariants(textData, variantsData);
+                displayTextAndVariants(textData, variantsData, witnessData, manuscriptData);
                 buildTocNav(textData);
             })
             .catch(error => {
@@ -799,7 +857,7 @@ async function exportToDocx() {
 
 document.getElementById('export-docx').addEventListener('click', exportToDocx);
 
-function displayTextAndVariants(textData, variantsData){
+function displayTextAndVariants(textData, variantsData, witnessData, manuscriptData){
     const contentContainer = document.getElementById('content-container');
     const showHiddenCheckbox = document.getElementById('showHidden');
     const hideMinorOrthographyCheckbox = document.getElementById('hideMinorOrthography');
@@ -826,6 +884,417 @@ function displayTextAndVariants(textData, variantsData){
             el.classList.add('highlight');
         });
     }
+
+    // --- Persistent synopsis footer: click a word, footnote marker, or
+    // apparatus reading anywhere and the footer scrolls to and highlights
+    // the matching row. Scoped per-halakha by default (Erfurt can split or
+    // even reorder halakhot relative to Vienna, so a chapter-wide fixed grid
+    // isn't reliable) with prev/next nav and an explicit whole-chapter toggle.
+    const synopsisFooter = document.getElementById('synopsis-footer');
+    const synopsisFooterBody = document.getElementById('synopsis-footer-body');
+    const synopsisFooterLabel = document.getElementById('synopsis-footer-label');
+    const synopsisShowChapterCheckbox = document.getElementById('synopsisShowChapter');
+    let footerState = { perekIndex: 0, halachaIndex: 0 };
+
+    function halakhaCountFor(perekIndex) {
+        return (textData.text[perekIndex] || []).length;
+    }
+
+    function clampFooterState() {
+        const nChapters = textData.text.length;
+        footerState.perekIndex = Math.max(0, Math.min(footerState.perekIndex, nChapters - 1));
+        const nHal = halakhaCountFor(footerState.perekIndex);
+        footerState.halachaIndex = Math.max(0, Math.min(footerState.halachaIndex, nHal - 1));
+    }
+
+    function renderSynopsisFooter(highlightBaseIdx) {
+        if (!witnessData) { console.log('[synopsis] renderSynopsisFooter: no witnessData at all'); return; }
+        clampFooterState();
+        const { perekIndex, halachaIndex } = footerState;
+        const chapterWitness = witnessData.chapters[perekIndex];
+        const textPerek = textData.text[perekIndex];
+        const showChapter = synopsisShowChapterCheckbox.checked;
+        console.log('[synopsis] renderSynopsisFooter', { perekIndex, halachaIndex, highlightBaseIdx, showChapter, hasChapterWitness: !!chapterWitness });
+        synopsisFooterBody.innerHTML = '';
+
+        if (!chapterWitness) {
+            console.log('[synopsis] no chapterWitness for perekIndex', perekIndex, 'chapters length', witnessData.chapters.length);
+            synopsisFooterBody.textContent = 'אין נתוני עדי נוסח לפרק זה.';
+        } else {
+            const { ranges } = computeChapterWordIndex(textPerek);
+            console.log('[synopsis] ranges for chapter', perekIndex, ranges);
+            if (showChapter) {
+                textPerek.forEach((halakhaHtml, hi) => {
+                    const label = document.createElement('div');
+                    label.className = 'synopsis-footer-halakha-label';
+                    label.textContent = `הלכה ${hi + 1}`;
+                    synopsisFooterBody.appendChild(label);
+                    const table = buildSynopsisStrips(chapterWitness, ranges[hi], halakhaHtml);
+                    if (!table) console.log('[synopsis] show-chapter: no table for halakha', hi, 'range', ranges[hi]);
+                    if (table) synopsisFooterBody.appendChild(table);
+                });
+            } else {
+                const table = buildSynopsisStrips(chapterWitness, ranges[halachaIndex], textPerek[halachaIndex]);
+                if (table) {
+                    synopsisFooterBody.appendChild(table);
+                } else {
+                    console.log('[synopsis] single-halakha: no table for halachaIndex', halachaIndex, 'range', ranges[halachaIndex]);
+                    synopsisFooterBody.textContent = 'אין נתוני עדי נוסח להלכה זו.';
+                }
+            }
+        }
+
+        synopsisFooterLabel.textContent = `פרק ${convert_number(perekIndex + 1)}, הלכה ${halachaIndex + 1}`;
+
+        if (highlightBaseIdx != null) {
+            // Highlight the same word position ("column") across every
+            // horizontal witness strip, not just one row.
+            const words = [...synopsisFooterBody.querySelectorAll(`[data-base-idx="${highlightBaseIdx}"]`)];
+            console.log('[synopsis] highlight lookup for baseIdx', highlightBaseIdx, '-> matched cells:', words.length);
+            words.forEach(w => w.classList.add('synw-active'));
+            if (words[0]) words[0].scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        }
+    }
+
+    function syncFooterTo(perekIndex, halachaIndex, baseIdx) {
+        const modeOn = document.getElementById('synopsisMode').checked;
+        console.log('[synopsis] syncFooterTo called', { perekIndex, halachaIndex, baseIdx, synopsisModeOn: modeOn });
+        if (!modeOn) return;
+        footerState = { perekIndex, halachaIndex };
+        renderSynopsisFooter(baseIdx);
+    }
+
+    function resolveNoteIdToBaseIdx(noteId) {
+        // Sotah's merged "notes" mode (buildKiyMergedNotes) uses a different id
+        // shape, n-<perek>-<halakha>-k<wi>, where wi is already a halakha-local
+        // base-word position (a Vienna-word index) -- not an apparatus-note
+        // occurrence index like the plain n-<p>-<h>-<idx> form below, so it
+        // resolves directly via ranges instead of markerBaseIdx.
+        const km = /^n-(\d+)-(\d+)-k(\d+)$/.exec(noteId);
+        if (km) {
+            const perekIndex = Number(km[1]), halachaIndex = Number(km[2]), wi = Number(km[3]);
+            const { ranges } = computeChapterWordIndex(textData.text[perekIndex]);
+            const range = ranges[halachaIndex];
+            if (!range) { console.log('[synopsis] resolveNoteIdToBaseIdx: k-pattern, no range', { noteId }); return null; }
+            const result = { perekIndex, halachaIndex, baseIdx: range[0] + wi };
+            console.log('[synopsis] resolveNoteIdToBaseIdx resolved (k-pattern)', { noteId, ...result });
+            return result;
+        }
+        const m = /^n-(\d+)-(\d+)-(\d+)$/.exec(noteId);
+        if (!m) { console.log('[synopsis] resolveNoteIdToBaseIdx: noteId did not match pattern', noteId); return null; }
+        const perekIndex = Number(m[1]), halachaIndex = Number(m[2]), noteIdx = Number(m[3]);
+        const variantsChapter = variantsData.text[perekIndex] || [];
+        const supIdx = noteIdx - (isKiyChapter(variantsChapter) ? 1 : 0);
+        if (supIdx < 0) { console.log('[synopsis] resolveNoteIdToBaseIdx: supIdx < 0 (leading כי"ע note)', { noteId, supIdx }); return { perekIndex, halachaIndex, baseIdx: null }; }
+        const { markerBaseIdx } = computeChapterWordIndex(textData.text[perekIndex]);
+        const markers = markerBaseIdx[halachaIndex] || [];
+        if (supIdx >= markers.length) { console.log('[synopsis] resolveNoteIdToBaseIdx: supIdx out of range', { noteId, supIdx, markersLength: markers.length }); return { perekIndex, halachaIndex, baseIdx: null }; }
+        const result = { perekIndex, halachaIndex, baseIdx: markers[supIdx] + 1 };
+        console.log('[synopsis] resolveNoteIdToBaseIdx resolved', { noteId, ...result });
+        return result;
+    }
+
+    // --- Manuscript viewer footer: shows the Erfurt manuscript page for the
+    // word at a given baseIdx, with a highlight box on the matched region.
+    // Independent of synopsis mode (its own toggle/checkbox), but hooked into
+    // the exact same click sources via syncManuscriptTo alongside syncFooterTo.
+    const manuscriptFooter = document.getElementById('manuscript-footer');
+    const manuscriptFooterBody = document.getElementById('manuscript-footer-body');
+    const manuscriptFooterLabel = document.getElementById('manuscript-footer-label');
+    let manuscriptState = { perekIndex: null, baseIdx: null };
+
+    // --- Pan/zoom: a CSS transform:scale() on .ms-page-wrap (inside the
+    // scrolling .manuscript-footer-body) is enough on its own -- transformed
+    // elements' visual (post-scale) bounds count toward a scrolling ancestor's
+    // overflow area, so native scroll/scrollbars/trackpad already pan a zoomed
+    // page with no extra bookkeeping. Percent-based .ms-highlight-box
+    // positions are relative to the wrap's LAYOUT box, which transform doesn't
+    // change, so the box scales/pans together with the image automatically.
+    const MS_MIN_ZOOM = 0.4, MS_MAX_ZOOM = 6, MS_FOCUS_ZOOM = 3, MS_ZOOM_STEP = 1.25;
+    let msZoom = 1;
+    let msWrapEl = null, msBoxEl = null;
+
+    function hebLabelFor(perekIndex) {
+        return convert_number(perekIndex + 1);
+    }
+
+    function lookupManuscriptWord(perekIndex, baseIdx) {
+        if (!manuscriptData) return null;
+        const chapter = manuscriptData.chapters && manuscriptData.chapters[hebLabelFor(perekIndex)];
+        return chapter ? (chapter[String(baseIdx)] || null) : null;
+    }
+
+    // Zoom is applied as a real layout width (a percentage, so it's relative
+    // to the container and needs no manual pixel math), NOT a CSS transform.
+    // transform:scale() only visually enlarges the element -- it doesn't
+    // change its layout box, and browsers largely don't grow a scrolling
+    // ancestor's horizontal scrollable-overflow region for that (confirmed:
+    // scrollWidth stayed pinned to clientWidth at any zoom level under
+    // transform, while scrollHeight DID grow -- an inconsistent, unreliable
+    // asymmetry). An actual width resize makes native scrollbars/trackpad/
+    // drag-panning work correctly in both directions, with no special-casing.
+    function applyZoomWidth() {
+        if (!msWrapEl) return;
+        msWrapEl.style.width = (msZoom * 100) + '%';
+    }
+
+    // .manuscript-footer-body computes direction:rtl (inherited, Hebrew page),
+    // so its scrollLeft follows the "negative" RTL scrolling model every
+    // modern browser now implements: 0 = home = viewport's LEFT edge sits at
+    // physical content-X (scrollWidth-clientWidth); more negative reveals
+    // content further toward physical-X 0. offsetLeft/offsetTop are always
+    // physical (direction-independent), so converting a desired physical
+    // viewport-left-edge X into scrollLeft needs this offset subtracted --
+    // using the *positive* LTR-style formula directly (as a first version of
+    // this code did) computes wildly out-of-range targets that silently
+    // clamp to 0, which looked like "horizontal scroll/centering does nothing".
+    function physicalLeftToScrollLeft(physicalX) {
+        const body = manuscriptFooterBody;
+        return physicalX - (body.scrollWidth - body.clientWidth);
+    }
+
+    // Re-center the scroll position on the focused word's highlight box at
+    // the current msZoom (used after any zoom-button change, and on initial
+    // focus). Since .ms-highlight-box is positioned with PERCENTAGES against
+    // the wrap, offsetLeft/Top/Width/Height already reflect its real, current
+    // on-screen pixel position at whatever width msWrapEl now has -- no
+    // separate *msZoom factor needed (unlike the old transform approach).
+    function centerOnHighlightBox() {
+        if (!msWrapEl || !msBoxEl) return;
+        applyZoomWidth();
+        const boxCenterX = msBoxEl.offsetLeft + msBoxEl.offsetWidth / 2;
+        const targetLeft = physicalLeftToScrollLeft(boxCenterX - manuscriptFooterBody.clientWidth / 2);
+        const targetTop = msBoxEl.offsetTop + msBoxEl.offsetHeight / 2 - manuscriptFooterBody.clientHeight / 2;
+        manuscriptFooterBody.scrollTo({ left: targetLeft, top: targetTop, behavior: 'smooth' });
+    }
+
+    function setZoomAtPoint(newZoom, clientX, clientY) {
+        if (!msWrapEl) return;
+        newZoom = Math.min(MS_MAX_ZOOM, Math.max(MS_MIN_ZOOM, newZoom));
+        const body = manuscriptFooterBody;
+        const rect = body.getBoundingClientRect();
+        const cx = clientX - rect.left, cy = clientY - rect.top;
+        // Work in fractions of content width/height so the RTL offset only
+        // has to be applied once, at the very end, when writing scrollLeft.
+        const oldScrollWidth = body.scrollWidth;
+        const physX = (oldScrollWidth - body.clientWidth + body.scrollLeft) + cx;
+        const fracX = physX / oldScrollWidth;
+        const fracY = (body.scrollTop + cy) / body.scrollHeight;
+        msZoom = newZoom;
+        applyZoomWidth();
+        const newPhysX = fracX * body.scrollWidth;
+        body.scrollLeft = physicalLeftToScrollLeft(newPhysX - cx);
+        body.scrollTop = fracY * body.scrollHeight - cy;
+    }
+
+    function zoomButtonStep(factor) {
+        if (!msWrapEl) return;
+        msZoom = Math.min(MS_MAX_ZOOM, Math.max(MS_MIN_ZOOM, msZoom * factor));
+        if (msBoxEl) centerOnHighlightBox();
+        else applyZoomWidth();
+    }
+
+    document.getElementById('manuscript-zoom-in').addEventListener('click', () => zoomButtonStep(MS_ZOOM_STEP));
+    document.getElementById('manuscript-zoom-out').addEventListener('click', () => zoomButtonStep(1 / MS_ZOOM_STEP));
+    document.getElementById('manuscript-zoom-reset').addEventListener('click', () => {
+        msZoom = 1;
+        if (msBoxEl) centerOnHighlightBox();
+        else if (msWrapEl) { applyZoomWidth(); manuscriptFooterBody.scrollTo({ left: 0, top: 0, behavior: 'smooth' }); }
+    });
+
+    // Ctrl/pinch + wheel zooms at the pointer (trackpad pinch is reported as a
+    // wheel event with ctrlKey by every major browser); plain wheel keeps its
+    // native scroll/pan behavior untouched.
+    manuscriptFooterBody.addEventListener('wheel', (e) => {
+        if (!e.ctrlKey || !msWrapEl) return;
+        e.preventDefault();
+        setZoomAtPoint(msZoom * (e.deltaY < 0 ? 1.08 : 1 / 1.08), e.clientX, e.clientY);
+    }, { passive: false });
+
+    // Click-and-drag panning.
+    let msDragging = false, msDragLastX = 0, msDragLastY = 0;
+    manuscriptFooterBody.addEventListener('mousedown', (e) => {
+        if (!msWrapEl || e.button !== 0) return;
+        msDragging = true;
+        msDragLastX = e.clientX; msDragLastY = e.clientY;
+        manuscriptFooterBody.classList.add('ms-dragging');
+        e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e) => {
+        if (!msDragging) return;
+        manuscriptFooterBody.scrollLeft -= (e.clientX - msDragLastX);
+        manuscriptFooterBody.scrollTop -= (e.clientY - msDragLastY);
+        msDragLastX = e.clientX; msDragLastY = e.clientY;
+    });
+    window.addEventListener('mouseup', () => {
+        msDragging = false;
+        manuscriptFooterBody.classList.remove('ms-dragging');
+    });
+
+    function renderManuscriptFooter() {
+        const { perekIndex, baseIdx } = manuscriptState;
+        manuscriptFooterBody.innerHTML = '';
+        msWrapEl = null; msBoxEl = null;
+        if (baseIdx == null) {
+            manuscriptFooterLabel.textContent = '';
+            manuscriptFooterBody.innerHTML = '<div class="manuscript-footer-placeholder">לחצו על מילה בטקסט, בעד הנוסח או בהערת השוליים כדי להציג את כתב היד</div>';
+            return;
+        }
+        manuscriptFooterLabel.textContent = `פרק ${convert_number(perekIndex + 1)}`;
+        const word = lookupManuscriptWord(perekIndex, baseIdx);
+        if (!word || !word.bbox || !manuscriptData.pages || !manuscriptData.pages[String(word.page)]) {
+            manuscriptFooterBody.innerHTML = '<div class="manuscript-footer-placeholder">המילה חסרה בכתב יד ערפורט במיקום זה (או שאין עדיין נתוני כתב יד לפרק זה)</div>';
+            return;
+        }
+        const page = manuscriptData.pages[String(word.page)];
+        const [x0, y0, x1, y1] = word.bbox;
+        const wrap = document.createElement('div');
+        wrap.className = 'ms-page-wrap';
+        const img = document.createElement('img');
+        img.className = 'ms-page-img';
+        img.src = page.url;
+        img.alt = `MS Erfurt, עמ' ${word.page}`;
+        img.draggable = false;
+        const box = document.createElement('div');
+        box.className = 'ms-highlight-box';
+        box.style.left = (x0 / page.width * 100) + '%';
+        box.style.top = (y0 / page.height * 100) + '%';
+        box.style.width = ((x1 - x0) / page.width * 100) + '%';
+        box.style.height = ((y1 - y0) / page.height * 100) + '%';
+        wrap.appendChild(img);
+        wrap.appendChild(box);
+        manuscriptFooterBody.appendChild(wrap);
+        msWrapEl = wrap; msBoxEl = box;
+        msZoom = MS_FOCUS_ZOOM;
+        // Center the highlighted word -- must wait for the image's `load`
+        // event, not just the next frame: until it loads, .ms-page-wrap has
+        // no real height (nothing else gives it one), so measuring/centering
+        // any earlier works against a collapsed container and drifts once
+        // the image's layout lands.
+        if (img.complete) {
+            requestAnimationFrame(centerOnHighlightBox);
+        } else {
+            img.addEventListener('load', () => requestAnimationFrame(centerOnHighlightBox), { once: true });
+        }
+    }
+
+    function syncManuscriptTo(perekIndex, baseIdx) {
+        if (!document.getElementById('manuscriptMode').checked) return;
+        manuscriptState = { perekIndex, baseIdx };
+        renderManuscriptFooter();
+    }
+
+    document.getElementById('manuscript-footer-close').addEventListener('click', () => {
+        document.getElementById('manuscriptMode').checked = false;
+        if (typeof refreshCurrentDisplay === 'function') refreshCurrentDisplay();
+    });
+
+    // Reverse sync: clicking a word inside the synopsis table scrolls to and
+    // briefly highlights the matching word back in the main text.
+    synopsisFooterBody.addEventListener('click', (e) => {
+        const cell = e.target.closest('.synw[data-base-idx]');
+        if (!cell) return;
+        const baseIdx = cell.dataset.baseIdx;
+        const perekIndex = footerState.perekIndex;
+        const target = contentContainer.querySelector(`[id^="hal-${perekIndex}-"] .body-word[data-base-idx="${baseIdx}"]`);
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.classList.add('highlight');
+            setTimeout(() => target.classList.remove('highlight'), 2000);
+        }
+        synopsisFooterBody.querySelectorAll('.synw-active').forEach(el => el.classList.remove('synw-active'));
+        synopsisFooterBody.querySelectorAll(`[data-base-idx="${baseIdx}"]`).forEach(el => el.classList.add('synw-active'));
+
+        // Only the Erfurt row should drive the (Erfurt-only) manuscript viewer.
+        const row = cell.closest('tr');
+        if (row && row.dataset.siglum === ERFURT_SIGLUM) {
+            syncManuscriptTo(perekIndex, Number(baseIdx));
+        }
+    });
+
+    document.getElementById('synopsis-prev').addEventListener('click', () => {
+        footerState.halachaIndex -= 1;
+        if (footerState.halachaIndex < 0) {
+            footerState.perekIndex -= 1;
+            clampFooterState();
+            footerState.halachaIndex = halakhaCountFor(footerState.perekIndex) - 1;
+        }
+        renderSynopsisFooter();
+    });
+    document.getElementById('synopsis-next').addEventListener('click', () => {
+        footerState.halachaIndex += 1;
+        if (footerState.halachaIndex >= halakhaCountFor(footerState.perekIndex)) {
+            footerState.perekIndex += 1;
+            clampFooterState();
+            footerState.halachaIndex = 0;
+        }
+        renderSynopsisFooter();
+    });
+    synopsisShowChapterCheckbox.addEventListener('change', () => renderSynopsisFooter());
+    document.getElementById('synopsis-footer-close').addEventListener('click', () => {
+        document.getElementById('synopsisMode').checked = false;
+        if (typeof refreshCurrentDisplay === 'function') refreshCurrentDisplay();
+    });
+
+    // The manuscript viewer only ever shows Erfurt, so it should only be
+    // driven by clicks that are specifically about Erfurt (or witness-neutral
+    // base text) -- not by a click landing on some OTHER witness's reading,
+    // even though the shared baseIdx would technically still resolve.
+    const ERFURT_SIGLUM = 'א';
+
+    function noteInvolvesErfurt(noteId, e) {
+        // Sotah's merged "notes" mode (k-pattern) exists specifically to show
+        // Erfurt's parallel text -- every note there is inherently Erfurt's.
+        if (/^n-\d+-\d+-k\d+$/.test(noteId)) return true;
+        // If the click landed on one specific witness's reading within a
+        // (possibly multi-witness) note, judge by THAT reading alone.
+        const reading = e.target.closest('.variant-reading');
+        if (reading && reading.dataset.witnesses !== undefined) {
+            return reading.dataset.witnesses.includes(ERFURT_SIGLUM);
+        }
+        // Otherwise (clicked the note-ref marker, or the lemma part rather
+        // than a specific reading) fall back to: does this note have an
+        // Erfurt reading anywhere among its witnesses?
+        const span = contentContainer.querySelector(`.note-span[data-note-id="${noteId}"]`);
+        if (!span) return false;
+        return [...span.querySelectorAll('.variant-reading[data-witnesses]')]
+            .some(r => r.dataset.witnesses.includes(ERFURT_SIGLUM));
+    }
+
+    // Click a body word, a witness-strip word, a footnote marker, or an
+    // apparatus reading -- sync the footer to that position.
+    contentContainer.addEventListener('click', (e) => {
+        const wordEl = e.target.closest('.body-word, .witness-word');
+        if (wordEl && wordEl.dataset.baseIdx !== undefined) {
+            const pair = wordEl.closest('.paragraph-pair');
+            const m = pair && /^hal-(\d+)-(\d+)$/.exec(pair.id);
+            console.log('[synopsis] content click matched word/witness element', { text: wordEl.textContent, baseIdx: wordEl.dataset.baseIdx, pairId: pair && pair.id, matchedPairPattern: !!m });
+            if (m) {
+                syncFooterTo(Number(m[1]), Number(m[2]), Number(wordEl.dataset.baseIdx));
+                // .body-word has no siglum (witness-neutral base text) -- always
+                // relevant to Erfurt's own position. .witness-word belongs to a
+                // specific witness strip; only sync the image for Erfurt's own.
+                const strip = wordEl.closest('.witness-strip');
+                if (!strip || strip.dataset.siglum === ERFURT_SIGLUM) {
+                    syncManuscriptTo(Number(m[1]), Number(wordEl.dataset.baseIdx));
+                }
+            }
+            return;
+        }
+        const noteEl = e.target.closest('.note-ref, .note-span');
+        if (noteEl && noteEl.dataset.noteId) {
+            const resolved = resolveNoteIdToBaseIdx(noteEl.dataset.noteId);
+            console.log('[synopsis] content click matched note element', { noteId: noteEl.dataset.noteId, resolved });
+            if (resolved && resolved.baseIdx != null) {
+                syncFooterTo(resolved.perekIndex, resolved.halachaIndex, resolved.baseIdx);
+                if (noteInvolvesErfurt(noteEl.dataset.noteId, e)) {
+                    syncManuscriptTo(resolved.perekIndex, resolved.baseIdx);
+                }
+            }
+        } else {
+            console.log('[synopsis] content click matched neither word/witness nor note', { tag: e.target.tagName, classes: e.target.className });
+        }
+    });
 
     // Event delegation on the content container
     contentContainer.addEventListener('mouseover', (e) => {
@@ -855,6 +1324,29 @@ function displayTextAndVariants(textData, variantsData){
         }
     });
 
+    // Base-text sourcing differs by tractate (Sefaria-hosted Lieberman
+    // edition, our own in-house diplomatic transcriptions, the vocalized
+    // edBeeri/Zuckermandel set, or a Sefaria Vilna-print fallback where
+    // nothing else exists yet) -- surface which one is showing so it's
+    // never mistaken for another edition's readings.
+    function getEditionLabel(textData) {
+        const title = textData.title || '';
+        const versionTitle = textData.versionTitle || '';
+        if (title.includes('(Lieberman)')) {
+            return 'מהדורת ליברמן (כתב יד וינה ועוד)';
+        }
+        if (versionTitle.includes('edBeeri')) {
+            return 'מהדורת בארי (על פי צוקרמנדל, מנוקד)';
+        }
+        if (versionTitle.includes('In-house diplomatic')) {
+            return 'עריכה פנימית (כתב יד ערפורט)';
+        }
+        if (versionTitle.includes('Machon Mamre') || versionTitle.includes('Vilna')) {
+            return 'דפוס וילנא (מכון ממרא, דרך ספריא -- ללא חילופי נוסח)';
+        }
+        return versionTitle || 'מהדורה לא ידועה';
+    }
+
     function updateDisplay() {
         let hidden_count = 0;
         let total_count = 0;
@@ -867,6 +1359,10 @@ function displayTextAndVariants(textData, variantsData){
         // Toggle the 'show-hidden' class on the container
         contentContainer.classList.toggle('show-hidden', showHiddenCheckbox.checked);
 
+        const editionNoteEl = document.getElementById('edition-note');
+        editionNoteEl.textContent = `מהדורה: ${getEditionLabel(textData)}`;
+        editionNoteEl.hidden = false;
+
         const textArray = textData.text;
         const variantsArray = variantsData.text;
         const masechet = variantsData.title.split("Variants on ")[1];
@@ -878,7 +1374,35 @@ function displayTextAndVariants(textData, variantsData){
         const sotahModeInput = document.querySelector('input[name="sotahMode"]:checked');
         const sotahMode = sotahModeInput ? sotahModeInput.value : 'default';
 
+        // Witness-transcription panel: only relevant when this tractate has
+        // any witness-alignment data at all.
+        const hasWitnessData = !!(witnessData && Array.isArray(witnessData.chapters) && witnessData.chapters.length);
+        const witnessPanel = document.getElementById('witness-panel');
+        witnessPanel.hidden = !hasWitnessData;
+        document.getElementById('synopsis-toggle-panel').hidden = !hasWitnessData;
+        const activeWitnessSigla = hasWitnessData
+            ? [...document.querySelectorAll('.witness-strip-toggle:checked')].map(cb => cb.dataset.siglum)
+            : [];
+        const synopsisModeOn = hasWitnessData && document.getElementById('synopsisMode').checked;
+        document.getElementById('synopsis-footer').hidden = !synopsisModeOn;
+        document.body.classList.toggle('synopsis-footer-open', synopsisModeOn);
+        console.log('[synopsis] updateDisplay', { hasWitnessData, checkboxChecked: document.getElementById('synopsisMode').checked, synopsisModeOn, chaptersLen: hasWitnessData ? witnessData.chapters.length : 0 });
+        if (synopsisModeOn) renderSynopsisFooter();
+
+        // Manuscript-image panel: only relevant when this tractate has any
+        // baseIdx-joined manuscript data at all (independent of hasWitnessData,
+        // though in practice it's a subset -- some tractates have witness data
+        // but no manuscript images yet).
+        const hasManuscriptData = !!(manuscriptData && manuscriptData.chapters && Object.keys(manuscriptData.chapters).length);
+        document.getElementById('manuscript-toggle-panel').hidden = !hasManuscriptData;
+        const manuscriptModeOn = hasManuscriptData && document.getElementById('manuscriptMode').checked;
+        manuscriptFooter.hidden = !manuscriptModeOn;
+        document.body.classList.toggle('manuscript-footer-open', manuscriptModeOn);
+        if (manuscriptModeOn) renderManuscriptFooter();
+
         textArray.forEach((textPerek, perekIndex) => {
+            const chapterWitness = hasWitnessData ? witnessData.chapters[perekIndex] : null;
+            const { ranges: halakhaWordRanges } = chapterWitness ? computeChapterWordIndex(textPerek) : { ranges: null };
             // Add chapter header
             const chapterHeader = document.createElement('h2');
             chapterHeader.className = 'chapter-header';
@@ -1022,6 +1546,10 @@ function displayTextAndVariants(textData, variantsData){
                     }
                 );
                 textParagraph.innerHTML = updatedText;
+                const range = halakhaWordRanges ? halakhaWordRanges[halachaIndex] : null;
+                if (chapterWitness && range) {
+                    annotateWordsWithBaseIdx(textParagraph, range[0]);
+                }
 
                 // Sotah two-column / marked modes: render Vienna and Erfurt as a
                 // synoptic table of aligned rows so the columns stay parallel
@@ -1153,7 +1681,11 @@ function displayTextAndVariants(textData, variantsData){
                                     multiwitness
                                 );
 
-                                const part = `<span class="variant">${witnesses}</span>&nbsp;${varText}`;
+                                // data-witnesses lets a click on THIS specific reading (one of
+                                // possibly several per note, e.g. "ד: ... | ל: ...") be attributed
+                                // to its own witness(es) -- e.g. so a non-Erfurt reading within an
+                                // otherwise-mixed note doesn't focus the Erfurt manuscript viewer.
+                                const part = `<span class="variant-reading" data-witnesses="${witnesses}"><span class="variant">${witnesses}</span>&nbsp;${varText}</span>`;
 
                                 if (decision.hidden) {
                                     hiddenParts.push(part);
@@ -1194,8 +1726,11 @@ function displayTextAndVariants(textData, variantsData){
                     });
                 }
 
-                // In synoptic modes the aligned table replaces the V/E body;
-                // the apparatus (other witnesses) still renders below it.
+                // In Sotah synoptic modes the aligned table replaces the V/E
+                // body; the apparatus (other witnesses) still renders below
+                // it. The general multi-witness synopsis (any tractate) lives
+                // in the persistent footer instead of inline -- see
+                // renderSynopsisFooter / syncFooterTo.
                 if (synopticEl) {
                     paragraphPair.appendChild(synopticEl);
                 } else {
@@ -1203,6 +1738,12 @@ function displayTextAndVariants(textData, variantsData){
                 }
                 paragraphPair.appendChild(variantParagraph);
                 paragraphPair.appendChild(hiddenVariantParagraph);
+
+                if (chapterWitness && range && activeWitnessSigla.length) {
+                    const strips = buildWitnessStrips(chapterWitness, range, activeWitnessSigla);
+                    if (strips) paragraphPair.appendChild(strips);
+                }
+
                 contentContainer.appendChild(paragraphPair);
             });
         });
@@ -1249,6 +1790,11 @@ function displayTextAndVariants(textData, variantsData){
     document.querySelectorAll('input[name="sotahMode"]').forEach(rb => {
         rb.onchange = updateDisplay;
     });
+    document.querySelectorAll('.witness-strip-toggle').forEach(cb => {
+        cb.onchange = updateDisplay;
+    });
+    document.getElementById('synopsisMode').onchange = updateDisplay;
+    document.getElementById('manuscriptMode').onchange = updateDisplay;
 
 }
 
