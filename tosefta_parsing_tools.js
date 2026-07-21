@@ -1072,6 +1072,14 @@ function buildSynopsisStrips(chapterWitness, range, halakhaHtml, ranges) {
             if (run) {
                 cell.className = 'synw synw-plus';
                 cell.textContent = run.join(' ');
+                // Addition words have no base index of their own, but they sit
+                // right after base word `anchor` in the witness -- carry that
+                // index so the click handler (which keys off data-base-idx)
+                // treats the plus-box like any other cell: it drives the
+                // manuscript viewer to the anchor word's page/region, the
+                // nearest image target for a plus. (anchor -1 = a lead
+                // addition before the chapter's first word -> base 0.)
+                cell.dataset.baseIdx = String(anchor < 0 ? 0 : anchor);
                 const entry = displacedEntryAt(w, anchor);
                 if (entry) {
                     cell.classList.add('synw-ghost');

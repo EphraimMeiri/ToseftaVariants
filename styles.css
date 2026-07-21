@@ -701,6 +701,18 @@ body.sidebar-collapsed .sidebar-toggle {
     background: #faf7f1;
 }
 
+/* Any cell that resolves to a base position is clickable (scrolls the running
+   text, drives the manuscript viewer). Plus/addition cells now carry their
+   anchor's base index too, so this affordance covers them; empty plusgap
+   cells have no data-base-idx and stay non-interactive. */
+.synw[data-base-idx] {
+    cursor: pointer;
+}
+.synw[data-base-idx]:hover {
+    outline: 1px solid #d8b96a;
+    outline-offset: -1px;
+}
+
 /* Highlighted word ("column") synced from a clicked word/marker/apparatus note */
 .synw.synw-active {
     background: #fdf1d8;
