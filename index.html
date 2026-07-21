@@ -946,12 +946,16 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
                     label.className = 'synopsis-footer-halakha-label';
                     label.textContent = `הלכה ${hi + 1}`;
                     synopsisFooterBody.appendChild(label);
-                    const table = buildSynopsisStrips(chapterWitness, ranges[hi], halakhaHtml);
+                    const movementTable = buildMovementTableForHalakha(chapterWitness, ranges, textPerek, hi, { chapterView: true });
+                    if (movementTable) synopsisFooterBody.appendChild(movementTable);
+                    const table = buildSynopsisStrips(chapterWitness, ranges[hi], halakhaHtml, ranges);
                     if (!table) console.log('[synopsis] show-chapter: no table for halakha', hi, 'range', ranges[hi]);
                     if (table) synopsisFooterBody.appendChild(table);
                 });
             } else {
-                const table = buildSynopsisStrips(chapterWitness, ranges[halachaIndex], textPerek[halachaIndex]);
+                const movementTable = buildMovementTableForHalakha(chapterWitness, ranges, textPerek, halachaIndex, { chapterView: false });
+                if (movementTable) synopsisFooterBody.appendChild(movementTable);
+                const table = buildSynopsisStrips(chapterWitness, ranges[halachaIndex], textPerek[halachaIndex], ranges);
                 if (table) {
                     synopsisFooterBody.appendChild(table);
                 } else {

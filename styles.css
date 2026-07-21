@@ -608,6 +608,14 @@ body.sidebar-collapsed .sidebar-toggle {
     font-style: italic;
 }
 
+/* "Plus" material: words a witness has with no base-text counterpart
+   (offline-pipeline `additions`). Blue, not the diff-green, so it reads as
+   "extra material" rather than "variant of an existing word". */
+.witness-plus {
+    color: #1d5c8f;
+    font-weight: 600;
+}
+
 /* General multi-witness synopsis (non-Sotah tractates), built directly from
    Witnesses_<Tractate>.json's aligned words. A real <table>: one row per
    source (base text, then each witness), one column per word position, so
@@ -675,11 +683,55 @@ body.sidebar-collapsed .sidebar-toggle {
     font-style: italic;
 }
 
+/* "Plus" column: a witness's extra words with no base-text counterpart
+   (offline-pipeline `additions`), rendered as an inserted column after the
+   base position they follow. Blue, not the diff-green used for variants of
+   an existing base word, so plusses read as "extra material" instead. */
+/* `.synw.` (repeating the base class) beats the `.syn-strip td` rule above
+   on specificity, same trick `.synw.synw-active` already relies on. */
+.synw.synw-plus {
+    color: #1d5c8f;
+    font-weight: 600;
+    background: #eef4fa;
+}
+
+/* Same inserted column, for rows (including the base row) that have nothing
+   there -- kept quiet so it doesn't compete with the plus cell beside it. */
+.synw.synw-plusgap {
+    background: #faf7f1;
+}
+
 /* Highlighted word ("column") synced from a clicked word/marker/apparatus note */
 .synw.synw-active {
     background: #fdf1d8;
     outline: 2px solid #d8a94a;
     outline-offset: -2px;
+}
+
+/* "Ghost" cell: a witness word/plus that the offline pipeline aligned here
+   (same base-word position as every other row) but which the manuscript
+   actually places elsewhere (see `displaced` in Witnesses_<Tractate>.json).
+   Hollow letters on pale pink -- the word is still legible enough to check,
+   but visibly "not really here". Slightly larger + bolder than a normal
+   synopsis cell since an outlined glyph reads thinner than a filled one at
+   the synopsis's small font size. */
+.witness-synopsis td.synw-ghost {
+    background: #fdeef2;
+    color: transparent;
+    font-size: 1.05em;
+    font-weight: 600;
+    -webkit-text-stroke: 0.85px #a84a63;
+    paint-order: stroke fill;
+}
+
+/* Browsers without text-stroke support (non-WebKit-family) would otherwise
+   render fully invisible text -- fall back to plain (but still distinctly
+   pink) solid-colored text. */
+@supports not (-webkit-text-stroke: 1px black) {
+    .witness-synopsis td.synw-ghost {
+        color: #c2748a;
+        background: #fdeef2;
+    }
 }
 
 /* Persistent footer panels: synopsis + manuscript viewer, side by side.
@@ -802,6 +854,65 @@ body.sidebar-collapsed .sidebar-toggle {
     color: #7a6a52;
     font-size: 0.85em;
     margin: 8px 0 4px;
+}
+
+/* Movement-order table ("Lieberman-style" order table): shown above the
+   synopsis whenever the displayed halakha belongs to a witness's
+   `displaced` cluster. One column per source (base text, then witness
+   groups sharing an identical reading order); each row is one position in
+   that source's reading order of the cluster's halakhot. */
+.movement-table-scroll {
+    overflow-x: auto;
+    margin-bottom: 10px;
+    border: 1px solid #e6cdd6;
+    border-radius: 4px;
+    background: #fffaf9;
+}
+
+.movement-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    direction: rtl;
+    width: 100%;
+}
+
+.movement-table th,
+.movement-table td {
+    font-family: 'Noto Serif Hebrew', serif;
+    font-size: 0.82em;
+    white-space: nowrap;
+    padding: 4px 10px;
+    text-align: center;
+    border-bottom: 1px dashed #e6cdd6;
+    border-left: 1px solid #f0e3e7;
+}
+
+.movement-table th:last-child,
+.movement-table td:last-child {
+    border-left: none;
+}
+
+.movement-table tr:last-child td {
+    border-bottom: none;
+}
+
+.movement-table th {
+    background: #f7e9ed;
+    color: #7a3a4a;
+    font-weight: 700;
+}
+
+.movement-table td {
+    color: #4a3a30;
+}
+
+/* A halakha that sits in a different row-position here than in the base
+   column -- i.e. it moved for this source -- gets bold red text so the eye
+   catches it against the (unchanged) pastel background it shares with its
+   position in every other column. */
+.movement-table td.movement-moved {
+    color: #c0202e;
+    font-weight: 700;
 }
 
 /* Manuscript page image + percentage-positioned highlight box (positions are

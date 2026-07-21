@@ -949,15 +949,32 @@ function buildWitnessStrips(chapterWitness, range, sigla) {
         const w = chapterWitness.witnesses && chapterWitness.witnesses[siglum];
         if (!w) return;
         const words = w.words.slice(start, end);
-        if (!words.some(Boolean)) return; // nothing for this witness in this halakha
+        const additions = w.additions || null;
+        // Does this witness have any addition anchored inside [start, end), or
+        // at -1 (before the chapter's first base word) when start === 0?
+        const hasAnyAddition = !!additions && Object.keys(additions).some(k => {
+            const a = Number(k);
+            return a === -1 ? start === 0 : (a >= start && a < end);
+        });
+        if (!words.some(Boolean) && !hasAnyAddition) return; // nothing for this witness in this halakha
         const row = document.createElement('div');
         row.className = 'witness-strip';
         row.dataset.siglum = siglum;
-        const body = words.map((word, i) => {
+        const parts = [];
+        const leadPlus = start === 0 && additions && additions['-1'];
+        if (leadPlus) {
+            parts.push(`<span class="witness-plus">${leadPlus.join(' ')}</span>`);
+        }
+        words.forEach((word, i) => {
             const baseIdx = start + i;
             const cls = word ? 'witness-word' : 'witness-gap';
-            return `<span class="${cls}" data-base-idx="${baseIdx}">${word || '⟨ ⟩'}</span>`;
-        }).join(' ');
+            parts.push(`<span class="${cls}" data-base-idx="${baseIdx}">${word || '⟨ ⟩'}</span>`);
+            const add = additions && additions[String(baseIdx)];
+            if (add) {
+                parts.push(`<span class="witness-plus">${add.join(' ')}</span>`);
+            }
+        });
+        const body = parts.join(' ');
         row.innerHTML = `<span class="witness-strip-label">${siglum}</span><span class="witness-strip-body">${body}</span>`;
         container.appendChild(row);
     });
@@ -965,6 +982,26 @@ function buildWitnessStrips(chapterWitness, range, sigla) {
 }
 
 const SYNOPSIS_WITNESS_ORDER = ["א", "ב", "ד", "ל", "ג", "ש"];
+
+// Which of chapterWitness's witnesses (in SYNOPSIS_WITNESS_ORDER) have any
+// data -- aligned words or an addition anchored inside -- within base-word
+// range [start, end). Shared by buildSynopsisStrips (per-halakha) and the
+// movement-order table (a whole cluster of halakhot).
+function activeSiglaInRange(chapterWitness, start, end) {
+    return SYNOPSIS_WITNESS_ORDER.filter(s => {
+        const w = chapterWitness.witnesses[s];
+        if (!w) return false;
+        if (w.words.slice(start, end).some(Boolean)) return true;
+        // Include witnesses that have no aligned words here but do have
+        // plusses anchored inside this range (or before the chapter's first
+        // word, when start === 0).
+        if (!w.additions) return false;
+        return Object.keys(w.additions).some(k => {
+            const a = Number(k);
+            return a === -1 ? start === 0 : (a >= start && a < end);
+        });
+    });
+}
 
 // General multi-witness synopsis for a single halakha, built directly from
 // the already-aligned Witnesses_<Tractate>.json data (no LCS needed — the
@@ -977,7 +1014,13 @@ const SYNOPSIS_WITNESS_ORDER = ["א", "ב", "ד", "ל", "ג", "ש"];
 // wrapping independently. Words that diverge from the base are colored;
 // every cell carries data-base-idx so the footer can highlight one aligned
 // column (the same position across every row).
-function buildSynopsisStrips(chapterWitness, range, halakhaHtml) {
+//
+// `ranges` (optional) is the full chapter's per-halakha [start,end) ranges
+// (computeChapterWordIndex's return) -- when given, cells whose word a
+// witness has displaced elsewhere in the manuscript (see `displacedEntryAt`)
+// are ghosted (class `synw-ghost`) with a tooltip naming where it actually
+// appears.
+function buildSynopsisStrips(chapterWitness, range, halakhaHtml, ranges) {
     if (!chapterWitness || !range) {
         console.log('[synopsis] buildSynopsisStrips: missing chapterWitness or range', { hasChapterWitness: !!chapterWitness, range });
         return null;
@@ -989,16 +1032,30 @@ function buildSynopsisStrips(chapterWitness, range, halakhaHtml) {
         return null;
     }
     const baseWords = tokenizeHe(halakhaHtml).slice(0, n);
-    const sigla = SYNOPSIS_WITNESS_ORDER.filter(s => {
-        const w = chapterWitness.witnesses[s];
-        return w && w.words.slice(start, end).some(Boolean);
-    });
+
+    // Non-empty addition run anchored at chapter-wide base index `a` for
+    // witness `w` (or null if none / witness has no additions field).
+    function additionRunAt(w, a) {
+        const run = w && w.additions && w.additions[String(a)];
+        return (run && run.length) ? run : null;
+    }
+
+    const sigla = activeSiglaInRange(chapterWitness, start, end);
     if (!sigla.length) {
         console.log('[synopsis] buildSynopsisStrips: no witness has data in range', { range, availableSigla: Object.keys(chapterWitness.witnesses || {}) });
         return null;
     }
 
-    function buildRow(table, label, words, isBase) {
+    // Column plan: an optional leading "plus column" (anchor -1, only at the
+    // chapter's start), then for each base position i a base column followed
+    // by a plus column if any active witness has an addition anchored there.
+    const hasLeadPlus = start === 0 && sigla.some(s => additionRunAt(chapterWitness.witnesses[s], -1));
+    const plusAfter = [];
+    for (let i = 0; i < n; i++) {
+        plusAfter.push(sigla.some(s => additionRunAt(chapterWitness.witnesses[s], start + i)));
+    }
+
+    function buildRow(table, label, siglum, words, isBase) {
         const tr = document.createElement('tr');
         tr.className = 'syn-strip' + (isBase ? ' syn-strip-base' : '');
         tr.dataset.siglum = label; // e.g. "א" (Erfurt) -- lets clicks distinguish which witness's row this is
@@ -1006,31 +1063,272 @@ function buildSynopsisStrips(chapterWitness, range, halakhaHtml) {
         labelCell.className = 'syn-strip-label';
         labelCell.textContent = label;
         tr.appendChild(labelCell);
-        words.forEach((w, i) => {
+
+        const w = siglum ? chapterWitness.witnesses[siglum] : null;
+
+        function appendPlusCell(anchor) {
+            const cell = document.createElement('td');
+            const run = additionRunAt(w, anchor);
+            if (run) {
+                cell.className = 'synw synw-plus';
+                cell.textContent = run.join(' ');
+                const entry = displacedEntryAt(w, anchor);
+                if (entry) {
+                    cell.classList.add('synw-ghost');
+                    cell.title = ghostTooltip(entry.anchor, ranges);
+                }
+            } else {
+                cell.className = 'synw synw-plusgap';
+            }
+            tr.appendChild(cell);
+        }
+
+        if (hasLeadPlus) appendPlusCell(-1);
+
+        words.forEach((word, i) => {
+            const baseIdx = start + i;
             const cell = document.createElement('td');
             cell.className = 'synw';
-            cell.dataset.baseIdx = String(start + i);
-            if (!w) {
+            cell.dataset.baseIdx = String(baseIdx);
+            if (!word) {
                 cell.classList.add('synw-gap');
                 cell.textContent = '⟨ ⟩';
             } else {
-                cell.textContent = w;
-                if (!isBase) cell.classList.add(wordsMatchHe(baseWords[i], w) ? 'synw-match' : 'synw-diff');
+                cell.textContent = word;
+                if (!isBase) cell.classList.add(wordsMatchHe(baseWords[i], word) ? 'synw-match' : 'synw-diff');
+            }
+            if (!isBase) {
+                const entry = displacedEntryAt(w, baseIdx);
+                if (entry) {
+                    cell.classList.add('synw-ghost');
+                    cell.title = ghostTooltip(entry.anchor, ranges);
+                }
             }
             tr.appendChild(cell);
+
+            if (plusAfter[i]) appendPlusCell(baseIdx);
         });
         table.appendChild(tr);
     }
 
     const table = document.createElement('table');
     table.className = 'witness-synopsis';
-    buildRow(table, 'בסיס', baseWords, true);
-    sigla.forEach(sig => buildRow(table, sig, chapterWitness.witnesses[sig].words.slice(start, end), false));
+    buildRow(table, 'בסיס', null, baseWords, true);
+    sigla.forEach(sig => buildRow(table, sig, sig, chapterWitness.witnesses[sig].words.slice(start, end), false));
 
     const scroller = document.createElement('div');
     scroller.className = 'witness-synopsis-scroll';
     scroller.appendChild(table);
     return scroller;
+}
+
+// --- Displaced text ("order swap" between witness and base order) --------
+// A witness's chapter entry may carry `displaced: [{start, end, anchor}, ...]`
+// (sorted, non-overlapping): the witness HAS the base-word range [start,end)
+// -- its words are aligned there in .words[], same as any other run -- but
+// in the manuscript that text physically sits elsewhere: right after
+// base-word index `anchor` (-1 = before the chapter's first word). Typical
+// case: two adjacent halakhot swapped, so one witness's later halakha is
+// displaced with its anchor at the end of the earlier one.
+
+// Hebrew-numeral halakha label, e.g. halakhaLabel(5) -> "ה״ו" (0-based
+// hi=5 is the 6th halakha). Reuses convert_number's gematria table.
+function halakhaLabel(hi) {
+    return 'ה״' + convert_number(hi + 1);
+}
+
+// Which halakha (index into a chapter's per-halakha `ranges`) contains
+// base-word index `idx`; -1 for the virtual "before the chapter's first
+// word" position (idx < 0).
+function halakhaIndexForBaseIdx(ranges, idx) {
+    if (idx == null || idx < 0) return -1;
+    for (let i = 0; i < ranges.length; i++) {
+        if (idx >= ranges[i][0] && idx < ranges[i][1]) return i;
+    }
+    return ranges.length - 1;
+}
+
+// The displaced-range entry (if any) covering base-word index `baseIdx` for
+// witness `w`.
+function displacedEntryAt(w, baseIdx) {
+    if (!w || !Array.isArray(w.displaced)) return null;
+    for (const entry of w.displaced) {
+        if (baseIdx >= entry.start && baseIdx < entry.end) return entry;
+    }
+    return null;
+}
+
+// Tooltip text for a ghosted (displaced) synopsis cell: names where the
+// witness actually places this text. `ranges` is the chapter's full
+// per-halakha range list (needed to turn `anchor` into a halakha label);
+// without it, only the generic explanation is shown.
+function ghostTooltip(anchor, ranges) {
+    const base = 'סדר שונה בעד זה — מוצג כאן לפי סדר נוסח הפנים';
+    if (!ranges) return base + '.';
+    const anchorHi = halakhaIndexForBaseIdx(ranges, anchor);
+    const where = anchorHi < 0 ? 'לפני תחילת הפרק' : `אחרי ${halakhaLabel(anchorHi)}`;
+    return `${base}. בכתב היד מופיע ${where}.`;
+}
+
+// Merge a chapter's displaced entries (across all witnesses) into
+// contiguous "movement clusters" of halakha indices. A single displaced
+// entry touches every halakha its base-word range overlaps, plus the
+// halakha containing its anchor -- for a plain two-halakha swap these are
+// never adjacent-only, they bracket a contiguous run (e.g. anchor in
+// halakha 4, displaced range inside halakha 6 -> touches {4,6}, and the run
+// [4,6] pulls in halakha 5 too, since it sits between them in base order).
+// Runs from different witnesses/entries that touch or overlap are merged.
+function computeMovementClusters(chapterWitness, ranges) {
+    if (!chapterWitness || !chapterWitness.witnesses || !ranges || !ranges.length) return [];
+    const intervals = [];
+    Object.keys(chapterWitness.witnesses).forEach(sig => {
+        const w = chapterWitness.witnesses[sig];
+        if (!w || !Array.isArray(w.displaced)) return;
+        w.displaced.forEach(entry => {
+            const touched = [];
+            for (let hi = 0; hi < ranges.length; hi++) {
+                const [s, e] = ranges[hi];
+                if (entry.start < e && entry.end > s) touched.push(hi);
+            }
+            const anchorHi = halakhaIndexForBaseIdx(ranges, entry.anchor);
+            if (anchorHi >= 0) touched.push(anchorHi);
+            if (touched.length) intervals.push([Math.min(...touched), Math.max(...touched)]);
+        });
+    });
+    if (!intervals.length) return [];
+    intervals.sort((a, b) => a[0] - b[0]);
+    const merged = [intervals[0].slice()];
+    intervals.slice(1).forEach(([lo, hi]) => {
+        const last = merged[merged.length - 1];
+        if (lo <= last[1] + 1) {
+            last[1] = Math.max(last[1], hi);
+        } else {
+            merged.push([lo, hi]);
+        }
+    });
+    return merged.map(([min, max]) => ({ min, max }));
+}
+
+// The movement cluster (if any) that halakha `hi` belongs to.
+function movementClusterForHalakha(chapterWitness, ranges, hi) {
+    return computeMovementClusters(chapterWitness, ranges).find(c => hi >= c.min && hi <= c.max) || null;
+}
+
+// A witness's reading order over a cluster's halakhot: each halakha's sort
+// key is the anchor of whichever of the witness's displaced entries
+// overlaps it (if any), else its own natural base-word start position --
+// so a displaced halakha sorts to right after the halakha it's actually
+// written beside in the manuscript.
+function witnessOrderForCluster(w, ranges, cluster) {
+    const indices = [];
+    for (let hi = cluster.min; hi <= cluster.max; hi++) indices.push(hi);
+    function keyFor(hi) {
+        const [s, e] = ranges[hi];
+        if (w && Array.isArray(w.displaced)) {
+            const entry = w.displaced.find(en => en.start < e && en.end > s);
+            if (entry) return entry.anchor;
+        }
+        return s;
+    }
+    return indices.slice().sort((a, b) => keyFor(a) - keyFor(b));
+}
+
+// Stable pastel palette for movement-table cells, keyed by halakha index so
+// the same halakha keeps the same color in every column.
+const MOVEMENT_PALETTE = ['#ffe1e1', '#ffe9c7', '#fff6b8', '#ddf2d3', '#cdecec', '#d7e3fb', '#e8dcf7', '#fbdaee'];
+
+function movementColorFor(hi) {
+    return MOVEMENT_PALETTE[((hi % MOVEMENT_PALETTE.length) + MOVEMENT_PALETTE.length) % MOVEMENT_PALETTE.length];
+}
+
+// Build the Lieberman-style "order table" for one movement cluster: one
+// column per source (base text, then witnesses -- witnesses sharing the
+// identical reading order over the cluster are merged into one column)
+// showing that source's own reading order of the cluster's halakhot, top to
+// bottom. The same halakha keeps the same pastel background in every
+// column (so a glance shows where it landed for each witness); a cell is
+// bold+red when its row position there differs from its position in the
+// base column, i.e. it moved for that source.
+function buildMovementTable(chapterWitness, ranges, textPerek, cluster) {
+    const clusterHalakhot = [];
+    for (let hi = cluster.min; hi <= cluster.max; hi++) clusterHalakhot.push(hi);
+    const basePositionOf = new Map(clusterHalakhot.map((hi, i) => [hi, i]));
+
+    const start = ranges[cluster.min][0];
+    const end = ranges[cluster.max][1];
+    const sigla = activeSiglaInRange(chapterWitness, start, end);
+    if (!sigla.length) return null;
+
+    // Group witnesses whose reading order over the cluster is identical.
+    const groups = [];
+    sigla.forEach(s => {
+        const order = witnessOrderForCluster(chapterWitness.witnesses[s], ranges, cluster);
+        const key = order.join(',');
+        let group = groups.find(g => g.key === key);
+        if (!group) {
+            group = { key, order, sigla: [] };
+            groups.push(group);
+        }
+        group.sigla.push(s);
+    });
+
+    // Nothing actually differs from base order for any witness group --
+    // nothing useful to draw.
+    const anyMoved = groups.some(g => g.order.some((hi, i) => hi !== clusterHalakhot[i]));
+    if (!anyMoved) return null;
+
+    const columns = [{ label: 'בסיס', order: clusterHalakhot }]
+        .concat(groups.map(g => ({ label: g.sigla.join(' '), order: g.order })));
+
+    function cellText(hi) {
+        const words = tokenizeHe(textPerek[hi]).slice(0, 3).join(' ');
+        return `${halakhaLabel(hi)} ${words} וכו׳`;
+    }
+
+    const table = document.createElement('table');
+    table.className = 'movement-table';
+
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    columns.forEach(col => {
+        const th = document.createElement('th');
+        th.textContent = col.label;
+        headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    for (let row = 0; row < clusterHalakhot.length; row++) {
+        const tr = document.createElement('tr');
+        columns.forEach(col => {
+            const hi = col.order[row];
+            const td = document.createElement('td');
+            td.textContent = cellText(hi);
+            td.style.background = movementColorFor(hi);
+            if (row !== basePositionOf.get(hi)) td.classList.add('movement-moved');
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'movement-table-scroll';
+    wrap.appendChild(table);
+    return wrap;
+}
+
+// Entry point for callers: the movement table to render above halakha
+// `hi`'s synopsis, or null if it's not part of any movement cluster. In
+// whole-chapter view the table is only rendered once per cluster (above the
+// FIRST involved halakha) via opts.chapterView; in single-halakha view it's
+// shown whenever the displayed halakha is part of a cluster.
+function buildMovementTableForHalakha(chapterWitness, ranges, textPerek, hi, opts) {
+    const cluster = movementClusterForHalakha(chapterWitness, ranges, hi);
+    if (!cluster) return null;
+    if (opts && opts.chapterView && hi !== cluster.min) return null;
+    return buildMovementTable(chapterWitness, ranges, textPerek, cluster);
 }
 
 function tokenizeHe(text) {
