@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+    <title>היקף ציטוטי מקרא — תוספתא</title>
+    <script src="tosefta_parsing_tools.js"></script>
+    <script src="research_citations_data.js"></script>
+    <style>
+        .research-nav a { margin-inline-start: 12px; }
+        .intro-card p { margin: 6px 0; line-height: 1.7; }
+        .intro-card .meta-line { color: #6b5b47; font-size: 0.85em; }
+        td.num, th.num { text-align: center; font-variant-numeric: tabular-nums; }
+        h2.card-title { font-size: 1.15em; margin: 0 0 10px; }
+        .reading-cell { font-family: 'Noto Serif Hebrew', serif; }
+        .reading-empty { color: #a33; font-weight: bold; }
+        .class-scope { color: #1c5a7a; }
+        .class-context { color: #7a3d1c; }
+        .filter-note { font-size: 0.8em; color: #6b5b47; margin: 4px 0 0; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <h1>הבדלים בהיקף ציטוטי מקרא</h1>
+        <div class="header-controls">
+            <nav class="research-nav">
+                <a href="research_aggadah.html">סיווג קטעי אגדה</a>
+                <a href="research_variance.html">מדדי שוני בין העדים</a>
+                <a href="index.html">האתר הראשי</a>
+            </nav>
+        </div>
+    </header>
+
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="פתח/סגור סרגל צד">☰</button>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <div class="page-layout">
+        <aside class="sidebar" id="sidebar">
+            <section class="filters-section">
+                <div class="filter-body">
+                    <strong>זוג עדים:</strong>
+                    <label class="filter-parent"><input type="radio" name="pair" value="א-ב" checked> א–ב (ערפורט–וינה)</label>
+                    <label class="filter-parent"><input type="radio" name="pair" value="א-ד"> א–ד (ערפורט–דפוס)</label>
+                    <label class="filter-parent"><input type="radio" name="pair" value="ב-ד"> ב–ד (וינה–דפוס)</label>
+                </div>
+                <div class="filter-body">
+                    <strong>סוג החילוף:</strong>
+                    <label class="filter-parent"><input type="checkbox" id="showScope" checked> היקף ציטוט (סמן וגו׳)</label>
+                    <label class="filter-parent"><input type="checkbox" id="showContext" checked> שוני בתוך ציטוט</label>
+                </div>
+                <div class="masechet-selector">
+                    <label for="masechet-dropdown">מסכת (לטבלת החילופים):</label>
+                    <select id="masechet-dropdown">
+                        <option value="">כל המסכתות</option>
+                    </select>
+                </div>
+                <section class="filters-section">
+                    <div class="status-bar">
+                        מוצגים <strong><span id="visible-count">0</span></strong> חילופים מתוך <strong><span id="total-count">0</span></strong>
+                    </div>
+                </section>
+            </section>
+        </aside>
+
+        <div class="main-content">
+            <section class="card intro-card">
+                <h2 class="card-title">כמה מן השוני בין העדים נובע מהיקף ציטוטי פסוקים?</h2>
+                <p>שני סוגי חילופים נמדדים: <strong class="class-scope">היקף ציטוט</strong> — עד אחד מקצר את
+                   הפסוק בסמן (וגו׳, וכו׳) והשני מאריך; <strong class="class-context">שוני בתוך ציטוט</strong> —
+                   הבדל מהותי שהלמה שלו נופלת בתוך מובאה מקראית מזוהה (זיהוי על פי סמני
+                   ציטוט — שנ׳, ת״ל — ואימות מול קורפוס התנ״ך).</p>
+                <p>הנרמול הכפול בוחן את טענת ברודי מול השערת־הנגד של המחקר: <strong>שינויי ציטוט לכל 100
+                   מילות טקסט</strong> (כמה מן השוני הכולל מוסבר בציטוטים) מול <strong>שינויי ציטוט לכל 100
+                   מילות ציטוט</strong> (האם החופש בציטוט עצמו חריג, או שרק צפיפות הציטוטים גבוהה).</p>
+                <p class="meta-line" id="meta-line"></p>
+            </section>
+
+            <section class="card">
+                <h2 class="card-title">לפי מסכת</h2>
+                <table id="density-table" class="display" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>מסכת</th>
+                            <th class="num">מילות בסיס</th>
+                            <th class="num">מילות ציטוט</th>
+                            <th class="num">צפיפות ציטוט %</th>
+                            <th class="num">מילות היקף־ציטוט</th>
+                            <th class="num">מילות שוני־בציטוט</th>
+                            <th class="num">שינויי ציטוט /100 מילים</th>
+                            <th class="num">שינויי ציטוט /100 מילות ציטוט</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </section>
+
+            <section class="card">
+                <h2 class="card-title">החילופים עצמם</h2>
+                <p class="filter-note">קריאה ריקה (ח׳) פירושה שהמילים חסרות בעד זה. הקישור בעמודת המקום פותח את המסכת באתר הראשי.</p>
+                <table id="sites-table" class="display" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>מסכת</th>
+                            <th class="num">פרק:הלכה</th>
+                            <th class="num">זוג</th>
+                            <th class="num">סוג</th>
+                            <th>דיבור המתחיל (נוסח הפנים)</th>
+                            <th>העד הראשון</th>
+                            <th>העד השני</th>
+                            <th class="num">מילים</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </section>
+        </div>
+    </div>
+
+    <script>
+    function escapeHtml(text) {
+        return String(text ?? "")
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+
+    const sidebarEl = document.getElementById('sidebar');
+    document.getElementById('sidebar-toggle').addEventListener('click', () => {
+        sidebarEl.classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('visible');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', () => {
+        sidebarEl.classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('visible');
+    });
+
+    const heb = CITATIONS_DATA.eng_to_heb;
+    const CLASS_HEBREW = {
+        citation_scope: '<span class="class-scope">היקף ציטוט</span>',
+        citation_context: '<span class="class-context">בתוך ציטוט</span>',
+    };
+    const COL = {};
+    CITATIONS_DATA.site_columns.forEach((c, i) => COL[c] = i);
+    document.getElementById('meta-line').textContent =
+        `הופק: ${CITATIONS_DATA.generated} · מקור: ${CITATIONS_DATA.source}`;
+
+    function viewerLink(eng, chapter, halakha) {
+        const loc = locations.find(l => decodeURIComponent(l).endsWith('Tosefta ' + eng));
+        if (!loc) return null;
+        return `index.html?masechet=${loc}#hal-${chapter - 1}-${halakha - 1}`;
+    }
+
+    // Tractate dropdown
+    const masechetDropdown = document.getElementById('masechet-dropdown');
+    [...new Set(CITATIONS_DATA.sites.map(s => s[COL.tractate]))].forEach(eng => {
+        const opt = document.createElement('option');
+        opt.value = eng;
+        opt.textContent = heb[eng] || eng;
+        masechetDropdown.appendChild(opt);
+    });
+
+    // --- Density table (per pair) ---
+    let densityTable = null;
+    function buildDensity() {
+        const pair = document.querySelector('input[name="pair"]:checked').value;
+        const rows = CITATIONS_DATA.tractates
+            .filter(r => r.pair === pair)
+            .map(r => [
+                heb[r.tractate] || r.tractate,
+                r.base_words,
+                r.citation_words,
+                r.base_words ? (100 * r.citation_words / r.base_words).toFixed(1) + '%' : '—',
+                r.citation_scope,
+                r.citation_context,
+                r.citation_per_100w.toFixed(2),
+                r.citation_words ? r.citation_per_100_cite_words.toFixed(1) : '—',
+            ]);
+        if (densityTable) densityTable.destroy();
+        densityTable = $('#density-table').DataTable({
+            data: rows,
+            paging: false,
+            info: false,
+            order: [],
+            columnDefs: [{ targets: [1, 2, 3, 4, 5, 6, 7], className: 'num' }],
+            language: { search: 'חיפוש:', emptyTable: 'לא נמצאו נתונים', zeroRecords: 'לא נמצאו שורות תואמות' }
+        });
+    }
+
+    // --- Sites table ---
+    function readingCell(text) {
+        if (!text || !text.trim()) return '<span class="reading-empty">ח׳</span>';
+        return `<span class="reading-cell">${escapeHtml(text)}</span>`;
+    }
+    const siteRows = CITATIONS_DATA.sites.map(s => {
+        const eng = s[COL.tractate];
+        const c = s[COL.chapter], h = s[COL.halakah];
+        const link = viewerLink(eng, c, h);
+        const place = link ? `<a href="${link}" target="_blank">${c}:${h}</a>` : `${c}:${h}`;
+        return [
+            heb[eng] || eng,
+            place,
+            s[COL.pair],
+            CLASS_HEBREW[s[COL.class]] || s[COL.class],
+            `<span class="reading-cell">${escapeHtml(s[COL.lemma])}</span>`,
+            readingCell(s[COL.reading_1]),
+            readingCell(s[COL.reading_2]),
+            s[COL.affected_words],
+        ];
+    });
+    const sitesTable = $('#sites-table').DataTable({
+        data: siteRows,
+        pageLength: 50,
+        order: [],
+        columnDefs: [{ targets: [1, 2, 3, 7], className: 'num' }],
+        language: {
+            search: 'חיפוש:',
+            lengthMenu: 'הצג _MENU_ שורות',
+            info: 'מציג _START_–_END_ מתוך _TOTAL_',
+            infoFiltered: '(מסונן מתוך _MAX_ שורות)',
+            paginate: { first: 'ראשון', last: 'אחרון', next: 'הבא', previous: 'הקודם' },
+            emptyTable: 'לא נמצאו נתונים',
+            zeroRecords: 'לא נמצאו שורות תואמות'
+        }
+    });
+
+    $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+        if (settings.nTable.id !== 'sites-table') return true;
+        const s = CITATIONS_DATA.sites[dataIndex];
+        if (!s) return true;
+        const pair = document.querySelector('input[name="pair"]:checked').value;
+        if (s[COL.pair] !== pair) return false;
+        const selected = masechetDropdown.value;
+        if (selected && s[COL.tractate] !== selected) return false;
+        if (s[COL.class] === 'citation_scope' && !document.getElementById('showScope').checked) return false;
+        if (s[COL.class] === 'citation_context' && !document.getElementById('showContext').checked) return false;
+        return true;
+    });
+
+    function applyFilters() {
+        buildDensity();
+        sitesTable.draw();
+        const info = sitesTable.page.info();
+        document.getElementById('visible-count').textContent = info.recordsDisplay;
+        document.getElementById('total-count').textContent = info.recordsTotal;
+    }
+    document.querySelectorAll('input[name="pair"], #showScope, #showContext')
+        .forEach(el => el.addEventListener('change', applyFilters));
+    masechetDropdown.addEventListener('change', applyFilters);
+    applyFilters();
+    </script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+    <title>סיווג קטעי אגדה — תוספתא</title>
+    <script src="tosefta_parsing_tools.js"></script>
+    <script src="research_aggadah_data.js"></script>
+    <style>
+        .research-nav a { margin-inline-start: 12px; }
+        .intro-card p { margin: 6px 0; line-height: 1.7; }
+        .intro-card .meta-line { color: #6b5b47; font-size: 0.85em; }
+        td.num, th.num { text-align: center; font-variant-numeric: tabular-nums; }
+        .stat-chips { display: flex; gap: 18px; flex-wrap: wrap; margin: 10px 0; }
+        .stat-chip { background: #f7f1e8; border: 1px solid #e0d5c5; border-radius: 8px; padding: 8px 16px; text-align: center; }
+        .stat-chip .val { font-size: 1.5em; font-weight: bold; display: block; }
+        .stat-chip .lbl { font-size: 0.8em; color: #6b5b47; }
+        .conf-high { color: #1c7a3d; font-weight: bold; }
+        .conf-medium { color: #a86b00; }
+        .seg-snippet { font-family: 'Noto Serif Hebrew', serif; }
+        #tractate-summary tbody tr { cursor: pointer; }
+        #tractate-summary tbody tr.selected { background: #f0e6d6 !important; }
+        h2.card-title { font-size: 1.15em; margin: 0 0 10px; }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <h1>סיווג קטעי אגדה בתוספתא</h1>
+        <div class="header-controls">
+            <nav class="research-nav">
+                <a href="research_variance.html">מדדי שוני בין העדים</a>
+                <a href="research_citations.html">היקף ציטוטי מקרא</a>
+                <a href="index.html">האתר הראשי</a>
+            </nav>
+        </div>
+    </header>
+
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="פתח/סגור סרגל צד">☰</button>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <div class="page-layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="masechet-selector">
+                <label for="masechet-dropdown">בחירת מסכת:</label>
+                <select id="masechet-dropdown">
+                    <option value="">כל המסכתות</option>
+                </select>
+            </div>
+            <section class="filters-section">
+                <div class="filter-body">
+                    <label class="filter-parent"><input type="checkbox" id="showHigh" checked> ביטחון גבוה</label>
+                    <label class="filter-parent"><input type="checkbox" id="showMedium" checked> ביטחון בינוני</label>
+                </div>
+                <div class="status-bar">
+                    מוצגים <strong><span id="visible-count">0</span></strong> קטעים מתוך <strong><span id="total-count">0</span></strong>
+                </div>
+            </section>
+        </aside>
+
+        <div class="main-content">
+            <section class="card intro-card">
+                <h2 class="card-title">זיהוי קטעי אגדה</h2>
+                <p>קטעי האגדה שבתוספתא, כפי שזוהו על ידי יישור אוטומטי של <strong>אגדות התוספתא</strong> להיגר
+                   (נ״י תרפ״ט — אנתולוגיה של אגדות התוספתא, הקרובה לנוסח כ״י ערפורט) מול נוסח הפנים
+                   (כ״י וינה / מהד׳ ליברמן). הסיווג משמש לבחינת טענת ברודי שמידת השוני בין הענפים
+                   תלויה באופי האגדי של הקטע.</p>
+                <div class="stat-chips" id="summary-chips"></div>
+                <p class="meta-line" id="meta-line"></p>
+            </section>
+
+            <section class="card">
+                <h2 class="card-title">כיסוי לפי מסכת <span style="font-weight:normal;font-size:0.8em;color:#6b5b47;">(לחיצה על שורה מסננת את טבלת הקטעים)</span></h2>
+                <table id="tractate-summary" class="display" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>מסכת</th>
+                            <th class="num">קטעי אגדה</th>
+                            <th class="num">סה"כ קטעים</th>
+                            <th class="num">אחוז</th>
+                            <th class="num">גבוה</th>
+                            <th class="num">בינוני</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </section>
+
+            <section class="card">
+                <h2 class="card-title">הקטעים המסווגים</h2>
+                <table id="segments-table" class="display" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>מסכת</th>
+                            <th class="num">פרק:הלכה</th>
+                            <th>תחילת הקטע</th>
+                            <th class="num">ביטחון</th>
+                            <th class="num">ציון</th>
+                            <th class="num">מילים משותפות</th>
+                            <th class="num">עמ׳ היגר</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </section>
+        </div>
+    </div>
+
+    <script>
+    function escapeHtml(text) {
+        return String(text ?? "")
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+
+    const sidebarEl = document.getElementById('sidebar');
+    const sidebarToggleBtn = document.getElementById('sidebar-toggle');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    function toggleSidebar() {
+        sidebarEl.classList.toggle('open');
+        sidebarOverlay.classList.toggle('visible');
+    }
+    sidebarToggleBtn.addEventListener('click', toggleSidebar);
+    sidebarOverlay.addEventListener('click', toggleSidebar);
+
+    const CONF_HEBREW = { high: 'גבוה', medium: 'בינוני' };
+    const masechetDropdown = document.getElementById('masechet-dropdown');
+
+    // Link into the main viewer: locations comes from tosefta_parsing_tools.js
+    function viewerLink(eng, chapter, halakha) {
+        const loc = locations.find(l => decodeURIComponent(l).endsWith('Tosefta ' + eng));
+        if (!loc) return null;
+        return `index.html?masechet=${loc}#hal-${chapter - 1}-${halakha - 1}`;
+    }
+
+    // Flatten segments
+    const allSegments = [];
+    const tractateOrder = Object.keys(AGGADAH_DATA.tractates);
+    tractateOrder.forEach(eng => {
+        const t = AGGADAH_DATA.tractates[eng];
+        t.segments.forEach(seg => allSegments.push({ eng, heb: t.heb, ...seg }));
+    });
+
+    // Populate dropdown
+    tractateOrder.forEach(eng => {
+        const opt = document.createElement('option');
+        opt.value = eng;
+        opt.textContent = AGGADAH_DATA.tractates[eng].heb;
+        masechetDropdown.appendChild(opt);
+    });
+
+    // Summary chips
+    const totalTagged = allSegments.length;
+    const nHigh = allSegments.filter(s => s.conf === 'high').length;
+    document.getElementById('summary-chips').innerHTML = [
+        [totalTagged, 'קטעים מסווגים כאגדה'],
+        [AGGADAH_DATA.total_base_segments, 'קטעי בסיס בקורפוס'],
+        [(100 * totalTagged / AGGADAH_DATA.total_base_segments).toFixed(1) + '%', 'מן הקורפוס'],
+        [nHigh, 'ביטחון גבוה'],
+        [totalTagged - nHigh, 'ביטחון בינוני'],
+    ].map(([v, l]) => `<div class="stat-chip"><span class="val">${v}</span><span class="lbl">${l}</span></div>`).join('');
+    document.getElementById('meta-line').textContent =
+        `הופק: ${AGGADAH_DATA.generated} · מקור: ${AGGADAH_DATA.source}`;
+
+    // Tractate summary table
+    const summaryRows = tractateOrder.map(eng => {
+        const t = AGGADAH_DATA.tractates[eng];
+        const high = t.segments.filter(s => s.conf === 'high').length;
+        const pct = t.total_segments ? (100 * t.segments.length / t.total_segments) : 0;
+        return [t.heb, t.segments.length, t.total_segments, pct.toFixed(0) + '%',
+                high, t.segments.length - high, eng];
+    });
+    const summaryTable = $('#tractate-summary').DataTable({
+        data: summaryRows,
+        paging: false,
+        searching: false,
+        info: false,
+        order: [[1, 'desc']],
+        columnDefs: [
+            { targets: [1, 2, 3, 4, 5], className: 'num' },
+            { targets: 6, visible: false }
+        ],
+        language: { emptyTable: 'לא נמצאו נתונים' }
+    });
+    $('#tractate-summary tbody').on('click', 'tr', function () {
+        const row = summaryTable.row(this).data();
+        if (!row) return;
+        const eng = row[6];
+        if (masechetDropdown.value === eng) {
+            masechetDropdown.value = '';
+            $(this).removeClass('selected');
+        } else {
+            masechetDropdown.value = eng;
+            $('#tractate-summary tbody tr').removeClass('selected');
+            $(this).addClass('selected');
+        }
+        applyFilters();
+    });
+
+    // Segments table
+    const segRows = allSegments.map(s => {
+        const link = viewerLink(s.eng, s.c, s.h);
+        const refCell = link
+            ? `<a href="${link}" target="_blank">${s.ref}</a>`
+            : s.ref;
+        return [
+            s.heb,
+            refCell,
+            `<span class="seg-snippet">${escapeHtml(s.snippet)}</span>`,
+            `<span class="conf-${s.conf}">${CONF_HEBREW[s.conf] || s.conf}</span>`,
+            s.score.toFixed(2),
+            s.shared,
+            (s.pages || []).join(', '),
+        ];
+    });
+    const segTable = $('#segments-table').DataTable({
+        data: segRows,
+        pageLength: 50,
+        order: [],
+        columnDefs: [{ targets: [1, 3, 4, 5, 6], className: 'num' }],
+        language: {
+            search: 'חיפוש:',
+            lengthMenu: 'הצג _MENU_ שורות',
+            info: 'מציג _START_–_END_ מתוך _TOTAL_',
+            infoFiltered: '(מסונן מתוך _MAX_ שורות)',
+            paginate: { first: 'ראשון', last: 'אחרון', next: 'הבא', previous: 'הקודם' },
+            emptyTable: 'לא נמצאו נתונים',
+            zeroRecords: 'לא נמצאו שורות תואמות'
+        }
+    });
+
+    $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+        if (settings.nTable.id !== 'segments-table') return true;
+        const seg = allSegments[dataIndex];
+        if (!seg) return true;
+        const selected = masechetDropdown.value;
+        if (selected && seg.eng !== selected) return false;
+        if (seg.conf === 'high' && !document.getElementById('showHigh').checked) return false;
+        if (seg.conf === 'medium' && !document.getElementById('showMedium').checked) return false;
+        return true;
+    });
+
+    function applyFilters() {
+        segTable.draw();
+        const info = segTable.page.info();
+        document.getElementById('visible-count').textContent = info.recordsDisplay;
+        document.getElementById('total-count').textContent = info.recordsTotal;
+    }
+    masechetDropdown.addEventListener('change', () => {
+        $('#tractate-summary tbody tr').removeClass('selected');
+        applyFilters();
+    });
+    document.getElementById('showHigh').addEventListener('change', applyFilters);
+    document.getElementById('showMedium').addEventListener('change', applyFilters);
+    applyFilters();
+    </script>
+</body>
+</html>
