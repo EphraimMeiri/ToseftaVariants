@@ -8,27 +8,81 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
     <title>סיווג קטעי אגדה — תוספתא</title>
     <script src="tosefta_parsing_tools.js"></script>
     <script src="research_aggadah_data.js"></script>
+    <script src="research_variance_data.js"></script>
+    <script src="research_text_common.js"></script>
     <style>
         .research-nav a { margin-inline-start: 12px; }
         .intro-card p { margin: 6px 0; line-height: 1.7; }
         .intro-card .meta-line { color: #6b5b47; font-size: 0.85em; }
         td.num, th.num { text-align: center; font-variant-numeric: tabular-nums; }
-        .stat-chips { display: flex; gap: 18px; flex-wrap: wrap; margin: 10px 0; }
-        .stat-chip { background: #f7f1e8; border: 1px solid #e0d5c5; border-radius: 8px; padding: 8px 16px; text-align: center; }
-        .stat-chip .val { font-size: 1.5em; font-weight: bold; display: block; }
-        .stat-chip .lbl { font-size: 0.8em; color: #6b5b47; }
-        .conf-high { color: #1c7a3d; font-weight: bold; }
-        .conf-medium { color: #a86b00; }
-        .seg-snippet { font-family: 'Noto Serif Hebrew', serif; }
-        #tractate-summary tbody tr { cursor: pointer; }
-        #tractate-summary tbody tr.selected { background: #f0e6d6 !important; }
+        td.dim, th.dim { color: #b3a48d; }
         h2.card-title { font-size: 1.15em; margin: 0 0 10px; }
+        .subtable { width: 100%; border-collapse: collapse; }
+        .subtable th, .subtable td { border-bottom: 1px solid #e0d5c5; padding: 6px 10px; }
+        .subtable th { background: #f7f1e8; }
+        .subtable td:first-child { font-weight: bold; }
+        .filter-note { font-size: 0.8em; color: #6b5b47; margin: 4px 0 0; line-height: 1.5; }
+
+        /* Class colors (shared vocabulary with research_variance.html) */
+        .vh-substantive      { --vc-bg: #f5d3cd; --vc-line: #b03a2e; }
+        .vh-minor            { --vc-bg: #cfe8e2; --vc-line: #157a6c; }
+        .vh-citation_scope   { --vc-bg: #d3e1f5; --vc-line: #2e5fa3; }
+        .vh-citation_context { --vc-bg: #e5d7f2; --vc-line: #6e4a9e; }
+        .vh-orthographic     { --vc-bg: #e6e1d8; --vc-line: #857b6b; }
+        .vh-linguistic       { --vc-bg: #e7e9c4; --vc-line: #79802f; }
+        .swatch {
+            display: inline-block; width: 13px; height: 13px; border-radius: 3px;
+            background: var(--vc-bg); border: 1.5px solid var(--vc-line);
+            vertical-align: middle; margin-inline-end: 4px;
+        }
+
+        /* Text view */
+        .halakha-block {
+            border: 1px solid #e0d5c5; border-radius: 8px;
+            padding: 10px 14px; margin: 10px 0; background: #fffdf9;
+        }
+        .halakha-block.aggadah { background: #fbf3dd; border-inline-start: 4px solid #d3a53a; }
+        .halakha-block.flash { outline: 3px solid #d3a53a; }
+        .halakha-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+        .halakha-head .hal-ref { font-weight: bold; color: #5a4a35; }
+        .agg-badge {
+            font-size: 0.72em; background: #d3a53a; color: #fff;
+            border-radius: 10px; padding: 1px 9px;
+        }
+        .agg-badge.medium { background: #cbb47a; }
+        .count-chip {
+            font-size: 0.72em; border-radius: 10px; padding: 1px 8px;
+            background: var(--vc-bg); border: 1px solid var(--vc-line); color: #3a3126;
+        }
+        .count-chip.off { opacity: 0.35; }
+        .halakha-text { font-family: 'Noto Serif Hebrew', serif; line-height: 2.1; font-size: 1.12em; }
+        .vh {
+            background: var(--vc-bg);
+            box-shadow: 0 1.5px 0 var(--vc-line);
+            border-radius: 3px; padding: 0 2px; cursor: help;
+        }
+        .vb { color: var(--vc-line); cursor: help; font-size: 0.8em; }
+        .chapter-head { font-family: 'Suez One', serif; color: #5a4a35; margin: 22px 0 4px; font-size: 1.3em; }
+        .leftover { font-size: 0.85em; color: #6b5b47; margin-top: 6px; border-top: 1px dashed #e0d5c5; padding-top: 5px; line-height: 1.9; }
+        #text-loading { text-align: center; padding: 40px; color: #6b5b47; }
+
+        /* Passages list (sidebar) */
+        .passages-title { font-weight: bold; margin: 10px 0 6px; color: #5a4a35; }
+        .passages-list { max-height: 48vh; overflow-y: auto; border-top: 1px solid #e0d5c5; }
+        .passage-item {
+            display: block; padding: 5px 6px; border-bottom: 1px solid #efe7d9;
+            cursor: pointer; font-size: 0.85em; line-height: 1.5; color: #3a3126;
+            text-decoration: none;
+        }
+        .passage-item:hover { background: #f7f1e8; }
+        .passage-item .p-ref { font-weight: bold; margin-inline-end: 6px; }
+        .passage-item .p-conf { float: inline-end; font-size: 0.85em; }
+        .passage-item .p-conf.high { color: #1c7a3d; }
+        .passage-item .p-conf.medium { color: #a86b00; }
+        .passage-item .p-snip { color: #6b5b47; font-family: 'Noto Serif Hebrew', serif; }
     </style>
 </head>
 <body>
@@ -49,217 +103,240 @@
     <div class="page-layout">
         <aside class="sidebar" id="sidebar">
             <div class="masechet-selector">
-                <label for="masechet-dropdown">בחירת מסכת:</label>
-                <select id="masechet-dropdown">
-                    <option value="">כל המסכתות</option>
-                </select>
+                <label for="masechet-dropdown">מסכת:</label>
+                <select id="masechet-dropdown"></select>
             </div>
             <section class="filters-section">
                 <div class="filter-body">
+                    <strong>זוג עדים:</strong>
+                    <label class="filter-parent"><input type="radio" name="pair" value="א-ב" checked> א–ב (ערפורט–וינה)</label>
+                    <label class="filter-parent"><input type="radio" name="pair" value="א-ד"> א–ד (ערפורט–דפוס)</label>
+                    <label class="filter-parent"><input type="radio" name="pair" value="ב-ד"> ב–ד (וינה–דפוס)</label>
+                </div>
+                <div class="filter-body">
+                    <strong>סוגי שינוי מודגשים:</strong>
+                    <label class="filter-parent"><input type="checkbox" class="class-cb" value="substantive" checked> <span class="swatch vh-substantive"></span>שוני מהותי</label>
+                    <label class="filter-parent"><input type="checkbox" class="class-cb" value="minor" checked> <span class="swatch vh-minor"></span>קל (ו׳ החיבור, סדר מילים)</label>
+                    <label class="filter-parent"><input type="checkbox" class="class-cb" value="citation_scope" checked> <span class="swatch vh-citation_scope"></span>היקף ציטוט (סמן וגו׳)</label>
+                    <label class="filter-parent"><input type="checkbox" class="class-cb" value="citation_context" checked> <span class="swatch vh-citation_context"></span>שוני בתוך ציטוט</label>
+                    <label class="filter-parent"><input type="checkbox" class="class-cb" value="orthographic" checked> <span class="swatch vh-orthographic"></span>כתיב</label>
+                    <label class="filter-parent"><input type="checkbox" class="class-cb" value="linguistic" checked> <span class="swatch vh-linguistic"></span>לשון (ב/כ, ב/ל)</label>
+                </div>
+                <div class="filter-body">
+                    <strong>תיוג אגדה (היגר):</strong>
                     <label class="filter-parent"><input type="checkbox" id="showHigh" checked> ביטחון גבוה</label>
                     <label class="filter-parent"><input type="checkbox" id="showMedium" checked> ביטחון בינוני</label>
                 </div>
-                <div class="status-bar">
-                    מוצגים <strong><span id="visible-count">0</span></strong> קטעים מתוך <strong><span id="total-count">0</span></strong>
-                </div>
+                <div class="passages-title">קטעי האגדה במסכת <span id="passages-count"></span></div>
+                <div class="passages-list" id="passages-list"></div>
             </section>
         </aside>
 
         <div class="main-content">
             <section class="card intro-card">
-                <h2 class="card-title">זיהוי קטעי אגדה</h2>
-                <p>קטעי האגדה שבתוספתא, כפי שזוהו על ידי יישור אוטומטי של <strong>אגדות התוספתא</strong> להיגר
-                   (נ״י תרפ״ט — אנתולוגיה של אגדות התוספתא, הקרובה לנוסח כ״י ערפורט) מול נוסח הפנים
-                   (כ״י וינה / מהד׳ ליברמן). הסיווג משמש לבחינת טענת ברודי שמידת השוני בין הענפים
-                   תלויה באופי האגדי של הקטע.</p>
-                <div class="stat-chips" id="summary-chips"></div>
+                <h2 class="card-title" id="totals-title">שינויים לפי סוג וסוג־קטע</h2>
+                <p>הטקסט המלא של המסכת מוצג לפי פרקים; הלכות המתויגות כאגדה (על פי יישור
+                   <strong>אגדות התוספתא</strong> להיגר מול נוסח הפנים) מסומנות ברקע זהוב ובתג
+                   <span class="agg-badge">אגדה</span> (<span class="agg-badge medium">אגדה?</span> = ביטחון
+                   בינוני). כל חילוף מודגש בצבע סוגו; ריחוף מציג את קריאות שני העדים. הטבלה משווה
+                   את שיעורי השינוי לכל 100 מילים בין קטעי האגדה לשאר המסכת.</p>
+                <table class="subtable" id="totals-table"></table>
                 <p class="meta-line" id="meta-line"></p>
             </section>
 
             <section class="card">
-                <h2 class="card-title">כיסוי לפי מסכת <span style="font-weight:normal;font-size:0.8em;color:#6b5b47;">(לחיצה על שורה מסננת את טבלת הקטעים)</span></h2>
-                <table id="tractate-summary" class="display" style="width:100%">
-                    <thead>
-                        <tr>
-                            <th>מסכת</th>
-                            <th class="num">קטעי אגדה</th>
-                            <th class="num">סה"כ קטעים</th>
-                            <th class="num">אחוז</th>
-                            <th class="num">גבוה</th>
-                            <th class="num">בינוני</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </section>
-
-            <section class="card">
-                <h2 class="card-title">הקטעים המסווגים</h2>
-                <table id="segments-table" class="display" style="width:100%">
-                    <thead>
-                        <tr>
-                            <th>מסכת</th>
-                            <th class="num">פרק:הלכה</th>
-                            <th>תחילת הקטע</th>
-                            <th class="num">ביטחון</th>
-                            <th class="num">ציון</th>
-                            <th class="num">מילים משותפות</th>
-                            <th class="num">עמ׳ היגר</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
+                <div id="text-loading">טוען טקסט…</div>
+                <div id="text-body"></div>
             </section>
         </div>
     </div>
 
     <script>
-    function escapeHtml(text) {
-        return String(text ?? "")
-            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-    }
+    const CLASSES = RESEARCH_CLASSES;
+    const heb = VARIANCE_DATA.eng_to_heb;
+    const COL = {};
+    VARIANCE_DATA.halakah_columns.forEach((c, i) => COL[c] = i);
 
     const sidebarEl = document.getElementById('sidebar');
-    const sidebarToggleBtn = document.getElementById('sidebar-toggle');
-    const sidebarOverlay = document.getElementById('sidebar-overlay');
-    function toggleSidebar() {
+    document.getElementById('sidebar-toggle').addEventListener('click', () => {
         sidebarEl.classList.toggle('open');
-        sidebarOverlay.classList.toggle('visible');
-    }
-    sidebarToggleBtn.addEventListener('click', toggleSidebar);
-    sidebarOverlay.addEventListener('click', toggleSidebar);
-
-    const CONF_HEBREW = { high: 'גבוה', medium: 'בינוני' };
-    const masechetDropdown = document.getElementById('masechet-dropdown');
-
-    // Link into the main viewer: locations comes from tosefta_parsing_tools.js
-    function viewerLink(eng, chapter, halakha) {
-        const loc = locations.find(l => decodeURIComponent(l).endsWith('Tosefta ' + eng));
-        if (!loc) return null;
-        return `index.html?masechet=${loc}#hal-${chapter - 1}-${halakha - 1}`;
-    }
-
-    // Flatten segments
-    const allSegments = [];
-    const tractateOrder = Object.keys(AGGADAH_DATA.tractates);
-    tractateOrder.forEach(eng => {
-        const t = AGGADAH_DATA.tractates[eng];
-        t.segments.forEach(seg => allSegments.push({ eng, heb: t.heb, ...seg }));
+        document.getElementById('sidebar-overlay').classList.toggle('visible');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', () => {
+        sidebarEl.classList.toggle('open');
+        document.getElementById('sidebar-overlay').classList.toggle('visible');
     });
 
-    // Populate dropdown
-    tractateOrder.forEach(eng => {
-        const opt = document.createElement('option');
-        opt.value = eng;
-        opt.textContent = AGGADAH_DATA.tractates[eng].heb;
-        masechetDropdown.appendChild(opt);
-    });
-
-    // Summary chips
-    const totalTagged = allSegments.length;
-    const nHigh = allSegments.filter(s => s.conf === 'high').length;
-    document.getElementById('summary-chips').innerHTML = [
-        [totalTagged, 'קטעים מסווגים כאגדה'],
-        [AGGADAH_DATA.total_base_segments, 'קטעי בסיס בקורפוס'],
-        [(100 * totalTagged / AGGADAH_DATA.total_base_segments).toFixed(1) + '%', 'מן הקורפוס'],
-        [nHigh, 'ביטחון גבוה'],
-        [totalTagged - nHigh, 'ביטחון בינוני'],
-    ].map(([v, l]) => `<div class="stat-chip"><span class="val">${v}</span><span class="lbl">${l}</span></div>`).join('');
     document.getElementById('meta-line').textContent =
         `הופק: ${AGGADAH_DATA.generated} · מקור: ${AGGADAH_DATA.source}`;
 
-    // Tractate summary table
-    const summaryRows = tractateOrder.map(eng => {
-        const t = AGGADAH_DATA.tractates[eng];
-        const high = t.segments.filter(s => s.conf === 'high').length;
-        const pct = t.total_segments ? (100 * t.segments.length / t.total_segments) : 0;
-        return [t.heb, t.segments.length, t.total_segments, pct.toFixed(0) + '%',
-                high, t.segments.length - high, eng];
+    // --- tractate dropdown: every tractate with variance data, aggadah counts in label ---
+    const masechetDropdown = document.getElementById('masechet-dropdown');
+    const textTractates = [...new Set(VARIANCE_DATA.halakhot.map(r => r[COL.tractate]))];
+    textTractates.forEach(eng => {
+        const opt = document.createElement('option');
+        opt.value = eng;
+        const agg = AGGADAH_DATA.tractates[eng];
+        opt.textContent = (heb[eng] || eng) +
+            (agg ? ` — ${agg.segments.length}/${agg.total_segments} אגדה` : '');
+        masechetDropdown.appendChild(opt);
     });
-    const summaryTable = $('#tractate-summary').DataTable({
-        data: summaryRows,
-        paging: false,
-        searching: false,
-        info: false,
-        order: [[1, 'desc']],
-        columnDefs: [
-            { targets: [1, 2, 3, 4, 5], className: 'num' },
-            { targets: 6, visible: false }
-        ],
-        language: { emptyTable: 'לא נמצאו נתונים' }
-    });
-    $('#tractate-summary tbody').on('click', 'tr', function () {
-        const row = summaryTable.row(this).data();
-        if (!row) return;
-        const eng = row[6];
-        if (masechetDropdown.value === eng) {
-            masechetDropdown.value = '';
-            $(this).removeClass('selected');
-        } else {
-            masechetDropdown.value = eng;
-            $('#tractate-summary tbody tr').removeClass('selected');
-            $(this).addClass('selected');
-        }
-        applyFilters();
-    });
+    if (textTractates.includes('Sotah')) masechetDropdown.value = 'Sotah';
 
-    // Segments table
-    const segRows = allSegments.map(s => {
-        const link = viewerLink(s.eng, s.c, s.h);
-        const refCell = link
-            ? `<a href="${link}" target="_blank">${s.ref}</a>`
-            : s.ref;
-        return [
-            s.heb,
-            refCell,
-            `<span class="seg-snippet">${escapeHtml(s.snippet)}</span>`,
-            `<span class="conf-${s.conf}">${CONF_HEBREW[s.conf] || s.conf}</span>`,
-            s.score.toFixed(2),
-            s.shared,
-            (s.pages || []).join(', '),
-        ];
-    });
-    const segTable = $('#segments-table').DataTable({
-        data: segRows,
-        pageLength: 50,
-        order: [],
-        columnDefs: [{ targets: [1, 3, 4, 5, 6], className: 'num' }],
-        language: {
-            search: 'חיפוש:',
-            lengthMenu: 'הצג _MENU_ שורות',
-            info: 'מציג _START_–_END_ מתוך _TOTAL_',
-            infoFiltered: '(מסונן מתוך _MAX_ שורות)',
-            paginate: { first: 'ראשון', last: 'אחרון', next: 'הבא', previous: 'הקודם' },
-            emptyTable: 'לא נמצאו נתונים',
-            zeroRecords: 'לא נמצאו שורות תואמות'
-        }
-    });
-
-    $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
-        if (settings.nTable.id !== 'segments-table') return true;
-        const seg = allSegments[dataIndex];
-        if (!seg) return true;
-        const selected = masechetDropdown.value;
-        if (selected && seg.eng !== selected) return false;
-        if (seg.conf === 'high' && !document.getElementById('showHigh').checked) return false;
-        if (seg.conf === 'medium' && !document.getElementById('showMedium').checked) return false;
-        return true;
-    });
-
-    function applyFilters() {
-        segTable.draw();
-        const info = segTable.page.info();
-        document.getElementById('visible-count').textContent = info.recordsDisplay;
-        document.getElementById('total-count').textContent = info.recordsTotal;
+    function getState() {
+        return {
+            eng: masechetDropdown.value,
+            pair: document.querySelector('input[name="pair"]:checked').value,
+            classes: new Set([...document.querySelectorAll('.class-cb:checked')].map(cb => cb.value)),
+            showHigh: document.getElementById('showHigh').checked,
+            showMedium: document.getElementById('showMedium').checked,
+        };
     }
-    masechetDropdown.addEventListener('change', () => {
-        $('#tractate-summary tbody tr').removeClass('selected');
-        applyFilters();
-    });
-    document.getElementById('showHigh').addEventListener('change', applyFilters);
-    document.getElementById('showMedium').addEventListener('change', applyFilters);
-    applyFilters();
+
+    // Aggadah confidence for ref, respecting the confidence toggles
+    function aggConf(st, ref) {
+        const conf = (VARIANCE_DATA.aggadah[st.eng] || {})[ref];
+        if (!conf) return null;
+        if (conf === 'high' && !st.showHigh) return null;
+        if (conf === 'medium' && !st.showMedium) return null;
+        return conf;
+    }
+
+    // --- totals: aggadah vs rest, per-100-word rates from the halakah rows ---
+    function renderTotals(st) {
+        const accs = { all: newAcc(), agg: newAcc(), rest: newAcc() };
+        for (const row of VARIANCE_DATA.halakhot) {
+            if (row[COL.tractate] !== st.eng || row[COL.pair] !== st.pair) continue;
+            const ref = row[COL.chapter] + ':' + row[COL.halakah];
+            accumulate(accs.all, row);
+            accumulate(aggConf(st, ref) ? accs.agg : accs.rest, row);
+        }
+        document.getElementById('totals-title').textContent =
+            `${heb[st.eng] || st.eng} — שינויים לפי סוג, אגדה מול שאר המסכת (זוג ${st.pair}, לכל 100 מילים)`;
+        let html = `<thead><tr><th>קבוצה</th><th class="num">הלכות</th><th class="num">מילות בסיס</th><th class="num">משותף %</th>` +
+            CLASSES.map(c => `<th class="num${st.classes.has(c) ? '' : ' dim'}"><span class="swatch vh-${c}"></span>${RESEARCH_CLASS_HEBREW[c]}</th>`).join('') +
+            `</tr></thead><tbody>`;
+        for (const [label, acc] of [['הכל', accs.all], ['אגדה', accs.agg], ['לא־אגדה', accs.rest]]) {
+            const variant = CLASSES.reduce((s, c) => s + acc[c], 0);
+            const shared = acc.base ? (100 * (1 - variant / acc.base)).toFixed(1) + '%' : '—';
+            html += `<tr><td>${label}</td><td class="num">${acc.halakhot}</td>` +
+                `<td class="num">${acc.base.toLocaleString()}</td><td class="num">${shared}</td>` +
+                CLASSES.map(c => `<td class="num${st.classes.has(c) ? '' : ' dim'}">${acc.base ? (100 * acc[c] / acc.base).toFixed(2) : '—'}</td>`).join('') +
+                `</tr>`;
+        }
+        html += '</tbody>';
+        document.getElementById('totals-table').innerHTML = html;
+    }
+    function newAcc() {
+        const a = { base: 0, halakhot: 0 };
+        CLASSES.forEach(c => a[c] = 0);
+        return a;
+    }
+    function accumulate(acc, row) {
+        acc.base += row[COL.base_words];
+        acc.halakhot += 1;
+        CLASSES.forEach(c => acc[c] += row[COL[c]]);
+    }
+
+    // --- passages list (sidebar) ---
+    function renderPassagesList(st) {
+        const listEl = document.getElementById('passages-list');
+        const agg = AGGADAH_DATA.tractates[st.eng];
+        const segs = (agg ? agg.segments : []).filter(s =>
+            (s.conf === 'high' && st.showHigh) || (s.conf === 'medium' && st.showMedium));
+        document.getElementById('passages-count').textContent = `(${segs.length})`;
+        listEl.innerHTML = segs.map(s =>
+            `<a class="passage-item" data-c="${s.c}" data-h="${s.h}" title="ציון ${s.score.toFixed(2)} · עמ׳ היגר ${(s.pages || []).join(', ')}">` +
+            `<span class="p-conf ${s.conf}">${s.conf === 'high' ? '●' : '◐'}</span>` +
+            `<span class="p-ref">${researchHeNum(s.c)}:${researchHeNum(s.h)}</span>` +
+            `<span class="p-snip">${researchEscapeHtml(s.snippet.split(' ').slice(0, 7).join(' '))}…</span></a>`
+        ).join('');
+        listEl.querySelectorAll('.passage-item').forEach(a => {
+            a.addEventListener('click', () => {
+                const el = document.getElementById(`hal-${a.dataset.c - 1}-${a.dataset.h - 1}`);
+                if (el) {
+                    el.scrollIntoView({ block: 'start' });
+                    el.classList.add('flash');
+                    setTimeout(() => el.classList.remove('flash'), 1600);
+                }
+                if (sidebarEl.classList.contains('open')) {
+                    sidebarEl.classList.remove('open');
+                    document.getElementById('sidebar-overlay').classList.remove('visible');
+                }
+            });
+        });
+    }
+
+    // --- text body ---
+    const textCache = {};
+    async function loadTractate() {
+        const st = getState();
+        document.getElementById('text-loading').style.display = '';
+        document.getElementById('text-body').innerHTML = '';
+        if (!textCache[st.eng]) {
+            const loc = locations.find(l => decodeURIComponent(l).endsWith('Tosefta ' + st.eng));
+            try {
+                const [textData, sitesData] = await Promise.all([
+                    getToseftaText(loc),
+                    fetch(`data/research_sites/${encodeURIComponent(st.eng)}.json`)
+                        .then(r => r.ok ? r.json() : null),
+                ]);
+                textCache[st.eng] = { text: textData, sites: sitesData };
+            } catch (e) {
+                document.getElementById('text-loading').textContent = 'שגיאה בטעינת הנתונים: ' + e;
+                return;
+            }
+        }
+        renderAll();
+    }
+
+    function renderAll() {
+        const st = getState();
+        renderTotals(st);
+        renderPassagesList(st);
+
+        const cached = textCache[st.eng];
+        if (!cached) return;
+        const textArr = cached.text && cached.text.text;
+        const pairSites = (cached.sites && cached.sites.pairs && cached.sites.pairs[st.pair]) || {};
+
+        const chunks = [];
+        (textArr || []).forEach((chapter, ci) => {
+            chunks.push(`<div class="chapter-head">פרק ${researchHeNum(ci + 1)}</div>`);
+            chapter.forEach((halakhaHtml, hi) => {
+                const ref = `${ci + 1}:${hi + 1}`;
+                const sites = pairSites[ref] || [];
+                const conf = aggConf(st, ref);
+                const { html, leftovers } = researchRenderHalakha(halakhaHtml, sites, st.pair, st.classes);
+
+                const counts = {};
+                sites.forEach(s => counts[s[1]] = (counts[s[1]] || 0) + 1);
+                const chips = CLASSES.filter(c => counts[c]).map(c =>
+                    `<span class="count-chip vh-${c}${st.classes.has(c) ? '' : ' off'}">${RESEARCH_CLASS_HEBREW[c]} ${counts[c]}</span>`).join(' ');
+
+                let block = `<div class="halakha-block${conf ? ' aggadah' : ''}" id="hal-${ci}-${hi}">`;
+                block += `<div class="halakha-head"><span class="hal-ref">${researchHeNum(hi + 1)}</span>`;
+                if (conf) block += `<span class="agg-badge${conf === 'medium' ? ' medium' : ''}">${conf === 'medium' ? 'אגדה?' : 'אגדה'}</span>`;
+                block += chips ? `<span>${chips}</span>` : '';
+                block += `</div><div class="halakha-text">${html}</div>`;
+                block += researchLeftoverHtml(leftovers, st.pair, st.classes);
+                block += `</div>`;
+                chunks.push(block);
+            });
+        });
+        document.getElementById('text-loading').style.display = 'none';
+        document.getElementById('text-body').innerHTML = chunks.join('\n');
+    }
+
+    // --- wiring ---
+    masechetDropdown.addEventListener('change', loadTractate);
+    document.querySelectorAll('input[name="pair"], .class-cb, #showHigh, #showMedium')
+        .forEach(el => el.addEventListener('change', renderAll));
+
+    const params = new URLSearchParams(window.location.search);
+    const pTract = params.get('tractate');
+    if (pTract && textTractates.includes(pTract)) masechetDropdown.value = pTract;
+    loadTractate();
     </script>
 </body>
 </html>

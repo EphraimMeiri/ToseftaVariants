@@ -14,6 +14,7 @@
     <title>מדדי שוני בין העדים — תוספתא</title>
     <script src="tosefta_parsing_tools.js"></script>
     <script src="research_variance_data.js"></script>
+    <script src="research_text_common.js"></script>
     <style>
         .research-nav a { margin-inline-start: 12px; }
         .intro-card p { margin: 6px 0; line-height: 1.7; }
@@ -457,137 +458,9 @@
         renderTextView(eng);
     }
 
-    const MARKER_RE = /<i data-commentator="Variants" data-label="[^"]*" data-order="(\d+)"><\/i>/g;
-    function stripPunct(w) {
-        return String(w || '').replace(/<[^>]+>/g, '').replace(/[,.;:!?״()\[\]"׳'‏]+/g, '').trim();
-    }
-    function heNum(n) {
-        return (typeof convert_number === 'function') ? convert_number(n) : String(n);
-    }
-
-    // Tokenize a halakha's html, remembering marker positions (order -> token idx)
-    function tokenizeHalakha(html) {
-        const parts = String(html || '').split(MARKER_RE);
-        const tokens = [];
-        const markerPos = new Map();
-        for (let i = 0; i < parts.length; i++) {
-            if (i % 2 === 1) {
-                markerPos.set(parseInt(parts[i], 10), tokens.length);
-            } else {
-                parts[i].replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, ' ')
-                    .split(/\s+/).filter(Boolean).forEach(w => tokens.push(w));
-            }
-        }
-        return { tokens, markerPos };
-    }
-
-    // Match lemma (possibly "X … Y") against tokens starting at `start`.
-    // Returns matched token count, or 0.
-    function matchLemmaAt(tokens, start, lemma) {
-        const parts = String(lemma).split(/\s*(?:\.\.\.|…)\s*/).filter(Boolean)
-            .map(p => p.split(/\s+/).map(stripPunct).filter(Boolean));
-        if (!parts.length || !parts[0].length) return 0;
-        const first = parts[0];
-        for (let k = 0; k < first.length; k++) {
-            if (start + k >= tokens.length || stripPunct(tokens[start + k]) !== first[k]) return 0;
-        }
-        let len = first.length;
-        if (parts.length > 1 && parts[1].length) {
-            const second = parts[parts.length - 1];
-            const limit = Math.min(tokens.length - second.length, start + len + 60);
-            for (let p = start + len; p <= limit; p++) {
-                let ok = true;
-                for (let k = 0; k < second.length; k++) {
-                    if (stripPunct(tokens[p + k]) !== second[k]) { ok = false; break; }
-                }
-                if (ok) { len = (p + second.length) - start; break; }
-            }
-        }
-        return len;
-    }
-
-    // Search lemma anywhere from `from` (for synthetic, unanchored sites)
-    function searchLemma(tokens, from, lemma) {
-        for (let p = from; p < tokens.length; p++) {
-            const len = matchLemmaAt(tokens, p, lemma);
-            if (len > 0) return { start: p, len };
-        }
-        return null;
-    }
-
-    function siteTooltip(pair, r1, r2) {
-        const [s1, s2] = pair.split('-');
-        const show = r => (r && r.trim()) ? r : 'ח׳';
-        return `${s1}: ${show(r1)}  |  ${s2}: ${show(r2)}`;
-    }
-
-    function renderHalakha(html, sites, pair, visible) {
-        const { tokens, markerPos } = tokenizeHalakha(html);
-        const tokenSite = new Array(tokens.length).fill(null);
-        const badgeAt = new Map();   // token idx -> [site,...]
-        const leftovers = [];
-        let synthCursor = 0;
-
-        for (const site of sites) {
-            const [vi, cls, lemma] = site;
-            let start = null, len = 0;
-            if (vi < 1000 && markerPos.has(vi)) {
-                start = markerPos.get(vi);
-                len = matchLemmaAt(tokens, start, lemma);
-                if (!len) {
-                    // marker known but lemma text diverges — show a dot badge there
-                    if (!badgeAt.has(start)) badgeAt.set(start, []);
-                    badgeAt.get(start).push(site);
-                    continue;
-                }
-            } else {
-                const found = searchLemma(tokens, synthCursor, lemma);
-                if (found) {
-                    start = found.start; len = found.len;
-                    synthCursor = found.start + found.len;
-                } else {
-                    leftovers.push(site);
-                    continue;
-                }
-            }
-            for (let k = start; k < start + len && k < tokens.length; k++) {
-                if (!tokenSite[k]) tokenSite[k] = site;
-            }
-        }
-
-        // Build html, merging consecutive tokens of the same site
-        const out = [];
-        let i = 0;
-        while (i < tokens.length) {
-            if (badgeAt.has(i)) {
-                for (const site of badgeAt.get(i)) {
-                    if (visible.has(site[1])) {
-                        out.push(`<sup class="vb vh-${site[1]}" title="${escapeHtml(site[2] + ' — ' + siteTooltip(pair, site[3], site[4]))}">●</sup>`);
-                    }
-                }
-            }
-            const site = tokenSite[i];
-            if (site && visible.has(site[1])) {
-                let j = i;
-                while (j < tokens.length && tokenSite[j] === site) j++;
-                const words = tokens.slice(i, j).map(escapeHtml).join(' ');
-                out.push(`<span class="vh vh-${site[1]}" title="${escapeHtml(siteTooltip(pair, site[3], site[4]))}">${words}</span>`);
-                i = j;
-            } else {
-                out.push(escapeHtml(tokens[i]));
-                i++;
-            }
-        }
-        // trailing badges (markers at end of text)
-        if (badgeAt.has(tokens.length)) {
-            for (const site of badgeAt.get(tokens.length)) {
-                if (visible.has(site[1])) {
-                    out.push(`<sup class="vb vh-${site[1]}" title="${escapeHtml(site[2] + ' — ' + siteTooltip(pair, site[3], site[4]))}">●</sup>`);
-                }
-            }
-        }
-        return { html: out.join(' '), leftovers };
-    }
+    // Text tokenization / lemma anchoring / halakha rendering live in
+    // research_text_common.js (shared with research_aggadah.html).
+    const heNum = researchHeNum;
 
     function renderTextView(eng) {
         const st = getState();
@@ -629,7 +502,7 @@
                 const ref = `${ci + 1}:${hi + 1}`;
                 const sites = pairSites[ref] || [];
                 const conf = aggRefs[ref];
-                const { html, leftovers } = renderHalakha(halakhaHtml, sites, st.pair, visible);
+                const { html, leftovers } = researchRenderHalakha(halakhaHtml, sites, st.pair, visible);
 
                 const counts = {};
                 sites.forEach(s => counts[s[1]] = (counts[s[1]] || 0) + 1);
@@ -641,15 +514,7 @@
                 if (conf) block += `<span class="agg-badge${conf === 'medium' ? ' medium' : ''}">${conf === 'medium' ? 'אגדה?' : 'אגדה'}</span>`;
                 block += chips ? `<span>${chips}</span>` : '';
                 block += `</div><div class="halakha-text">${html}</div>`;
-                const visibleLeftovers = leftovers.filter(s => visible.has(s[1]));
-                if (visibleLeftovers.length) {
-                    block += `<div class="leftover">חילופים ללא עיגון בטקסט: ` +
-                        visibleLeftovers.map(s => {
-                            const label = (s[2] && s[2].trim()) ? s[2]
-                                : '+ ' + ((s[3] && s[3].trim()) || (s[4] && s[4].trim()) || '—');
-                            return `<span class="vh vh-${s[1]}" title="${escapeHtml(siteTooltip(st.pair, s[3], s[4]))}">${escapeHtml(label)}</span>`;
-                        }).join(' · ') + `</div>`;
-                }
+                block += researchLeftoverHtml(leftovers, st.pair, visible);
                 block += `</div>`;
                 chunks.push(block);
             });
