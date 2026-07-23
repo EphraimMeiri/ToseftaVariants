@@ -964,6 +964,14 @@ body.sidebar-collapsed .sidebar-toggle {
     min-height: 8px;
 }
 
+/* Nearest-neighbor fallback: the exact word wasn't aligned, but a nearby
+   aligned word in the same chapter is shown instead -- dashed instead of
+   solid so it reads as "roughly here", not "this exact word". */
+.ms-highlight-box.ms-highlight-approx {
+    border-style: dashed;
+    background: rgba(209, 69, 58, 0.10);
+}
+
 .ms-missing-note {
     color: #a89880;
     font-size: 0.85em;

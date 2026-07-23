@@ -1054,11 +1054,33 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         return convert_number(perekIndex + 1);
     }
 
-    function lookupManuscriptWord(witnessSlug, perekIndex, baseIdx) {
+    // Resolves a click into one of four states so the footer can explain
+    // *why* a word has no link instead of one generic "missing" message:
+    //   'no-data'    -- this witness has no manuscript-image file for the
+    //                   tractate at all (e.g. Geniza/London outside their
+    //                   covered scope).
+    //   'no-chapter' -- the file exists but this chapter has zero aligned
+    //                   entries.
+    //   'exact'      -- the word itself is aligned; a solid highlight box.
+    //   'approx'     -- the word itself isn't aligned (HTR miss), but the
+    //                   chapter has other aligned words nearby; falls back to
+    //                   the nearest one so the user at least sees the right
+    //                   general spot on the page, marked as approximate.
+    function resolveManuscriptEntry(witnessSlug, perekIndex, baseIdx) {
         const manuscriptData = manuscriptDataBySlug && manuscriptDataBySlug[witnessSlug];
-        if (!manuscriptData) return null;
+        if (!manuscriptData) return { status: 'no-data' };
         const chapter = manuscriptData.chapters && manuscriptData.chapters[hebLabelFor(perekIndex)];
-        return chapter ? (chapter[String(baseIdx)] || null) : null;
+        const keys = chapter ? Object.keys(chapter) : [];
+        if (!chapter || keys.length === 0) return { status: 'no-chapter' };
+        const exact = chapter[String(baseIdx)];
+        if (exact) return { status: 'exact', word: exact };
+        let nearestKey = null, nearestDist = Infinity;
+        for (const k of keys) {
+            const dist = Math.abs(Number(k) - baseIdx);
+            if (dist < nearestDist) { nearestDist = dist; nearestKey = k; }
+        }
+        if (nearestKey == null) return { status: 'no-chapter' };
+        return { status: 'approx', word: chapter[nearestKey], distance: nearestDist };
     }
 
     // Zoom is applied as a real layout width (a percentage, so it's relative
@@ -1180,9 +1202,18 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         const witnessLabel = WITNESS_HEB_LABEL[witnessSlug] || witnessSlug;
         manuscriptFooterLabel.textContent = `${witnessLabel}, פרק ${convert_number(perekIndex + 1)}`;
         const manuscriptData = manuscriptDataBySlug[witnessSlug];
-        const word = lookupManuscriptWord(witnessSlug, perekIndex, baseIdx);
+        const resolved = resolveManuscriptEntry(witnessSlug, perekIndex, baseIdx);
+        if (resolved.status === 'no-data') {
+            manuscriptFooterBody.innerHTML = `<div class="manuscript-footer-placeholder">אין נתוני כתב יד עבור ${witnessLabel} במסכת זו</div>`;
+            return;
+        }
+        if (resolved.status === 'no-chapter') {
+            manuscriptFooterBody.innerHTML = `<div class="manuscript-footer-placeholder">אין עדיין נתוני כתב יד לפרק זה ב${witnessLabel}</div>`;
+            return;
+        }
+        const word = resolved.word;
         if (!word || !word.bbox || !manuscriptData.pages || !manuscriptData.pages[String(word.page)]) {
-            manuscriptFooterBody.innerHTML = `<div class="manuscript-footer-placeholder">המילה חסרה ב${witnessLabel} במיקום זה (או שאין עדיין נתוני כתב יד לפרק זה)</div>`;
+            manuscriptFooterBody.innerHTML = `<div class="manuscript-footer-placeholder">המילה לא זוהתה ב${witnessLabel} במיקום זה</div>`;
             return;
         }
         const page = manuscriptData.pages[String(word.page)];
@@ -1195,7 +1226,7 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         img.alt = `MS ${witnessLabel}, עמ' ${word.page}`;
         img.draggable = false;
         const box = document.createElement('div');
-        box.className = 'ms-highlight-box';
+        box.className = resolved.status === 'approx' ? 'ms-highlight-box ms-highlight-approx' : 'ms-highlight-box';
         box.style.left = (x0 / page.width * 100) + '%';
         box.style.top = (y0 / page.height * 100) + '%';
         box.style.width = ((x1 - x0) / page.width * 100) + '%';
@@ -1203,6 +1234,12 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         wrap.appendChild(img);
         wrap.appendChild(box);
         manuscriptFooterBody.appendChild(wrap);
+        if (resolved.status === 'approx') {
+            const note = document.createElement('div');
+            note.className = 'ms-missing-note';
+            note.textContent = 'המילה המדויקת לא זוהתה בכתב היד -- מוצגת המילה המזוהה הקרובה ביותר';
+            manuscriptFooterBody.appendChild(note);
+        }
         msWrapEl = wrap; msBoxEl = box;
         msZoom = MS_FOCUS_ZOOM;
         // Center the highlighted word -- must wait for the image's `load`
