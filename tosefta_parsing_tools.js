@@ -2334,7 +2334,9 @@ function anchorOcrCommentaryChapter(notes, textPerek, chapterIndex, idPrefix, pr
             // surfacing to a reader comparing the commentator's Vorlage.
             matchedOn,
             text: note.text,
-            page: note.page,
+            // Page index in the volume scan, not the printed page -- see the
+            // exporter. Carried for linking back to the scan, not for citation.
+            scanPage: note.scanPage,
             volume: note.vol,
         });
     });

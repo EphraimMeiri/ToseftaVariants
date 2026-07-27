@@ -947,7 +947,12 @@ var MidrashViewerCore = (() => {
   var COMMENTARY_LABELS = {
     noSelection: "לחצו על מילה בטקסט כדי להציג את הפירוש",
     noNotes: "אין פירוש לקטע זה",
-    onPassage: "על הקטע כולו",
+    // Shown on a note we could not place to a word. It describes OUR
+    // uncertainty, not the note: the commentator was usually remarking on some
+    // particular phrase, we just couldn't find which. The earlier wording ("on
+    // the passage as a whole") asserted an editorial fact instead, and
+    // contradicted itself on any note that displays a lemma -- most of them.
+    unplaced: "מקום מדויק בקטע לא זוהה",
     line: (ref) => `שורה ${ref}`
   };
   function createCommentaryPanel(options) {
@@ -1058,9 +1063,10 @@ var MidrashViewerCore = (() => {
     const node = el3("div", "mvc-comm-note");
     node.dataset.entryId = entry.id;
     if (entry.baseIdx == null) node.classList.add("mvc-comm-note-passage");
-    if (entry.lineRef || entry.baseIdx == null) {
+    const metaText = entry.metaLabel || (entry.baseIdx == null ? labels.unplaced : entry.lineRef ? labels.line(entry.lineRef) : null);
+    if (metaText) {
       const meta = el3("span", "mvc-comm-meta");
-      meta.textContent = entry.baseIdx == null ? labels.onPassage : labels.line(entry.lineRef);
+      meta.textContent = metaText;
       node.appendChild(meta);
     }
     const body = el3("div", "mvc-comm-body");

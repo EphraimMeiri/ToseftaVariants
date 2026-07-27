@@ -282,15 +282,31 @@ function stripLeadingLemma(text, lemma) {
     return text;
 }
 
+// What an unplaced OCR note means depends on whether the chunker gave it a lemma
+// at all:
+//   - a lemma we couldn't find in the text -> the commentator was remarking on
+//     that phrase; we failed to locate it. Often because the lemma quotes some
+//     OTHER text (a Bavli or parallel baraita the author cites), which is
+//     inherent to lemma-based anchoring rather than a defect.
+//   - no lemma -> a marker-less chunk, which for these editions is the tail of a
+//     comment that began on the previous printed page.
+//
+// The scan page is deliberately NOT shown. `scanPage` is the page index within
+// the volume PDF, front matter included -- not the printed page number, which
+// for Chasdei David sits in the running header at a different value entirely
+// (scan page 20 is printed page לז = 37) and for Tekhelet Mordechai isn't
+// recoverable from what we OCR'd at all. Displaying it as "עמ׳ N" invited a
+// citation that would simply be wrong.
 function ocrPanelEntry(entry) {
     const body = escapeHtmlText(stripLeadingLemma(entry.text, entry.lemma));
     const lemma = entry.lemma ? `<b>${escapeHtmlText(entry.lemma)}</b> ` : '';
-    return {
-        ...entry,
-        html: lemma + body,
-        // The panel's citation slot: for these, the printed page.
-        lineRef: entry.page != null ? String(entry.page) : null,
-    };
+    let metaLabel = null;
+    if (entry.baseIdx == null) {
+        metaLabel = entry.lemma
+            ? 'מקום מדויק בקטע לא זוהה'
+            : 'המשך מהעמוד הקודם';
+    }
+    return { ...entry, html: lemma + body, lineRef: null, metaLabel };
 }
 
 function ocrCommentaryLayer({ id, slug, label, title }) {
@@ -302,7 +318,6 @@ function ocrCommentaryLayer({ id, slug, label, title }) {
         // the base text can't place -- see ocrMatchSurfaces.
         buildIndex: (data, ctx) => createOcrCommentaryIndex(data, ctx.textData, id, ctx.witnessData),
         toPanelEntry: ocrPanelEntry,
-        labels: { line: (ref) => `עמ׳ ${ref}` },
     });
 }
 
