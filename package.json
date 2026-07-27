@@ -1,0 +1,12 @@
+{
+  "name": "toseftasite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Digital edition viewer for the Tosefta: text, variants, synopsis and manuscript images.",
+  "scripts": {
+    "sync:core": "node \"../midrash-viewer-core/sync.mjs\" vendor/midrash-viewer-core --build"
+  },
+  "dependencies": {
+    "midrash-viewer-core": "file:../midrash-viewer-core"
+  }
+}

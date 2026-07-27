@@ -873,21 +873,6 @@ body.sidebar-collapsed .sidebar-toggle {
     margin-inline-end: auto;
 }
 
-.manuscript-zoom-controls {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.manuscript-zoom-controls button {
-    min-width: 26px;
-}
-
-#manuscript-fullscreen.active {
-    background: #6b5b47;
-    color: #fff;
-}
-
 .synopsis-footer-toggle {
     display: flex;
     align-items: center;
@@ -903,27 +888,26 @@ body.sidebar-collapsed .sidebar-toggle {
     font-weight: 700;
 }
 
-.synopsis-footer-body,
-.manuscript-footer-body {
+.synopsis-footer-body {
     overflow: auto;
     padding: 8px 14px 14px;
 }
 
+/* Host for the shared midrash-viewer-core panel, which brings its own
+   scrolling viewport, zoom/pan and fullscreen -- so this element must NOT
+   scroll or pad, only give the panel a box to fill. */
 .manuscript-footer-body {
-    cursor: grab;
+    overflow: hidden;
+    min-height: 0;
 }
 
-.manuscript-footer-body.ms-dragging {
-    cursor: grabbing;
-}
-
-/* Fullscreen API replaces this element's normal box with a viewport-filling
-   one but doesn't give it a background, so without this the page behind
-   would show through around the (usually narrower) manuscript image. */
-.manuscript-footer-body:fullscreen,
-.manuscript-footer-body:-webkit-full-screen {
-    background: #fffdf9;
-    padding: 20px;
+.manuscript-footer-body .mvc-ms {
+    --mvc-accent: #8a5a2b;
+    --mvc-border: #ddcdb4;
+    --mvc-bg: #fffdf9;
+    --mvc-fg: #5a4632;
+    --mvc-muted: #a89880;
+    --mvc-box: #d1453a;
 }
 
 .synopsis-footer-body .witness-synopsis-scroll {
@@ -999,55 +983,6 @@ body.sidebar-collapsed .sidebar-toggle {
 /* Manuscript page image + percentage-positioned highlight box (positions are
    computed as fractions of the page's known Sefaria pixel dimensions, so
    they're correct immediately without waiting on <img> natural size). */
-.manuscript-footer-placeholder {
-    color: #a89880;
-    font-size: 0.92em;
-    text-align: center;
-    padding: 24px 10px;
-}
-
-.ms-page-wrap {
-    position: relative;
-    display: block;
-    width: 100%; /* zoom sets this to a percentage (e.g. 300%) via JS; see applyZoomWidth() */
-}
-
-.ms-page-img {
-    display: block;
-    width: 100%;
-    /* Panning drags the image itself; suppress the browser's native
-       ghost-image drag affordance so it doesn't fight our own handler. */
-    -webkit-user-drag: none;
-    user-select: none;
-}
-
-.ms-highlight-box {
-    position: absolute;
-    border: 2px solid #d1453a;
-    background: rgba(209, 69, 58, 0.18);
-    border-radius: 2px;
-    pointer-events: none;
-    /* Some single-character words have a degenerate (near-zero-width) cut box
-       from the source HTR data -- keep the highlight visible regardless. */
-    min-width: 8px;
-    min-height: 8px;
-}
-
-/* Nearest-neighbor fallback: the exact word wasn't aligned, but a nearby
-   aligned word in the same chapter is shown instead -- dashed instead of
-   solid so it reads as "roughly here", not "this exact word". */
-.ms-highlight-box.ms-highlight-approx {
-    border-style: dashed;
-    background: rgba(209, 69, 58, 0.10);
-}
-
-.ms-missing-note {
-    color: #a89880;
-    font-size: 0.85em;
-    text-align: center;
-    padding: 6px 10px 0;
-}
-
 /* Leave room so the fixed footer row never permanently covers content */
 body.synopsis-footer-open .main-content,
 body.manuscript-footer-open .main-content {

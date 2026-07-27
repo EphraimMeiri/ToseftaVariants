@@ -1,2 +1,6 @@
 .DS_Store
 .playwright-mcp/
+
+# npm (only used for the shared midrash-viewer-core package; the built
+# bundle is vendored under vendor/midrash-viewer-core and IS committed)
+node_modules/

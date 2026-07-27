@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="vendor/midrash-viewer-core/midrash-viewer-core.css">
     <link rel="stylesheet" href="styles.css?v=12">
     <title>תוספתא עם חילופי נוסח</title>
 </head>
@@ -152,18 +153,15 @@
         <div class="manuscript-footer" id="manuscript-footer" hidden>
             <div class="manuscript-footer-header">
                 <span id="manuscript-footer-label" class="manuscript-footer-label"></span>
-                <div class="manuscript-zoom-controls">
-                    <button type="button" id="manuscript-zoom-out" title="הקטן">－</button>
-                    <button type="button" id="manuscript-zoom-reset" title="התאם לרוחב">▫</button>
-                    <button type="button" id="manuscript-zoom-in" title="הגדל">＋</button>
-                    <button type="button" id="manuscript-fullscreen" title="תצוגת מסך מלא">⤢</button>
-                </div>
+                <!-- zoom / fullscreen controls are provided by the shared
+                     midrash-viewer-core panel, inside the footer body -->
                 <button type="button" id="manuscript-footer-close" class="manuscript-footer-close" title="סגור">✕</button>
             </div>
             <div class="manuscript-footer-body" id="manuscript-footer-body"></div>
         </div>
     </div>
 
+    <script src="vendor/midrash-viewer-core/midrash-viewer-core.js"></script>
     <script src="tosefta_parsing_tools.js?v=12"></script>
     <script>
         let currentTextData = null;
@@ -888,6 +886,10 @@ function setNavToggleOn(id, on) {
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
 }
 
+// The shared manuscript panel outlives any single tractate load; see the
+// destroy()/recreate inside displayTextAndVariants.
+let manuscriptPanel = null;
+
 function displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData){
     const contentContainer = document.getElementById('content-container');
     const showHiddenCheckbox = document.getElementById('showHidden');
@@ -1053,16 +1055,6 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         return SIGLUM_TO_WITNESS_SLUG[siglum] || null;
     }
 
-    // --- Pan/zoom: a CSS transform:scale() on .ms-page-wrap (inside the
-    // scrolling .manuscript-footer-body) is enough on its own -- transformed
-    // elements' visual (post-scale) bounds count toward a scrolling ancestor's
-    // overflow area, so native scroll/scrollbars/trackpad already pan a zoomed
-    // page with no extra bookkeeping. Percent-based .ms-highlight-box
-    // positions are relative to the wrap's LAYOUT box, which transform doesn't
-    // change, so the box scales/pans together with the image automatically.
-    const MS_MIN_ZOOM = 0.4, MS_MAX_ZOOM = 6, MS_FOCUS_ZOOM = 3, MS_ZOOM_STEP = 1.25;
-    let msZoom = 1;
-    let msWrapEl = null, msBoxEl = null;
 
     function hebLabelFor(perekIndex) {
         return convert_number(perekIndex + 1);
@@ -1097,193 +1089,63 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         return { status: 'approx', word: chapter[nearestKey], distance: nearestDist };
     }
 
-    // Zoom is applied as a real layout width (a percentage, so it's relative
-    // to the container and needs no manual pixel math), NOT a CSS transform.
-    // transform:scale() only visually enlarges the element -- it doesn't
-    // change its layout box, and browsers largely don't grow a scrolling
-    // ancestor's horizontal scrollable-overflow region for that (confirmed:
-    // scrollWidth stayed pinned to clientWidth at any zoom level under
-    // transform, while scrollHeight DID grow -- an inconsistent, unreliable
-    // asymmetry). An actual width resize makes native scrollbars/trackpad/
-    // drag-panning work correctly in both directions, with no special-casing.
-    function applyZoomWidth() {
-        if (!msWrapEl) return;
-        msWrapEl.style.width = (msZoom * 100) + '%';
-    }
-
-    // .manuscript-footer-body computes direction:rtl (inherited, Hebrew page),
-    // so its scrollLeft follows the "negative" RTL scrolling model every
-    // modern browser now implements: 0 = home = viewport's LEFT edge sits at
-    // physical content-X (scrollWidth-clientWidth); more negative reveals
-    // content further toward physical-X 0. offsetLeft/offsetTop are always
-    // physical (direction-independent), so converting a desired physical
-    // viewport-left-edge X into scrollLeft needs this offset subtracted --
-    // using the *positive* LTR-style formula directly (as a first version of
-    // this code did) computes wildly out-of-range targets that silently
-    // clamp to 0, which looked like "horizontal scroll/centering does nothing".
-    function physicalLeftToScrollLeft(physicalX) {
-        const body = manuscriptFooterBody;
-        return physicalX - (body.scrollWidth - body.clientWidth);
-    }
-
-    // Re-center the scroll position on the focused word's highlight box at
-    // the current msZoom (used after any zoom-button change, and on initial
-    // focus). Since .ms-highlight-box is positioned with PERCENTAGES against
-    // the wrap, offsetLeft/Top/Width/Height already reflect its real, current
-    // on-screen pixel position at whatever width msWrapEl now has -- no
-    // separate *msZoom factor needed (unlike the old transform approach).
-    function centerOnHighlightBox() {
-        if (!msWrapEl || !msBoxEl) return;
-        applyZoomWidth();
-        const boxCenterX = msBoxEl.offsetLeft + msBoxEl.offsetWidth / 2;
-        const targetLeft = physicalLeftToScrollLeft(boxCenterX - manuscriptFooterBody.clientWidth / 2);
-        const targetTop = msBoxEl.offsetTop + msBoxEl.offsetHeight / 2 - manuscriptFooterBody.clientHeight / 2;
-        manuscriptFooterBody.scrollTo({ left: targetLeft, top: targetTop, behavior: 'smooth' });
-    }
-
-    function setZoomAtPoint(newZoom, clientX, clientY) {
-        if (!msWrapEl) return;
-        newZoom = Math.min(MS_MAX_ZOOM, Math.max(MS_MIN_ZOOM, newZoom));
-        const body = manuscriptFooterBody;
-        const rect = body.getBoundingClientRect();
-        const cx = clientX - rect.left, cy = clientY - rect.top;
-        // Work in fractions of content width/height so the RTL offset only
-        // has to be applied once, at the very end, when writing scrollLeft.
-        const oldScrollWidth = body.scrollWidth;
-        const physX = (oldScrollWidth - body.clientWidth + body.scrollLeft) + cx;
-        const fracX = physX / oldScrollWidth;
-        const fracY = (body.scrollTop + cy) / body.scrollHeight;
-        msZoom = newZoom;
-        applyZoomWidth();
-        const newPhysX = fracX * body.scrollWidth;
-        body.scrollLeft = physicalLeftToScrollLeft(newPhysX - cx);
-        body.scrollTop = fracY * body.scrollHeight - cy;
-    }
-
-    function zoomButtonStep(factor) {
-        if (!msWrapEl) return;
-        msZoom = Math.min(MS_MAX_ZOOM, Math.max(MS_MIN_ZOOM, msZoom * factor));
-        if (msBoxEl) centerOnHighlightBox();
-        else applyZoomWidth();
-    }
-
-    document.getElementById('manuscript-zoom-in').addEventListener('click', () => zoomButtonStep(MS_ZOOM_STEP));
-    document.getElementById('manuscript-zoom-out').addEventListener('click', () => zoomButtonStep(1 / MS_ZOOM_STEP));
-    document.getElementById('manuscript-zoom-reset').addEventListener('click', () => {
-        msZoom = 1;
-        if (msBoxEl) centerOnHighlightBox();
-        else if (msWrapEl) { applyZoomWidth(); manuscriptFooterBody.scrollTo({ left: 0, top: 0, behavior: 'smooth' }); }
-    });
-
-    // Fullscreen toggles the Fullscreen API directly on .manuscript-footer-body
-    // rather than moving the image into a separate overlay -- the element
-    // stays put in the DOM, so the zoom/pan/drag listeners already bound to
-    // it keep working unchanged while it's promoted to fill the screen.
-    const manuscriptFullscreenBtn = document.getElementById('manuscript-fullscreen');
-    manuscriptFullscreenBtn.addEventListener('click', () => {
-        if (document.fullscreenElement) {
-            document.exitFullscreen();
-        } else {
-            manuscriptFooterBody.requestFullscreen();
-        }
-    });
-    document.addEventListener('fullscreenchange', () => {
-        const isFs = document.fullscreenElement === manuscriptFooterBody;
-        manuscriptFullscreenBtn.title = isFs ? 'צאת ממסך מלא' : 'תצוגת מסך מלא';
-        manuscriptFullscreenBtn.classList.toggle('active', isFs);
-    });
-
-    // Ctrl/pinch + wheel zooms at the pointer (trackpad pinch is reported as a
-    // wheel event with ctrlKey by every major browser); plain wheel keeps its
-    // native scroll/pan behavior untouched.
-    manuscriptFooterBody.addEventListener('wheel', (e) => {
-        if (!e.ctrlKey || !msWrapEl) return;
-        e.preventDefault();
-        setZoomAtPoint(msZoom * (e.deltaY < 0 ? 1.08 : 1 / 1.08), e.clientX, e.clientY);
-    }, { passive: false });
-
-    // Click-and-drag panning.
-    let msDragging = false, msDragLastX = 0, msDragLastY = 0;
-    manuscriptFooterBody.addEventListener('mousedown', (e) => {
-        if (!msWrapEl || e.button !== 0) return;
-        msDragging = true;
-        msDragLastX = e.clientX; msDragLastY = e.clientY;
-        manuscriptFooterBody.classList.add('ms-dragging');
-        e.preventDefault();
-    });
-    window.addEventListener('mousemove', (e) => {
-        if (!msDragging) return;
-        manuscriptFooterBody.scrollLeft -= (e.clientX - msDragLastX);
-        manuscriptFooterBody.scrollTop -= (e.clientY - msDragLastY);
-        msDragLastX = e.clientX; msDragLastY = e.clientY;
-    });
-    window.addEventListener('mouseup', () => {
-        msDragging = false;
-        manuscriptFooterBody.classList.remove('ms-dragging');
+    // The manuscript image panel is midrash-viewer-core (vendor/), shared with
+    // the Tannaitic Midrashim site: it owns the image DOM, zoom, pan and
+    // fullscreen. This site keeps only the header label and close button.
+    //
+    // Single-witness mode: which witness to show comes from the click source
+    // (a synopsis row, a footnote, a body word), not from a tab strip, so
+    // `listWitnesses` is deliberately absent and the witness is passed per
+    // select() instead.
+    // displayTextAndVariants re-runs on every tractate load, so tear down the
+    // previous panel first -- otherwise each load leaves its window-level
+    // mousemove/mouseup pan handlers and fullscreenchange listener behind.
+    // (The hand-rolled version this replaced re-bound those every load too.)
+    if (manuscriptPanel) manuscriptPanel.destroy();
+    manuscriptPanel = MidrashViewerCore.createManuscriptPanel({
+        root: manuscriptFooterBody,
+        showFolioLabel: false,   // the header label already names page + chapter
+        labels: {
+            noSelection: 'לחצו על מילה בטקסט, בעד הנוסח או בהערת השוליים כדי להציג את כתב היד',
+            noData: (w) => `אין נתוני כתב יד עבור ${w} במסכת זו`,
+            noChapter: (w) => `אין עדיין נתוני כתב יד לפרק זה ב${w}`,
+            notFound: (w) => `המילה לא זוהתה ב${w} במיקום זה`,
+            approxNote: 'המילה המדויקת לא זוהתה בכתב היד -- מוצגת המילה המזוהה הקרובה ביותר',
+        },
+        adapter: {
+            resolve(witnessSlug, addr) {
+                const witnessLabel = WITNESS_HEB_LABEL[witnessSlug] || witnessSlug;
+                const data = manuscriptDataBySlug && manuscriptDataBySlug[witnessSlug];
+                const resolved = resolveManuscriptEntry(witnessSlug, addr.perekIndex, addr.baseIdx);
+                if (resolved.status === 'no-data' || resolved.status === 'no-chapter') {
+                    return { status: resolved.status, witnessLabel };
+                }
+                const word = resolved.word;
+                const page = word && data.pages && data.pages[String(word.page)];
+                if (!word || !word.bbox || !page) return { status: 'not-found', witnessLabel };
+                // This site's emitted JSON stores [x0,y0,x1,y1]; the core
+                // speaks [x,y,w,h] only, so convert here.
+                return {
+                    status: resolved.status,
+                    page,
+                    bbox: MidrashViewerCore.bbox.fromXYXY(word.bbox),
+                    folio: word.page,
+                    witnessLabel,
+                };
+            },
+        },
     });
 
     function renderManuscriptFooter() {
         const { witnessSlug, perekIndex, baseIdx } = manuscriptState;
-        manuscriptFooterBody.innerHTML = '';
-        msWrapEl = null; msBoxEl = null;
         if (baseIdx == null || !witnessSlug) {
             manuscriptFooterLabel.textContent = '';
-            manuscriptFooterBody.innerHTML = '<div class="manuscript-footer-placeholder">לחצו על מילה בטקסט, בעד הנוסח או בהערת השוליים כדי להציג את כתב היד</div>';
+            manuscriptPanel.select(null);
             return;
         }
         const witnessLabel = WITNESS_HEB_LABEL[witnessSlug] || witnessSlug;
         manuscriptFooterLabel.textContent = `${witnessLabel}, פרק ${convert_number(perekIndex + 1)}`;
-        const manuscriptData = manuscriptDataBySlug[witnessSlug];
-        const resolved = resolveManuscriptEntry(witnessSlug, perekIndex, baseIdx);
-        if (resolved.status === 'no-data') {
-            manuscriptFooterBody.innerHTML = `<div class="manuscript-footer-placeholder">אין נתוני כתב יד עבור ${witnessLabel} במסכת זו</div>`;
-            return;
-        }
-        if (resolved.status === 'no-chapter') {
-            manuscriptFooterBody.innerHTML = `<div class="manuscript-footer-placeholder">אין עדיין נתוני כתב יד לפרק זה ב${witnessLabel}</div>`;
-            return;
-        }
-        const word = resolved.word;
-        if (!word || !word.bbox || !manuscriptData.pages || !manuscriptData.pages[String(word.page)]) {
-            manuscriptFooterBody.innerHTML = `<div class="manuscript-footer-placeholder">המילה לא זוהתה ב${witnessLabel} במיקום זה</div>`;
-            return;
-        }
-        const page = manuscriptData.pages[String(word.page)];
-        const [x0, y0, x1, y1] = word.bbox;
-        const wrap = document.createElement('div');
-        wrap.className = 'ms-page-wrap';
-        const img = document.createElement('img');
-        img.className = 'ms-page-img';
-        img.src = page.url;
-        img.alt = `MS ${witnessLabel}, עמ' ${word.page}`;
-        img.draggable = false;
-        const box = document.createElement('div');
-        box.className = resolved.status === 'approx' ? 'ms-highlight-box ms-highlight-approx' : 'ms-highlight-box';
-        box.style.left = (x0 / page.width * 100) + '%';
-        box.style.top = (y0 / page.height * 100) + '%';
-        box.style.width = ((x1 - x0) / page.width * 100) + '%';
-        box.style.height = ((y1 - y0) / page.height * 100) + '%';
-        wrap.appendChild(img);
-        wrap.appendChild(box);
-        manuscriptFooterBody.appendChild(wrap);
-        if (resolved.status === 'approx') {
-            const note = document.createElement('div');
-            note.className = 'ms-missing-note';
-            note.textContent = 'המילה המדויקת לא זוהתה בכתב היד -- מוצגת המילה המזוהה הקרובה ביותר';
-            manuscriptFooterBody.appendChild(note);
-        }
-        msWrapEl = wrap; msBoxEl = box;
-        msZoom = MS_FOCUS_ZOOM;
-        // Center the highlighted word -- must wait for the image's `load`
-        // event, not just the next frame: until it loads, .ms-page-wrap has
-        // no real height (nothing else gives it one), so measuring/centering
-        // any earlier works against a collapsed container and drifts once
-        // the image's layout lands.
-        if (img.complete) {
-            requestAnimationFrame(centerOnHighlightBox);
-        } else {
-            img.addEventListener('load', () => requestAnimationFrame(centerOnHighlightBox), { once: true });
-        }
+        manuscriptPanel.select({ perekIndex, baseIdx }, { witnessId: witnessSlug });
     }
 
     function syncManuscriptTo(witnessSlug, perekIndex, baseIdx) {

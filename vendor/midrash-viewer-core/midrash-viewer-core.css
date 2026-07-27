@@ -1,0 +1,170 @@
+/* ../midrash-viewer-core/styles/manuscript-panel.css */
+.mvc-ms {
+  --mvc-bg: #faf7f0;
+  --mvc-fg: #3a2d1c;
+  --mvc-border: #d8cbb0;
+  --mvc-accent: #7a3b12;
+  --mvc-muted: #7a6a52;
+  --mvc-box: #d94f2b;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  color: var(--mvc-fg);
+}
+.mvc-ms-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--mvc-border);
+  background: var(--mvc-bg);
+}
+.mvc-ms-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+.mvc-ms-tabs[hidden] {
+  display: none;
+}
+.mvc-ms-tab {
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  color: var(--mvc-fg);
+  background: #fff;
+  border: 1px solid var(--mvc-border);
+  border-radius: 4px;
+}
+.mvc-ms-tab:hover {
+  border-color: var(--mvc-accent);
+}
+.mvc-ms-tab.active {
+  background: var(--mvc-accent);
+  border-color: var(--mvc-accent);
+  color: #fff;
+}
+.mvc-ms-folio {
+  font-size: 12px;
+  color: var(--mvc-muted);
+  white-space: nowrap;
+}
+.mvc-ms-controls {
+  display: flex;
+  gap: 4px;
+  margin-inline-start: auto;
+}
+.mvc-ms-btn {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--mvc-fg);
+  background: #fff;
+  border: 1px solid var(--mvc-border);
+  border-radius: 4px;
+}
+.mvc-ms-btn:hover:not(:disabled) {
+  border-color: var(--mvc-accent);
+}
+.mvc-ms-btn.active {
+  background: var(--mvc-accent);
+  border-color: var(--mvc-accent);
+  color: #fff;
+}
+.mvc-ms-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.mvc-ms-viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+  background: #ece5d6;
+  cursor: grab;
+  overscroll-behavior: contain;
+}
+.mvc-ms-viewport.mvc-dragging {
+  cursor: grabbing;
+}
+.mvc-ms-viewport:fullscreen,
+.mvc-ms-viewport:-webkit-full-screen {
+  background: #1a1712;
+}
+.mvc-ms-wrap {
+  position: relative;
+  width: 100%;
+  flex: none;
+}
+.mvc-ms-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.mvc-ms-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--mvc-box);
+  border-radius: 2px;
+  background: rgba(217, 79, 43, 0.14);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+  min-width: 8px;
+  min-height: 8px;
+}
+.mvc-ms-box.mvc-ms-box-approx {
+  border-style: dashed;
+  border-color: #b98a2e;
+  background: rgba(185, 138, 46, 0.12);
+}
+.mvc-ms-note,
+.mvc-ms-placeholder {
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--mvc-muted);
+  text-align: center;
+}
+.mvc-ms-note {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  font-size: 12px;
+  background: rgba(185, 138, 46, 0.14);
+  border-top: 1px solid var(--mvc-border);
+}
+.mvc-ms-note[hidden] {
+  display: none;
+}
+.mvc-ms-placeholder {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  min-height: 80px;
+}
+@media (prefers-color-scheme: dark) {
+  .mvc-ms {
+    --mvc-bg: #1c1913;
+    --mvc-fg: #e0d7c4;
+    --mvc-border: #4a4030;
+    --mvc-accent: #c07a3a;
+    --mvc-muted: #a2947c;
+  }
+  .mvc-ms-tab,
+  .mvc-ms-btn {
+    background: #23201a;
+  }
+  .mvc-ms-viewport {
+    background: #14120e;
+  }
+}
