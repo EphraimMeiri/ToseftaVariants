@@ -7,8 +7,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="vendor/midrash-viewer-core/midrash-viewer-core.css">
-    <link rel="stylesheet" href="styles.css?v=12">
+    <link rel="stylesheet" href="vendor/midrash-viewer-core/midrash-viewer-core.css?v=9">
+    <link rel="stylesheet" href="styles.css?v=15">
     <title>תוספתא עם חילופי נוסח</title>
 </head>
 <body>
@@ -33,6 +33,13 @@
                 <button type="button" class="nav-toggle-btn" id="manuscriptMode" hidden aria-pressed="false"
                         title="תצוגת כתב יד" aria-label="תצוגת כתב יד">
                     <span class="nav-toggle-icon nav-manuscript-icon">כ״י</span>
+                </button>
+                <!-- One button for every commentary: they share a dock and
+                     appear as tabs within it, so a button apiece was both
+                     redundant and unscalable (four commentaries are coming). -->
+                <button type="button" class="nav-toggle-btn" id="commentaryMode" hidden aria-pressed="false"
+                        title="פירושים" aria-label="פירושים">
+                    <span class="nav-toggle-icon">פי׳</span>
                 </button>
                 <button id="export-docx" class="nav-export" title="ייצוא ל‑Word" aria-label="ייצוא ל‑Word">
                     <span class="nav-export-w">W</span><span class="nav-export-arrow">↓</span>
@@ -150,25 +157,30 @@
             <div class="synopsis-footer-body" id="synopsis-footer-body"></div>
         </div>
 
-        <div class="manuscript-footer" id="manuscript-footer" hidden>
-            <div class="manuscript-footer-header">
-                <span id="manuscript-footer-label" class="manuscript-footer-label"></span>
-                <!-- zoom / fullscreen controls are provided by the shared
-                     midrash-viewer-core panel, inside the footer body -->
-                <button type="button" id="manuscript-footer-close" class="manuscript-footer-close" title="סגור">✕</button>
-            </div>
-            <div class="manuscript-footer-body" id="manuscript-footer-body"></div>
-        </div>
+        <!-- Dock region: chrome (header, tabs, close) comes from
+             midrash-viewer-core's createDock; the manuscript-image layer mounts
+             its panel inside. Zoom / fullscreen controls are the shared panel's
+             own, inside the dock body. -->
+        <div class="dock-region" id="manuscript-dock" hidden></div>
     </div>
 
-    <script src="vendor/midrash-viewer-core/midrash-viewer-core.js"></script>
-    <script src="tosefta_parsing_tools.js?v=12"></script>
+    <!-- Commentaries dock. Tall rather than wide: commentary runs in long
+         paragraphs (Tosefta Kifshuta's notes carry their own footnotes), which
+         needs vertical room and would wreck the reading column if inlined.
+         This is the one dock expected to host several layers at once, so it's
+         where the tab strip actually earns its keep. -->
+    <aside class="side-dock dock-region" id="side-dock" hidden></aside>
+
+    <script src="vendor/midrash-viewer-core/midrash-viewer-core.js?v=9"></script>
+    <script src="tosefta_parsing_tools.js?v=16"></script>
+    <script src="viewer_layers.js?v=9"></script>
     <script>
         let currentTextData = null;
         let currentVariantsData = null;
         let currentWitnessData = null;
         let currentManuscriptData = null;
         let currentEditionsData = null;
+        let currentCommentaryData = null;
         // Which alternate-edition overlays are toggled on; persists across tractate loads
         // within the page (each tractate load hides/unchecks whichever is native there).
         let editionOverlayState = { vilna: false, lz: false };
@@ -616,9 +628,17 @@ if (reason === 'word order difference') return 'סדר מילים';
                 getToseftavariants(selectedLocation),
                 getWitnessAlignment(selectedLocation),
                 getEditionAlignment(selectedLocation),
-                ...MANUSCRIPT_WITNESS_SLUGS.map(slug => getManuscriptImageData(selectedLocation, slug))
+                ...MANUSCRIPT_WITNESS_SLUGS.map(slug => getManuscriptImageData(selectedLocation, slug)),
+                ...COMMENTARY_SLUGS.map(slug => getCommentaryData(selectedLocation, slug)),
+                ...OCR_COMMENTARY_SLUGS.map(slug => getOcrCommentaryData(selectedLocation, slug))
             ])
-            .then(([textData, variantsData, witnessData, editionsData, ...manuscriptDataList]) => {
+            .then(([textData, variantsData, witnessData, editionsData, ...rest]) => {
+                const manuscriptDataList = rest.slice(0, MANUSCRIPT_WITNESS_SLUGS.length);
+                const commentaryDataList = rest.slice(
+                    MANUSCRIPT_WITNESS_SLUGS.length,
+                    MANUSCRIPT_WITNESS_SLUGS.length + COMMENTARY_SLUGS.length);
+                const ocrCommentaryDataList = rest.slice(
+                    MANUSCRIPT_WITNESS_SLUGS.length + COMMENTARY_SLUGS.length);
                 currentTextData = textData;
                 currentVariantsData = variantsData;
                 currentWitnessData = witnessData;
@@ -626,8 +646,13 @@ if (reason === 'word order difference') return 'סדר מילים';
                 const manuscriptDataBySlug = {};
                 MANUSCRIPT_WITNESS_SLUGS.forEach((slug, i) => { manuscriptDataBySlug[slug] = manuscriptDataList[i]; });
                 currentManuscriptData = manuscriptDataBySlug;
+                const commentaryBySlug = {};
+                COMMENTARY_SLUGS.forEach((slug, i) => { commentaryBySlug[slug] = commentaryDataList[i]; });
+                currentCommentaryData = commentaryBySlug;
+                const ocrCommentaryBySlug = {};
+                OCR_COMMENTARY_SLUGS.forEach((slug, i) => { ocrCommentaryBySlug[slug] = ocrCommentaryDataList[i]; });
                 renderClassificationDetailControls(variantsData);
-                displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData);
+                displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData, commentaryBySlug, ocrCommentaryBySlug);
                 buildTocNav(textData);
             })
             .catch(error => {
@@ -886,11 +911,26 @@ function setNavToggleOn(id, on) {
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
 }
 
-// The shared manuscript panel outlives any single tractate load; see the
-// destroy()/recreate inside displayTextAndVariants.
-let manuscriptPanel = null;
+// The shared layer registry (midrash-viewer-core): one selection model, and one
+// place that knows which apparatus is switched on and where it renders. Built
+// once, outlives every tractate load -- see viewer_layers.js for the layers.
+let viewer = null;
 
-function displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData){
+function displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData, commentaryBySlug, ocrCommentaryBySlug){
+    const masechetName = (variantsData.title || '').replace('Variants on ', '');
+
+    // Mounted panels outlive a tractate switch and take the new data through
+    // setContext, rather than being torn down and rebuilt: that's what stops
+    // each load from leaving another set of window-level pan/fullscreen
+    // listeners behind, which both this and the hand-rolled version before it
+    // used to do.
+    if (!viewer) viewer = createToseftaViewer();
+    viewer.setContext({
+        masechet: masechetName,
+        textData, variantsData, witnessData, manuscriptDataBySlug, editionsData,
+        commentaryBySlug, ocrCommentaryBySlug,
+    });
+
     const contentContainer = document.getElementById('content-container');
     const showHiddenCheckbox = document.getElementById('showHidden');
     const hideMinorOrthographyCheckbox = document.getElementById('hideMinorOrthography');
@@ -1031,133 +1071,20 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         return result;
     }
 
-    // --- Manuscript viewer footer: shows the manuscript page (for whichever
-    // witness the click was about) for the word at a given baseIdx, with a
-    // highlight box on the matched region. Independent of synopsis mode (its
-    // own toggle/checkbox), but hooked into the exact same click sources via
-    // syncManuscriptTo alongside syncFooterTo.
-    const manuscriptFooter = document.getElementById('manuscript-footer');
-    const manuscriptFooterBody = document.getElementById('manuscript-footer-body');
-    const manuscriptFooterLabel = document.getElementById('manuscript-footer-label');
-    let manuscriptState = { witnessSlug: null, perekIndex: null, baseIdx: null };
+    // The manuscript-image panel is now a registered dock layer -- see
+    // MANUSCRIPT_LAYER in viewer_layers.js, which also owns
+    // SIGLUM_TO_WITNESS_SLUG, WITNESS_HEB_LABEL, witnessSlugForSynopsisSiglum
+    // and resolveManuscriptEntry. Clicks reach it by setting the shared
+    // selection, not by a dedicated sync function.
+    const selection = viewer.selection;
 
-    // Vienna is the site's base text (data-siglum-less .body-word / synopsis
-    // 'בסיס' row), so witness-neutral clicks resolve to it. Erfurt is a full
-    // secondary witness with its own images. London (ל) only has image data
-    // for the Chullin/Seder Moed volume (BL Add. 27296, via NLI's IIIF).
-    // Other sigla (ד/ש) have no manuscript-image data yet, so are simply
-    // absent from this map.
-    const SIGLUM_TO_WITNESS_SLUG = { 'א': 'Erfurt', 'ב': 'Vienna', 'ג': 'Geniza', 'ל': 'London' };
-    const WITNESS_HEB_LABEL = { 'Erfurt': 'כתב יד ערפורט', 'Vienna': 'כתב יד וינה', 'Geniza': 'קטע גניזה', 'London': 'כתב יד לונדון' };
-
-    function witnessSlugForSynopsisSiglum(siglum) {
-        if (siglum === 'בסיס') return 'Vienna';
-        return SIGLUM_TO_WITNESS_SLUG[siglum] || null;
+    // Build the address a click refers to. `baseIdx` is nullable throughout the
+    // shared address model: an apparatus entry that can only be placed to its
+    // halakhah is a first-class case, not a degraded word anchor.
+    function addressAt(perekIndex, halachaIndex, baseIdx) {
+        return MidrashViewerCore.address.makeAddress(masechetName, perekIndex, halachaIndex, baseIdx);
     }
 
-
-    function hebLabelFor(perekIndex) {
-        return convert_number(perekIndex + 1);
-    }
-
-    // Resolves a click into one of four states so the footer can explain
-    // *why* a word has no link instead of one generic "missing" message:
-    //   'no-data'    -- this witness has no manuscript-image file for the
-    //                   tractate at all (e.g. Geniza/London outside their
-    //                   covered scope).
-    //   'no-chapter' -- the file exists but this chapter has zero aligned
-    //                   entries.
-    //   'exact'      -- the word itself is aligned; a solid highlight box.
-    //   'approx'     -- the word itself isn't aligned (HTR miss), but the
-    //                   chapter has other aligned words nearby; falls back to
-    //                   the nearest one so the user at least sees the right
-    //                   general spot on the page, marked as approximate.
-    function resolveManuscriptEntry(witnessSlug, perekIndex, baseIdx) {
-        const manuscriptData = manuscriptDataBySlug && manuscriptDataBySlug[witnessSlug];
-        if (!manuscriptData) return { status: 'no-data' };
-        const chapter = manuscriptData.chapters && manuscriptData.chapters[hebLabelFor(perekIndex)];
-        const keys = chapter ? Object.keys(chapter) : [];
-        if (!chapter || keys.length === 0) return { status: 'no-chapter' };
-        const exact = chapter[String(baseIdx)];
-        if (exact) return { status: 'exact', word: exact };
-        let nearestKey = null, nearestDist = Infinity;
-        for (const k of keys) {
-            const dist = Math.abs(Number(k) - baseIdx);
-            if (dist < nearestDist) { nearestDist = dist; nearestKey = k; }
-        }
-        if (nearestKey == null) return { status: 'no-chapter' };
-        return { status: 'approx', word: chapter[nearestKey], distance: nearestDist };
-    }
-
-    // The manuscript image panel is midrash-viewer-core (vendor/), shared with
-    // the Tannaitic Midrashim site: it owns the image DOM, zoom, pan and
-    // fullscreen. This site keeps only the header label and close button.
-    //
-    // Single-witness mode: which witness to show comes from the click source
-    // (a synopsis row, a footnote, a body word), not from a tab strip, so
-    // `listWitnesses` is deliberately absent and the witness is passed per
-    // select() instead.
-    // displayTextAndVariants re-runs on every tractate load, so tear down the
-    // previous panel first -- otherwise each load leaves its window-level
-    // mousemove/mouseup pan handlers and fullscreenchange listener behind.
-    // (The hand-rolled version this replaced re-bound those every load too.)
-    if (manuscriptPanel) manuscriptPanel.destroy();
-    manuscriptPanel = MidrashViewerCore.createManuscriptPanel({
-        root: manuscriptFooterBody,
-        showFolioLabel: false,   // the header label already names page + chapter
-        labels: {
-            noSelection: 'לחצו על מילה בטקסט, בעד הנוסח או בהערת השוליים כדי להציג את כתב היד',
-            noData: (w) => `אין נתוני כתב יד עבור ${w} במסכת זו`,
-            noChapter: (w) => `אין עדיין נתוני כתב יד לפרק זה ב${w}`,
-            notFound: (w) => `המילה לא זוהתה ב${w} במיקום זה`,
-            approxNote: 'המילה המדויקת לא זוהתה בכתב היד -- מוצגת המילה המזוהה הקרובה ביותר',
-        },
-        adapter: {
-            resolve(witnessSlug, addr) {
-                const witnessLabel = WITNESS_HEB_LABEL[witnessSlug] || witnessSlug;
-                const data = manuscriptDataBySlug && manuscriptDataBySlug[witnessSlug];
-                const resolved = resolveManuscriptEntry(witnessSlug, addr.perekIndex, addr.baseIdx);
-                if (resolved.status === 'no-data' || resolved.status === 'no-chapter') {
-                    return { status: resolved.status, witnessLabel };
-                }
-                const word = resolved.word;
-                const page = word && data.pages && data.pages[String(word.page)];
-                if (!word || !word.bbox || !page) return { status: 'not-found', witnessLabel };
-                // This site's emitted JSON stores [x0,y0,x1,y1]; the core
-                // speaks [x,y,w,h] only, so convert here.
-                return {
-                    status: resolved.status,
-                    page,
-                    bbox: MidrashViewerCore.bbox.fromXYXY(word.bbox),
-                    folio: word.page,
-                    witnessLabel,
-                };
-            },
-        },
-    });
-
-    function renderManuscriptFooter() {
-        const { witnessSlug, perekIndex, baseIdx } = manuscriptState;
-        if (baseIdx == null || !witnessSlug) {
-            manuscriptFooterLabel.textContent = '';
-            manuscriptPanel.select(null);
-            return;
-        }
-        const witnessLabel = WITNESS_HEB_LABEL[witnessSlug] || witnessSlug;
-        manuscriptFooterLabel.textContent = `${witnessLabel}, פרק ${convert_number(perekIndex + 1)}`;
-        manuscriptPanel.select({ perekIndex, baseIdx }, { witnessId: witnessSlug });
-    }
-
-    function syncManuscriptTo(witnessSlug, perekIndex, baseIdx) {
-        if (!isNavToggleOn('manuscriptMode')) return;
-        manuscriptState = { witnessSlug, perekIndex, baseIdx };
-        renderManuscriptFooter();
-    }
-
-    document.getElementById('manuscript-footer-close').addEventListener('click', () => {
-        setNavToggleOn('manuscriptMode', false);
-        if (typeof refreshCurrentDisplay === 'function') refreshCurrentDisplay();
-    });
 
     // Reverse sync: clicking a word inside the synopsis table scrolls to and
     // briefly highlights the matching word back in the main text.
@@ -1180,9 +1107,8 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         // sigla with no manuscript-image data (ד/ל/ג/ש) don't drive it.
         const row = cell.closest('tr');
         const witnessSlug = row && witnessSlugForSynopsisSiglum(row.dataset.siglum);
-        if (witnessSlug) {
-            syncManuscriptTo(witnessSlug, perekIndex, Number(baseIdx));
-        }
+        selection.set(addressAt(perekIndex, footerState.halachaIndex, Number(baseIdx)),
+                      { source: 'synopsis', witnessId: witnessSlug });
     });
 
     document.getElementById('synopsis-prev').addEventListener('click', () => {
@@ -1257,9 +1183,8 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
                 // only sync the image if that witness has manuscript data.
                 const strip = wordEl.closest('.witness-strip');
                 const witnessSlug = strip ? SIGLUM_TO_WITNESS_SLUG[strip.dataset.siglum] : 'Vienna';
-                if (witnessSlug) {
-                    syncManuscriptTo(witnessSlug, Number(m[1]), Number(wordEl.dataset.baseIdx));
-                }
+                selection.set(addressAt(Number(m[1]), Number(m[2]), Number(wordEl.dataset.baseIdx)),
+                              { source: 'body', witnessId: witnessSlug });
             }
             return;
         }
@@ -1269,10 +1194,8 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
             console.log('[synopsis] content click matched note element', { noteId: noteEl.dataset.noteId, resolved });
             if (resolved && resolved.baseIdx != null) {
                 syncFooterTo(resolved.perekIndex, resolved.halachaIndex, resolved.baseIdx);
-                const witnessSlug = resolveNoteManuscriptWitness(noteEl.dataset.noteId, e);
-                if (witnessSlug) {
-                    syncManuscriptTo(witnessSlug, resolved.perekIndex, resolved.baseIdx);
-                }
+                selection.set(addressAt(resolved.perekIndex, resolved.halachaIndex, resolved.baseIdx),
+                              { source: 'apparatus', witnessId: resolveNoteManuscriptWitness(noteEl.dataset.noteId, e) });
             }
         } else {
             console.log('[synopsis] content click matched neither word/witness nor note', { tag: e.target.tagName, classes: e.target.className });
@@ -1375,19 +1298,10 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         console.log('[synopsis] updateDisplay', { hasWitnessData, checkboxChecked: isNavToggleOn('synopsisMode'), synopsisModeOn, chaptersLen: hasWitnessData ? witnessData.chapters.length : 0 });
         if (synopsisModeOn) renderSynopsisFooter();
 
-        // Manuscript-image panel: only relevant when this tractate has any
-        // baseIdx-joined manuscript data at all (independent of hasWitnessData,
-        // though in practice it's a subset -- some tractates have witness data
-        // but no manuscript images yet).
-        const hasManuscriptData = MANUSCRIPT_WITNESS_SLUGS.some(slug => {
-            const md = manuscriptDataBySlug && manuscriptDataBySlug[slug];
-            return md && md.chapters && Object.keys(md.chapters).length;
-        });
-        document.getElementById('manuscriptMode').hidden = !hasManuscriptData;
-        const manuscriptModeOn = hasManuscriptData && isNavToggleOn('manuscriptMode');
-        manuscriptFooter.hidden = !manuscriptModeOn;
-        document.body.classList.toggle('manuscript-footer-open', manuscriptModeOn);
-        if (manuscriptModeOn) renderManuscriptFooter();
+        // The manuscript-image panel needs nothing here any more: the registry
+        // decides whether it's relevant (MANUSCRIPT_LAYER.available -- any
+        // baseIdx-joined manuscript data for this tractate), whether it's
+        // showing, and what its nav button reads. See viewer_layers.js.
 
         // Alternate-edition numbering overlay (Vilna / Lieberman-Zuckermandel):
         // a scheme's checkbox is only shown when this tractate actually has
@@ -1811,6 +1725,12 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
                 sup.style.display = '';
             }
         });
+
+        // Re-observe the rebuilt paragraphs so the commentary keeps following
+        // the reader's scroll position. This runs on every updateDisplay, not
+        // just on load: a filter change rebuilds the whole body, which would
+        // otherwise leave the follower watching detached elements.
+        viewer.scrollFollower.setContext(viewer.context);
     }
 
     // Initial display
@@ -1848,10 +1768,13 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         setNavToggleOn('synopsisMode', !isNavToggleOn('synopsisMode'));
         updateDisplay();
     };
-    document.getElementById('manuscriptMode').onclick = () => {
-        setNavToggleOn('manuscriptMode', !isNavToggleOn('manuscriptMode'));
-        updateDisplay();
-    };
+    // A dock layer's toggle no longer re-renders the body: switching an
+    // apparatus panel on is not a reason to rebuild several thousand words of
+    // text and re-run the variant classification over it.
+    document.getElementById('manuscriptMode').onclick = () => viewer.toggle('manuscript');
+    // One button, every commentary: opens the dock with a tab per commentary
+    // that has data for this tractate, and shuts them all.
+    document.getElementById('commentaryMode').onclick = () => viewer.toggleNavGroup('commentaryMode');
     ['vilna', 'lz'].forEach(key => {
         document.getElementById(`numbering-overlay-${key}`).onchange = (e) => {
             editionOverlayState[key] = e.target.checked;

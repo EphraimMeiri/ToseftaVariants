@@ -3,6 +3,17 @@ const VARIANTS_DATA_BASE = "data/variants/";
 const WITNESSES_DATA_BASE = "data/witnesses/";
 const MANUSCRIPT_IMAGES_DATA_BASE = "data/manuscript_images/";
 const EDITIONS_DATA_BASE = "data/editions/";
+const COMMENTARIES_DATA_BASE = "data/commentaries/";
+// Commentaries available as apparatus layers, keyed by the file-name prefix in
+// data/commentaries/. Lieberman's two cover only Zeraim through Nezikin (33 of
+// our 59 tractates); tractates without a file simply get no layer.
+const COMMENTARY_SLUGS = ["BriefCommentary", "Kifshuta"];
+// Our own OCR of the printed editions, kept out of the public site: this
+// directory is gitignored, and a layer whose file is absent is simply
+// unavailable, so the public deploy needs no special casing -- it just has two
+// fewer tabs. Exported by editionsDigitization/export_commentary_layers.py.
+const OCR_COMMENTARIES_DATA_BASE = "data/commentaries-ocr/";
+const OCR_COMMENTARY_SLUGS = ["ChasdeiDavid", "TekheletMordechai"];
 // Display names for the alternate numbering schemes in data/editions/Editions_<Tractate>.json.
 // "lz" is only ever shown when its edition is Zuckermandel -- see the
 // (key === 'lz' && schemeData.edition === 'lieberman') hide-check in
@@ -93,6 +104,28 @@ function getEditionUrl(location) {
 
 function getEditionAlignment(location) {
     return fetch(getEditionUrl(location))
+        .then(response => response.ok ? response.json() : null)
+        .catch(() => null);
+}
+
+function getCommentaryUrl(location, slug) {
+    const tractateSlug = location.split("/").pop().replace("Tosefta%20", slug + "_");
+    return COMMENTARIES_DATA_BASE + tractateSlug + ".json";
+}
+
+function getCommentaryData(location, slug) {
+    return fetch(getCommentaryUrl(location, slug))
+        .then(response => response.ok ? response.json() : null)
+        .catch(() => null);
+}
+
+function getOcrCommentaryUrl(location, slug) {
+    const tractateSlug = location.split("/").pop().replace("Tosefta%20", slug + "_");
+    return OCR_COMMENTARIES_DATA_BASE + tractateSlug + ".json";
+}
+
+function getOcrCommentaryData(location, slug) {
+    return fetch(getOcrCommentaryUrl(location, slug))
         .then(response => response.ok ? response.json() : null)
         .catch(() => null);
 }
@@ -1937,4 +1970,419 @@ function convert_number(integer) {
     }
 
     return output;
+}
+
+// --- Commentary anchoring (Tosefta Kifshuta, Brief Commentary) ---------------
+//
+// Both commentaries are Sefaria JSON shaped text[chapter][halakhah][note], each
+// note opening with a dibbur hamatchil in <b>...</b> that quotes the passage
+// being commented on. We re-anchor every note to a base-word index by matching
+// that quote against our own text, rather than trusting the JSON's halakhah
+// index -- because that index is not reliable. Measured over all 33 tractates:
+// 646 of the Brief Commentary's 6,246 notes (10.4%) sit in a different halakhah
+// than their index claims, with an accumulating forward drift (+1, +2, +3, +5),
+// while Kifshuta drifts for only 98 of 14,657. Matching the DH across the whole
+// chapter fixes all of them and lifts the word-anchor rate from 92.6% to 99.9%
+// (Brief) and 99.5% to 99.7% (Kifshuta).
+//
+// Notes whose DH doesn't resolve (53 of 20,903 -- mostly a DH quoting a reading
+// the commentator is emending away from, e.g. Ketubot 9:6 "שכרה" where the note
+// itself says צ"ל: שברה) keep a halakhah-scoped anchor. That's a first-class
+// case in the shared address model, not a failure.
+
+// A DH elides the rest of the quoted passage with וכו'; everything after that
+// is not text to match, and neither is the printer's closing period, editorial
+// brackets, or a paraphrase following a comma.
+const DH_ETC_RE = /(?:\s|^)(?:וכו|וכר|וכול)['׳]?\.?\s*$/;
+
+function parseCommentaryDH(noteHtml) {
+    const m = /<b>([\s\S]*?)<\/b>/.exec(String(noteHtml || ""));
+    if (!m) return null;
+    let dh = m[1].replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
+    dh = dh.replace(/[.:]\s*$/, "").trim();
+    dh = dh.replace(/[\[\]()]/g, " ").trim();
+    dh = dh.replace(DH_ETC_RE, "").trim();
+    dh = dh.split(",")[0].trim();
+    dh = dh.replace(DH_ETC_RE, "").trim();
+    const words = tokenizeHe(dh);
+    return words.length ? words : null;
+}
+
+// The chapter's body words as one flat stream, with each position's halakhah
+// and chapter-wide base index. Same tokenization as computeChapterWordIndex, so
+// the indices are the same currency the witness alignment and manuscript-image
+// data speak.
+function buildChapterWordStream(textPerek) {
+    const words = [];
+    const halOf = [];
+    textPerek.forEach((halakhaHtml, hi) => {
+        tokenizeHe(halakhaHtml.replace(MARKER_SPLIT_RE, " ")).forEach(w => {
+            words.push(w);
+            halOf.push(hi);
+        });
+    });
+    return { words, halOf };
+}
+
+// First position >= `from` where `needle` matches consecutively, by wordsMatchHe
+// (so kitzur, haser/maleh and prefix differences don't break a match).
+function findWordRunHe(haystack, needle, from) {
+    const limit = haystack.length - needle.length;
+    for (let i = Math.max(0, from || 0); i <= limit; i++) {
+        let ok = true;
+        for (let k = 0; k < needle.length; k++) {
+            if (!wordsMatchHe(haystack[i + k], needle[k])) { ok = false; break; }
+        }
+        if (ok) return i;
+    }
+    return -1;
+}
+
+// Anchor one chapter's commentary notes. Notes are in printed order, so a
+// forward-only cursor disambiguates a DH whose words recur later in the chapter
+// -- which is why the ordered rules carry ~98% of matches on their own. The
+// restart rules exist for the handful of notes that genuinely refer backwards.
+//
+// Returns entries sorted by position, each:
+//   { id, chapter, halakhah, baseIdx, endIdx, dh, html, lineRef, sourceHalakhah }
+// with baseIdx null when only the halakhah is known.
+function anchorCommentaryChapter(commentaryChapter, textPerek, chapterIndex, idPrefix) {
+    const { words, halOf } = buildChapterWordStream(textPerek);
+    const entries = [];
+    let cursor = 0;
+    let seq = 0;
+
+    (commentaryChapter || []).forEach((halakhaNotes, sourceHal) => {
+        (halakhaNotes || []).forEach(noteHtml => {
+            const id = `${idPrefix}-${chapterIndex}-${sourceHal}-${seq++}`;
+            const dh = parseCommentaryDH(noteHtml);
+            let at = -1;
+            let len = 0;
+            if (dh) {
+                at = findWordRunHe(words, dh, cursor);
+                len = dh.length;
+                if (at < 0) { at = findWordRunHe(words, dh, 0); }
+                if (at < 0 && dh.length > 1) { at = findWordRunHe(words, [dh[0]], cursor); len = 1; }
+                if (at < 0 && dh.length > 1) { at = findWordRunHe(words, [dh[0]], 0); len = 1; }
+            }
+            const resolved = at >= 0;
+            if (resolved) cursor = at;
+            entries.push({
+                id,
+                chapter: chapterIndex,
+                // Where the note actually belongs, which is where its DH landed
+                // -- not necessarily where the source JSON filed it.
+                halakhah: resolved ? halOf[at] : sourceHal,
+                sourceHalakhah: sourceHal,
+                baseIdx: resolved ? at : null,
+                endIdx: resolved ? at + len - 1 : null,
+                dh: dh ? dh.join(" ") : null,
+                html: stripCommentaryLineRef(noteHtml),
+                lineRef: commentaryLineRef(noteHtml),
+            });
+        });
+    });
+
+    entries.sort((a, b) => {
+        if (a.halakhah !== b.halakhah) return a.halakhah - b.halakhah;
+        if (a.baseIdx == null && b.baseIdx == null) return 0;
+        if (a.baseIdx == null) return -1;
+        if (b.baseIdx == null) return 1;
+        return a.baseIdx - b.baseIdx;
+    });
+    return entries;
+}
+
+// Kifshuta notes may open with a printed-LINE reference -- "7." or "10-11." --
+// referring to line numbers of the Tosefta text in the JTS edition, NOT to a
+// note number. They restart per chapter, are monotonic, appear on only ~2/3 of
+// notes (an unnumbered note continues the previous printed line), and their
+// maxima exceed the note count. Kept as metadata and shown as a citation, never
+// rendered as if it numbered the note.
+const COMMENTARY_LINE_REF_RE = /^\s*<small>(\d+(?:[-–]\d+)?)\.<\/small>\s*/;
+
+function commentaryLineRef(noteHtml) {
+    const m = COMMENTARY_LINE_REF_RE.exec(String(noteHtml || ""));
+    return m ? m[1] : null;
+}
+
+function stripCommentaryLineRef(noteHtml) {
+    return String(noteHtml || "").replace(COMMENTARY_LINE_REF_RE, "");
+}
+
+// Anchor a whole tractate, lazily per chapter: Kifshuta is ~600KB per tractate
+// and up to 1,349 notes, and a reader looking at chapter 1 shouldn't pay to
+// align chapter 12.
+function createCommentaryIndex(commentaryData, textData, idPrefix) {
+    const byChapter = new Map();
+    return {
+        get title() { return commentaryData.heTitle || commentaryData.title || idPrefix; },
+        chapter(chapterIndex) {
+            if (!byChapter.has(chapterIndex)) {
+                const commChapter = (commentaryData.text || [])[chapterIndex];
+                const textPerek = (textData.text || [])[chapterIndex];
+                byChapter.set(chapterIndex, (commChapter && textPerek)
+                    ? anchorCommentaryChapter(commChapter, textPerek, chapterIndex, idPrefix)
+                    : []);
+            }
+            return byChapter.get(chapterIndex);
+        },
+    };
+}
+
+// --- OCR'd commentary anchoring (Chasdei David, Tekhelet Mordechai) ---------
+//
+// These arrive page-shaped rather than halakhah-shaped: each note carries the
+// lemma the chunker cut it at, plus the ref of the PAGE it sits on -- and a
+// page's ref names where the page starts, while its commentary runs on into the
+// following halakhot (the very assumption behind comment_chunk_lib's
+// DEFAULT_FORWARD_WINDOW). So notes are placed by matching their lemma forward
+// from the ref'd halakhah, the same "trust the lemma, not the filed location"
+// approach the Lieberman commentaries need.
+//
+// Differences from the Lieberman path, all consequences of this being OCR:
+//   - the lemma is a chunker guess, not an authored dibbur hamatchil, and only
+//     ~51% (Chasdei David) / ~36% (Tekhelet Mordechai) validated against the
+//     text at chunk time. Unvalidated lemmas are still tried here -- this
+//     matcher is fuzzier and searches wider than the chunker's local backward
+//     match, so it recovers some of them -- but many simply won't place.
+//   - the search is bounded below by the page's ref and above by its range end
+//     where one is given, because a chunker-guessed lemma is far likelier to be
+//     a common word that could match anywhere.
+//
+// A note whose lemma doesn't place keeps a halakhah-scoped anchor (or
+// chapter-scoped, for Seder Taharot pages whose running headers cite no
+// halakhah at all). That is a first-class case, not a failure.
+
+// How far past the page's ref a lemma may be sought, in halakhot. Mirrors
+// comment_chunk_lib's DEFAULT_FORWARD_WINDOW, which is the assumption the
+// chunking was done under: a page's commentary covers its ref'd halakhah and a
+// handful after. Bounding this is a correctness matter as much as a speed one --
+// a chunker-guessed lemma is often a common word, and an unbounded chapter-wide
+// search will cheerfully match one 30 halakhot away.
+const OCR_FORWARD_WINDOW = 10;
+
+// Exact-normalized key for the candidate index: Hebrew letters only, final
+// letters folded. Words that wordsMatchHe would equate can still key
+// differently (haser/maleh, prefixes), which is why the fuzzy scan remains as a
+// fallback -- the index just spares us running it at every position.
+function ocrIndexKey(word) {
+    return String(word || "")
+        .replace(/<[^>]+>/g, "")
+        .replace(/[^\u05D0-\u05EA]/g, "")
+        .replace(/[ךםןףץ]/g, c => ({ 'ך': 'כ', 'ם': 'מ', 'ן': 'נ', 'ף': 'פ', 'ץ': 'צ' })[c]);
+}
+
+// Two indexes over the chapter's words: exact normalized keys, and
+// matres-lectionis-reduced keys. A lemma is looked up by a handful of derived
+// keys rather than scanned for.
+//
+// The linear fuzzy scan this replaced was correct but unusably slow -- 13.5s to
+// place one tractate's 1,442 notes, because a note that will never place costs
+// a full window of wordsMatchHe calls, and most OCR lemmas never place. Keyed
+// lookup gets the same recall on what wordsMatchHe actually catches here
+// (haser/maleh and single-letter prefixes) for a few Map hits per note.
+function buildWordPositionIndex(words) {
+    const exact = new Map();
+    const reduced = new Map();
+    const add = (map, key, i) => {
+        if (!key) return;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(i);
+    };
+    words.forEach((word, i) => {
+        const key = ocrIndexKey(word);
+        add(exact, key, i);
+        const red = removeInternalMatres(key);
+        if (red !== key) add(reduced, red, i);
+    });
+    return { exact, reduced };
+}
+
+// Candidate positions for a lemma's first word: the word itself, the same word
+// with a one-letter prefix added or removed, and its matres-reduced form.
+function ocrCandidatePositions(positions, word) {
+    const key = ocrIndexKey(word);
+    if (!key) return [];
+    const keys = new Set([key]);
+    PREFIXES.forEach(pre => {
+        keys.add(pre + key);
+        if (key.length > 2 && key[0] === pre) keys.add(key.slice(1));
+    });
+    const out = new Set();
+    keys.forEach(k => {
+        (positions.exact.get(k) || []).forEach(i => out.add(i));
+    });
+    const red = removeInternalMatres(key);
+    (positions.reduced.get(red) || []).forEach(i => out.add(i));
+    (positions.exact.get(red) || []).forEach(i => out.add(i));
+    return [...out].sort((a, b) => a - b);
+}
+
+// Which texts a lemma may be matched against, in priority order.
+//
+// Both these commentaries are 18th/19th-century and were written against the
+// PRINTED Tosefta rather than Codex Vienna, so it's a reasonable guess that
+// their lemmas would match our ד (defus) witness better than our
+// Lieberman/Vienna base text -- and the witness is stored positionally, one slot
+// per base word index, so a match in it IS a baseIdx needing no mapping back.
+//
+// Measured, though, the guess doesn't pay as a PRIMARY surface. Trying print
+// first moved 1,981 of Chasdei David's notes (11% of those placed) to a
+// different position, median 61 words away -- and judged against the page's own
+// cited halakhah, which is evidence independent of both surfaces, the base-text
+// placement was the nearer one twice as often (44.5% vs 21.4%). Our matcher is
+// already tolerant of the orthographic differences that separate the two texts,
+// so the print witness mostly offers alternative positions for words that were
+// matchable anyway, and its nulls and variants let it reach spurious ones.
+//
+// So: base text first, print witness only as a fallback for what the base text
+// cannot place at all. That keeps the ~200 notes only the print witness can
+// place and relocates nothing.
+function ocrMatchSurfaces(words, printWords) {
+    const surfaces = [{ name: 'base', words, positions: buildWordPositionIndex(words) }];
+    if (printWords && printWords.length === words.length) {
+        surfaces.push({ name: 'print', words: printWords, positions: buildWordPositionIndex(printWords) });
+    }
+    return surfaces;
+}
+
+// The ד witness's words for one chapter, or null when this tractate has no
+// witness alignment (or no print witness in it).
+function printWitnessWordsForChapter(witnessData, chapterIndex) {
+    const chapter = witnessData && witnessData.chapters && witnessData.chapters[chapterIndex];
+    const witness = chapter && chapter.witnesses && chapter.witnesses['ד'];
+    return (witness && Array.isArray(witness.words)) ? witness.words : null;
+}
+
+function anchorOcrCommentaryChapter(notes, textPerek, chapterIndex, idPrefix, printWords) {
+    const { words, halOf } = buildChapterWordStream(textPerek);
+    const { ranges } = computeChapterWordIndex(textPerek);
+    const surfaces = ocrMatchSurfaces(words, printWords);
+    const entries = [];
+    let cursor = 0;
+    let seq = 0;
+
+    (notes || []).forEach(note => {
+        const id = `${idPrefix}-${chapterIndex}-${seq++}`;
+        const hal = note.hal;
+        const floorRange = (hal != null && ranges[hal]) ? ranges[hal] : null;
+        const floor = floorRange ? floorRange[0] : 0;
+        const endHal = note.halEnd != null ? note.halEnd : hal;
+        // Without a ref'd halakhah (a chapter-scoped page ref, as all of Seder
+        // Taharot is) the whole chapter is in bounds; there's nothing narrower
+        // to go on.
+        let ceiling = words.length;
+        if (endHal != null) {
+            const lastHal = Math.min(endHal + OCR_FORWARD_WINDOW, ranges.length - 1);
+            if (ranges[lastHal]) ceiling = ranges[lastHal][1];
+        }
+
+        const lemmaWords = note.lemma ? tokenizeHe(note.lemma) : null;
+        let at = -1, len = 0, matchedOn = null;
+        if (lemmaWords && lemmaWords.length) {
+            const from = Math.max(cursor, floor);
+            // Fast path: only positions where the lemma's first word occurs
+            // exactly-normalized, verifying the rest fuzzily.
+            const indexed = (surface, start, needle) => {
+                const candidates = ocrCandidatePositions(surface.positions, needle[0]);
+                for (const i of candidates) {
+                    if (i < start) continue;
+                    if (i + needle.length > ceiling) break;
+                    let ok = true;
+                    for (let k = 1; k < needle.length; k++) {
+                        if (!wordsMatchHe(surface.words[i + k], needle[k])) { ok = false; break; }
+                    }
+                    if (ok) return i;
+                }
+                return -1;
+            };
+            // Prefer a full-lemma match at or after the cursor; then anywhere in
+            // the window; only then settle for the first word alone. Within each
+            // of those, the base text is tried before the print witness -- see
+            // ocrMatchSurfaces for why that order and not the reverse.
+            const needles = lemmaWords.length > 1
+                ? [lemmaWords, lemmaWords, [lemmaWords[0]], [lemmaWords[0]]]
+                : [lemmaWords, lemmaWords];
+            const starts = lemmaWords.length > 1
+                ? [from, floor, from, floor]
+                : [from, floor];
+            for (let a = 0; a < needles.length && at < 0; a++) {
+                for (const surface of surfaces) {
+                    const found = indexed(surface, starts[a], needles[a]);
+                    if (found >= 0) { at = found; len = needles[a].length; matchedOn = surface.name; break; }
+                }
+            }
+        }
+
+        const resolved = at >= 0;
+        if (resolved) cursor = at;
+        entries.push({
+            id,
+            chapter: chapterIndex,
+            halakhah: resolved ? halOf[at] : (hal != null ? hal : null),
+            sourceHalakhah: hal,
+            baseIdx: resolved ? at : null,
+            endIdx: resolved ? at + len - 1 : null,
+            lemma: note.lemma || null,
+            // Whether the chunker had already validated this lemma against the
+            // text. Kept because it says how much to trust the note's cut, which
+            // is a different question from whether we could place it.
+            lemmaValidated: !!note.v,
+            // Which text the lemma actually matched -- 'print' means it matched
+            // the defus witness where our base text differs, which is worth
+            // surfacing to a reader comparing the commentator's Vorlage.
+            matchedOn,
+            text: note.text,
+            page: note.page,
+            volume: note.vol,
+        });
+    });
+
+    // Order for reading. An unplaced note keeps the position of the last note
+    // placed BEFORE it in the printed commentary, so the two interleave in the
+    // order Pardo wrote them. Sorting unplaced notes to the front instead (the
+    // obvious reading of "no position") buried every anchored note behind the
+    // ~39% that don't place, which is precisely backwards.
+    let lastPlaced = -1;
+    entries.forEach((entry, i) => {
+        if (entry.baseIdx != null) lastPlaced = entry.baseIdx;
+        entry.readingOrder = i;
+        entry.sortIdx = entry.baseIdx != null ? entry.baseIdx : lastPlaced;
+    });
+    entries.sort((a, b) => {
+        const ah = a.halakhah == null ? -1 : a.halakhah;
+        const bh = b.halakhah == null ? -1 : b.halakhah;
+        if (ah !== bh) return ah - bh;
+        if (a.sortIdx !== b.sortIdx) return a.sortIdx - b.sortIdx;
+        return a.readingOrder - b.readingOrder;
+    });
+    return entries;
+}
+
+// Lazily anchor one tractate's OCR commentary, a chapter at a time. Chasdei
+// David runs to ~1,700 notes in a tractate, and a reader in chapter 1 shouldn't
+// pay for chapter 20.
+function createOcrCommentaryIndex(commentaryData, textData, idPrefix, witnessData) {
+    const byChapter = new Map();
+    const notesByChapter = new Map();
+    (commentaryData.notes || []).forEach(note => {
+        if (!notesByChapter.has(note.ch)) notesByChapter.set(note.ch, []);
+        notesByChapter.get(note.ch).push(note);
+    });
+    return {
+        get title() { return commentaryData.heTitle || commentaryData.title || idPrefix; },
+        chapter(chapterIndex) {
+            if (!byChapter.has(chapterIndex)) {
+                const textPerek = (textData.text || [])[chapterIndex];
+                const notes = notesByChapter.get(chapterIndex);
+                byChapter.set(chapterIndex, (textPerek && notes)
+                    ? anchorOcrCommentaryChapter(
+                        notes, textPerek, chapterIndex, idPrefix,
+                        printWitnessWordsForChapter(witnessData, chapterIndex))
+                    : []);
+            }
+            return byChapter.get(chapterIndex);
+        },
+    };
 }

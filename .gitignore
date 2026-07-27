@@ -4,3 +4,16 @@
 # npm (only used for the shared midrash-viewer-core package; the built
 # bundle is vendored under vendor/midrash-viewer-core and IS committed)
 node_modules/
+
+# Chasdei David: our OCR of the Vagshal "חסדי דוד השלם" edition, which is NOT a
+# plain facsimile of a public-domain printing -- it advertises itself as newly
+# prepared and annotated, and its Seder Taharot was first published from
+# manuscript only in recent decades. Pardo himself died in 1790, so the
+# commentary is long out of copyright; the EDITION we transcribed is the problem.
+# Until it is re-sourced from a pre-1929 printing, this stays local. Tekhelet
+# Mordechai (HebrewBooks scan of Pakš 1895) is public and IS committed.
+#
+# Exported by editionsDigitization/export_commentary_layers.py. The viewer simply
+# shows no tab for a commentary whose file is absent, so a checkout without these
+# needs no special casing.
+data/commentaries-ocr/ChasdeiDavid_*.json

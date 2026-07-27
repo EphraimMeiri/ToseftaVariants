@@ -815,7 +815,7 @@ body.sidebar-collapsed .sidebar-toggle {
 }
 
 .synopsis-footer,
-.manuscript-footer {
+.bottom-panels .dock-region {
     flex: 1 1 0;
     min-width: 0;
     max-height: 42vh;
@@ -826,17 +826,105 @@ body.sidebar-collapsed .sidebar-toggle {
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
 }
 
-.synopsis-footer + .manuscript-footer {
+.synopsis-footer + .dock-region {
     border-inline-start: 1px solid #d8ccb8;
 }
 
 .synopsis-footer[hidden],
-.manuscript-footer[hidden] {
+.dock-region[hidden] {
     display: none;
 }
 
-.synopsis-footer-header,
-.manuscript-footer-header {
+/* Dock chrome comes from midrash-viewer-core; only the palette is ours, so the
+   shared header/tabs match the hand-rolled synopsis footer beside it. */
+.dock-region.mvc-dock {
+    --mvc-dock-bg: #fffdf9;
+    --mvc-dock-border: #d8ccb8;
+    --mvc-dock-header-bg: #f5f0e6;
+    --mvc-dock-title-fg: #3a2e20;
+    border: none;   /* the region already draws its own border/shadow */
+}
+
+/* A layer's own header contribution (which witness and chapter is showing). */
+.dock-position-label {
+    font-weight: 600;
+    color: #3a2e20;
+    font-size: 0.9em;
+}
+
+/* Commentary dock: full height under the header, tall rather than wide (see the
+   note in index.html), and pinned to the inline-END edge -- the opposite side
+   from the filters sidebar and the perek/halakhah nav, which are the
+   .page-layout flex children occupying the inline-start edge. Putting it here
+   leaves the reading column between the controls and the commentary instead of
+   burying the sidebar underneath a fixed panel. */
+.side-dock {
+    position: fixed;
+    inline-size: min(30rem, 38vw);
+    inset-block: var(--site-header-height, 3.5rem) 0;
+    inset-inline-end: 0;
+    z-index: 480;
+    display: flex;
+    flex-direction: column;
+    background: #fffdf9;
+    border-inline-start: 2px solid #d8ccb8;
+    box-shadow: -4px 0 16px rgba(0, 0, 0, 0.1);
+}
+
+body.side-dock-open .main-content {
+    margin-inline-end: min(30rem, 38vw);
+}
+
+/* Pin toggle in the commentary dock header: stops the panel following the
+   reader's scroll position. Dimmed when off, so "following" reads as the
+   normal state and pinning as the deliberate exception. */
+.dock-pin {
+    font: inherit;
+    font-size: 0.95em;
+    line-height: 1;
+    padding: 0.15rem 0.35rem;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    opacity: 0.45;
+    filter: grayscale(1);
+}
+
+.dock-pin:hover {
+    opacity: 0.8;
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.dock-pin.active {
+    opacity: 1;
+    filter: none;
+    border-color: #c9bda4;
+    background: #f0e6d2;
+}
+
+/* Commentary panels: the shared core panel, in this site's palette. */
+#side-dock .mvc-comm {
+    --mvc-comm-fg: #2e2a22;
+    --mvc-comm-muted: #7a6a52;
+    --mvc-comm-rule: #eae4d8;
+    --mvc-comm-accent: #8a5a2b;
+    --mvc-comm-dh: #6b4423;
+    --mvc-comm-active-bg: #fdf6e3;
+    font-family: 'Noto Serif Hebrew', serif;
+}
+
+@media (max-width: 900px) {
+    .side-dock {
+        inline-size: 100vw;
+    }
+
+    body.side-dock-open .main-content {
+        margin-inline-end: 0;
+    }
+}
+
+.synopsis-footer-header {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -846,8 +934,7 @@ body.sidebar-collapsed .sidebar-toggle {
     flex: none;
 }
 
-.synopsis-footer-header button,
-.manuscript-footer-header button {
+.synopsis-footer-header button {
     background: none;
     border: 1px solid #c9bda4;
     border-radius: 4px;
@@ -857,20 +944,14 @@ body.sidebar-collapsed .sidebar-toggle {
     color: #3a2e20;
 }
 
-.synopsis-footer-header button:hover,
-.manuscript-footer-header button:hover {
+.synopsis-footer-header button:hover {
     background: #e9e1d1;
 }
 
-.synopsis-footer-label,
-.manuscript-footer-label {
+.synopsis-footer-label {
     font-weight: 600;
     color: #3a2e20;
     font-size: 0.9em;
-}
-
-.manuscript-footer-label {
-    margin-inline-end: auto;
 }
 
 .synopsis-footer-toggle {
@@ -883,8 +964,7 @@ body.sidebar-collapsed .sidebar-toggle {
     margin-inline-start: auto;
 }
 
-.synopsis-footer-close,
-.manuscript-footer-close {
+.synopsis-footer-close {
     font-weight: 700;
 }
 
@@ -896,12 +976,13 @@ body.sidebar-collapsed .sidebar-toggle {
 /* Host for the shared midrash-viewer-core panel, which brings its own
    scrolling viewport, zoom/pan and fullscreen -- so this element must NOT
    scroll or pad, only give the panel a box to fill. */
-.manuscript-footer-body {
+#manuscript-dock .mvc-dock-body,
+#manuscript-dock .mvc-dock-pane {
     overflow: hidden;
     min-height: 0;
 }
 
-.manuscript-footer-body .mvc-ms {
+#manuscript-dock .mvc-ms {
     --mvc-accent: #8a5a2b;
     --mvc-border: #ddcdb4;
     --mvc-bg: #fffdf9;
@@ -985,7 +1066,7 @@ body.sidebar-collapsed .sidebar-toggle {
    they're correct immediately without waiting on <img> natural size). */
 /* Leave room so the fixed footer row never permanently covers content */
 body.synopsis-footer-open .main-content,
-body.manuscript-footer-open .main-content {
+body.manuscript-dock-open .main-content {
     padding-bottom: 42vh;
 }
 
@@ -994,9 +1075,9 @@ body.manuscript-footer-open .main-content {
    mobile .sidebar becomes a fixed full-height off-canvas drawer instead. */
 @media (min-width: 901px) {
     body.synopsis-footer-open .sidebar,
-    body.manuscript-footer-open .sidebar,
+    body.manuscript-dock-open .sidebar,
     body.synopsis-footer-open .toc-nav,
-    body.manuscript-footer-open .toc-nav {
+    body.manuscript-dock-open .toc-nav {
         height: calc(100vh - 60px - 42vh);
     }
 }

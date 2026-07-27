@@ -1,4 +1,4 @@
-/* ../midrash-viewer-core/styles/manuscript-panel.css */
+/* styles/manuscript-panel.css */
 .mvc-ms {
   --mvc-bg: #faf7f0;
   --mvc-fg: #3a2d1c;
@@ -168,3 +168,177 @@
     background: #14120e;
   }
 }
+
+/* styles/dock.css */
+.mvc-dock {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--mvc-dock-bg, #fff);
+  border: 1px solid var(--mvc-dock-border, #d8d2c4);
+}
+.mvc-dock-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  padding: 0.25rem 0.5rem;
+  background: var(--mvc-dock-header-bg, #f4f1e8);
+  border-bottom: 1px solid var(--mvc-dock-border, #d8d2c4);
+}
+.mvc-dock-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--mvc-dock-title-fg, #4a4234);
+}
+.mvc-dock-tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+.mvc-dock-tab {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.15rem 0.6rem;
+  cursor: pointer;
+  color: var(--mvc-dock-title-fg, #4a4234);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px 3px 0 0;
+}
+.mvc-dock-tab:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+.mvc-dock-tab.active {
+  background: var(--mvc-dock-bg, #fff);
+  border-color: var(--mvc-dock-border, #d8d2c4);
+  border-bottom-color: var(--mvc-dock-bg, #fff);
+  margin-bottom: -1px;
+  font-weight: 600;
+}
+.mvc-dock-extras {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-inline-start: auto;
+}
+.mvc-dock-fixed-extras {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.mvc-dock-close {
+  font: inherit;
+  line-height: 1;
+  padding: 0.15rem 0.4rem;
+  cursor: pointer;
+  color: var(--mvc-dock-title-fg, #4a4234);
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+}
+.mvc-dock-close:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+.mvc-dock-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+}
+.mvc-dock-pane {
+  height: 100%;
+  min-height: 0;
+}
+.mvc-dock-pane[hidden] {
+  display: none;
+}
+
+/* styles/commentary-panel.css */
+.mvc-comm {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  font-size: var(--mvc-comm-font-size, 0.95rem);
+  line-height: var(--mvc-comm-line-height, 1.7);
+  color: var(--mvc-comm-fg, #2e2a22);
+}
+.mvc-comm-heading {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--mvc-comm-muted, #7a6a52);
+  border-bottom: 1px solid var(--mvc-comm-rule, #eae4d8);
+}
+.mvc-comm-heading:empty {
+  display: none;
+}
+.mvc-comm-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.5rem 0.9rem 1.5rem;
+}
+.mvc-comm-note {
+  padding: 0.45rem 0.6rem;
+  margin-block-end: 0.2rem;
+  border-inline-start: 3px solid transparent;
+  border-radius: 3px;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.mvc-comm-note.active {
+  background: var(--mvc-comm-active-bg, #fdf6e3);
+  border-inline-start-color: var(--mvc-comm-accent, #8a5a2b);
+}
+.mvc-comm-body b {
+  font-weight: 700;
+  color: var(--mvc-comm-dh, #6b4423);
+}
+.mvc-comm-note-passage {
+  background: var(--mvc-comm-passage-bg, rgba(0, 0, 0, 0.02));
+}
+.mvc-comm-meta {
+  display: inline-block;
+  margin-inline-end: 0.4rem;
+  font-size: 0.8em;
+  font-variant-numeric: tabular-nums;
+  color: var(--mvc-comm-muted, #7a6a52);
+}
+.mvc-comm-note-passage .mvc-comm-meta {
+  font-style: italic;
+}
+.mvc-comm-body sup.footnote-marker {
+  font-size: 0.7em;
+  color: var(--mvc-comm-accent, #8a5a2b);
+  font-weight: 700;
+}
+.mvc-comm-body i.footnote {
+  display: block;
+  margin: 0.25rem 0 0.35rem;
+  padding-inline-start: 0.7rem;
+  border-inline-start: 2px solid var(--mvc-comm-rule, #eae4d8);
+  font-size: 0.88em;
+  font-style: normal;
+  color: var(--mvc-comm-muted, #7a6a52);
+}
+.mvc-comm-empty {
+  padding: 1.5rem 0.9rem;
+  text-align: center;
+  color: var(--mvc-comm-muted, #7a6a52);
+  font-size: 0.9em;
+}
+.mvc-comm-credit {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.9rem;
+  font-size: 0.75em;
+  line-height: 1.45;
+  color: var(--mvc-comm-muted, #7a6a52);
+  border-bottom: 1px solid var(--mvc-comm-rule, #eae4d8);
+}
+.mvc-comm-credit[hidden] {
+  display: none;
+}
+
+/* styles/index.css */
