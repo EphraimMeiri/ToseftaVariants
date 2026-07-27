@@ -3,10 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "description": "Digital edition viewer for the Tosefta: text, variants, synopsis and manuscript images.",
+  "comment": "Local tooling only: this site has no build step and GitHub Pages serves the repo as-is. Deliberately NO dependencies block -- a file:../midrash-viewer-core path does not exist inside the repo, and any host that installs dependencies on finding a package.json would fail on it. sync:core reaches the sibling checkout by path and never resolves it through node_modules.",
   "scripts": {
     "sync:core": "node \"../midrash-viewer-core/sync.mjs\" vendor/midrash-viewer-core --build"
-  },
-  "dependencies": {
-    "midrash-viewer-core": "file:../midrash-viewer-core"
   }
 }
