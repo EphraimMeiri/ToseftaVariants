@@ -2,6 +2,13 @@ const TOSEFTA_DATA_BASE = "data/tosefta/";
 const VARIANTS_DATA_BASE = "data/variants/";
 const WITNESSES_DATA_BASE = "data/witnesses/";
 const MANUSCRIPT_IMAGES_DATA_BASE = "data/manuscript_images/";
+const EDITIONS_DATA_BASE = "data/editions/";
+// Display names for the alternate numbering schemes in data/editions/Editions_<Tractate>.json.
+// "lz" is only ever shown when its edition is Zuckermandel -- see the
+// (key === 'lz' && schemeData.edition === 'lieberman') hide-check in
+// updateDisplay, which always suppresses it on Lieberman-based tractates --
+// so the checkbox never actually means Lieberman in practice.
+const EDITION_SCHEME_NAMES = { vilna: "וילנא", lz: "צוקרמנדל" };
 // Witnesses with manuscript-image data files (data/manuscript_images/<slug>_<Tractate>.json).
 // Vienna is the site's base text; Erfurt is a full secondary witness with its
 // own manuscript images. "Geniza" covers only the specific Cairo Genizah
@@ -75,6 +82,17 @@ function getManuscriptImageUrl(location, witnessSlug) {
 
 function getManuscriptImageData(location, witnessSlug) {
     return fetch(getManuscriptImageUrl(location, witnessSlug))
+        .then(response => response.ok ? response.json() : null)
+        .catch(() => null);
+}
+
+function getEditionUrl(location) {
+    const tractateSlug = location.split("/").pop().replace("Tosefta%20", "Editions_");
+    return EDITIONS_DATA_BASE + tractateSlug + ".json";
+}
+
+function getEditionAlignment(location) {
+    return fetch(getEditionUrl(location))
         .then(response => response.ok ? response.json() : null)
         .catch(() => null);
 }
@@ -934,6 +952,79 @@ function annotateWordsWithBaseIdx(container, startIdx) {
         }
     }
     [...container.childNodes].forEach(walk);
+}
+
+// --- Alternate edition (Vilna / Lieberman-Zuckermandel) numbering overlay ---
+//
+// data/editions/Editions_<Tractate>.json holds, per scheme, a list of
+// breakpoints {atChapter, atHalakha, atWord, chapter, halakha} sorted in our
+// own text's reading order: "at our (atChapter, atHalakha, atWord), edition
+// X begins its chapter/halakha (chapter, halakha)". atChapter/atHalakha are
+// 0-based indices into our own text[]; atWord is 0-based and LOCAL to that
+// halakha (same word-splitting convention as computeChapterWordIndex), not
+// chapter-wide like data-base-idx.
+
+// The breakpoint in effect at or before (atChapter, atHalakha, atWord) --
+// e.g. for a chapter header, call with atHalakha=0, atWord=0. Returns null
+// only if the position is before the very first breakpoint (shouldn't
+// normally happen -- every tractate's first word is breakpoint 0).
+function findActiveEditionBreakpoint(breakpoints, atChapter, atHalakha, atWord) {
+    let active = null;
+    for (const bp of breakpoints) {
+        if (bp.atChapter > atChapter) break;
+        if (bp.atChapter === atChapter && bp.atHalakha > atHalakha) break;
+        if (bp.atChapter === atChapter && bp.atHalakha === atHalakha && bp.atWord > atWord) break;
+        active = bp;
+    }
+    return active;
+}
+
+// All breakpoints that fall inside one specific (chapter, halakha) of ours.
+function editionBreakpointsInHalakha(breakpoints, atChapter, atHalakha) {
+    return breakpoints.filter(bp => bp.atChapter === atChapter && bp.atHalakha === atHalakha);
+}
+
+// Label for a chapter header under an alternate scheme: the edition's
+// chapter/halakha in effect as of this chapter's very first word. When that
+// breakpoint sits exactly at this chapter's start (the common case), show
+// just the chapter number; otherwise this chapter opens mid-way through the
+// edition's own previous chapter (e.g. Avodah Zarah splits Zuckermandel's
+// chapter 3 across our chapters 3 and 4), so say so explicitly.
+function editionChapterHeaderLabel(breakpoints, schemeName, perekIndex) {
+    const active = findActiveEditionBreakpoint(breakpoints, perekIndex, 0, 0);
+    if (!active) return null;
+    // active.halakha === 'א' means the edition ALSO starts a fresh chapter
+    // exactly here, not merely that our own chapter happens to start here --
+    // otherwise this our-chapter opens mid-way through the edition's own
+    // previous chapter (e.g. Avodah Zarah splits Zuckermandel's chapter ג
+    // across our chapters ד and ה), so say so explicitly.
+    if (active.halakha === 'א') {
+        return `${schemeName}: פרק ${active.chapter}`;
+    }
+    return `${schemeName}: המשך פרק ${active.chapter} (מהלכה ${active.halakha})`;
+}
+
+// Insert a small inline tag before the word where each breakpoint inside
+// this halakha begins, so a break the alternate edition draws in the middle
+// of one of our paragraphs is visible right where it falls. `rangeStart` is
+// this halakha's chapter-wide word offset (halakhaWordRanges[i][0]) -- the
+// DOM only has chapter-wide data-base-idx, so atWord (halakha-local) needs
+// that offset added back to find the matching .body-word span.
+function insertEditionMarkers(container, breakpointsInHalakha, schemeName, rangeStart) {
+    breakpointsInHalakha.forEach(bp => {
+        const marker = document.createElement('span');
+        marker.className = 'edition-break-marker';
+        marker.textContent = `${schemeName} ${bp.chapter}:${bp.halakha}`;
+        const globalIdx = rangeStart + bp.atWord;
+        const span = container.querySelector(`.body-word[data-base-idx="${globalIdx}"]`);
+        if (span) {
+            span.before(marker);
+        } else {
+            // Falls at/after this halakha's last matched word (rare edge
+            // case) -- append rather than silently drop it.
+            container.appendChild(marker);
+        }
+    });
 }
 
 // Render one strip per active witness siglum, showing that witness's

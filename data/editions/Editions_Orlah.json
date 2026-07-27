@@ -1,0 +1,132 @@
+{
+ "lz": {
+  "edition": "lieberman",
+  "source_keys": [
+   "ערלה (ליברמן)"
+  ],
+  "native": true,
+  "breakpoints": [
+   {
+    "atChapter": 0,
+    "atHalakha": 0,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "א"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 1,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ב"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 2,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ג"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 3,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ד"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 4,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ה"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 5,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ו"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 6,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ז"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 7,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ח"
+   }
+  ]
+ },
+ "vilna": {
+  "edition": "vilna",
+  "source_keys": [
+   "ערלה"
+  ],
+  "native": false,
+  "breakpoints": [
+   {
+    "atChapter": 0,
+    "atHalakha": 0,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "א"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 1,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ב"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 2,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ג"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 3,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ד"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 4,
+    "atWord": 1,
+    "chapter": "א",
+    "halakha": "ה"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 4,
+    "atWord": 32,
+    "chapter": "א",
+    "halakha": "ו"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 6,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ז"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 7,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ח"
+   }
+  ]
+ }
+}

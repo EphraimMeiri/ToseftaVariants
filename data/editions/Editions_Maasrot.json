@@ -1,0 +1,741 @@
+{
+ "lz": {
+  "edition": "lieberman",
+  "source_keys": [
+   "מעשרות (ליברמן)"
+  ],
+  "native": true,
+  "breakpoints": [
+   {
+    "atChapter": 0,
+    "atHalakha": 0,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "א"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 1,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ב"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 2,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ג"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 3,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ד"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 4,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ה"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 5,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ו"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 6,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ז"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 7,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ח"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 8,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ט"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 9,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "י"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 10,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "יא"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 0,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "א"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 1,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "ב"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 2,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "ג"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 3,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "ד"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 4,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "ה"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 5,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "ו"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 6,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "ז"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 7,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "ח"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 8,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "ט"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 9,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "י"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 10,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "יא"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 11,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "יב"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 12,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "יג"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 13,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "יד"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 14,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "טו"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 15,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "טז"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 16,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "יז"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 17,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "יח"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 18,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "יט"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 19,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "כ"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 20,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "כא"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 21,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "כב"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 0,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "א"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 1,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "ב"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 2,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "ג"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 3,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "ד"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 4,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "ה"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 5,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "ו"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 6,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "ז"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 7,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "ח"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 8,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "ט"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 9,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "י"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 10,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "יא"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 11,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "יב"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 12,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "יג"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 13,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "יד"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 14,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "טו"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 15,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "טז"
+   }
+  ]
+ },
+ "vilna": {
+  "edition": "vilna",
+  "source_keys": [
+   "מעשרות"
+  ],
+  "native": false,
+  "breakpoints": [
+   {
+    "atChapter": 0,
+    "atHalakha": 0,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "א"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 0,
+    "atWord": 10,
+    "chapter": "א",
+    "halakha": "ב"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 0,
+    "atWord": 70,
+    "chapter": "א",
+    "halakha": "ג"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 3,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ד"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 5,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ה"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 5,
+    "atWord": 34,
+    "chapter": "א",
+    "halakha": "ו"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 6,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ז"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 6,
+    "atWord": 41,
+    "chapter": "א",
+    "halakha": "ח"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 8,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "ט"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 8,
+    "atWord": 20,
+    "chapter": "א",
+    "halakha": "י"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 9,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "יא"
+   },
+   {
+    "atChapter": 0,
+    "atHalakha": 10,
+    "atWord": 0,
+    "chapter": "א",
+    "halakha": "יב"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 0,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "א"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 0,
+    "atWord": 31,
+    "chapter": "ב",
+    "halakha": "ב"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 1,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "ג"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 2,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "ד"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 3,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "ה"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 4,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "ו"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 5,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "ז"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 5,
+    "atWord": 37,
+    "chapter": "ב",
+    "halakha": "ח"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 7,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "ט"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 8,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "י"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 9,
+    "atWord": 25,
+    "chapter": "ב",
+    "halakha": "יא"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 10,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "יב"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 11,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "יג"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 12,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "יד"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 13,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "טו"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 14,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "טז"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 15,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "יז"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 16,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "יח"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 16,
+    "atWord": 29,
+    "chapter": "ב",
+    "halakha": "יט"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 17,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "כ"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 19,
+    "atWord": 8,
+    "chapter": "ב",
+    "halakha": "כא"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 19,
+    "atWord": 37,
+    "chapter": "ב",
+    "halakha": "כב"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 20,
+    "atWord": 0,
+    "chapter": "ב",
+    "halakha": "כג"
+   },
+   {
+    "atChapter": 1,
+    "atHalakha": 21,
+    "atWord": 16,
+    "chapter": "ב",
+    "halakha": "כד"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 0,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "א"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 1,
+    "atWord": 9,
+    "chapter": "ג",
+    "halakha": "ב"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 1,
+    "atWord": 24,
+    "chapter": "ג",
+    "halakha": "ג"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 3,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "ד"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 4,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "ה"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 5,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "ו"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 6,
+    "atWord": 14,
+    "chapter": "ג",
+    "halakha": "ז"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 6,
+    "atWord": 61,
+    "chapter": "ג",
+    "halakha": "ח"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 7,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "ט"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 8,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "י"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 9,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "יא"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 10,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "יב"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 11,
+    "atWord": 18,
+    "chapter": "ג",
+    "halakha": "יג"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 12,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "יד"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 13,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "טו"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 14,
+    "atWord": 0,
+    "chapter": "ג",
+    "halakha": "טז"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 14,
+    "atWord": 24,
+    "chapter": "ג",
+    "halakha": "יז"
+   },
+   {
+    "atChapter": 2,
+    "atHalakha": 15,
+    "atWord": 35,
+    "chapter": "ג",
+    "halakha": "יח"
+   }
+  ]
+ }
+}

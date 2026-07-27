@@ -338,6 +338,39 @@ body.sidebar-collapsed .sidebar-toggle {
     border-radius: 10px;
 }
 
+/* .filters-section label sets an unconditional display:flex (see that rule
+   below), which otherwise overrides the browser's native
+   `[hidden] { display: none }` -- author CSS always wins over that UA rule
+   regardless of specificity, same issue .filters-section details:not([open])
+   already documents above for a different element. */
+.filters-section label[hidden] {
+    display: none;
+}
+
+.chapter-header-alt {
+    display: block;
+    font-family: 'Noto Serif Hebrew', serif;
+    font-size: 0.5em;
+    font-weight: 600;
+    color: #4a6b7a;
+    margin-top: 4px;
+}
+
+.edition-break-marker {
+    display: inline-block;
+    font-family: 'Noto Serif Hebrew', serif;
+    font-size: 0.72em;
+    font-weight: 600;
+    color: #4a6b7a;
+    background: #eef3f4;
+    border: 1px solid #c8d8db;
+    border-radius: 8px;
+    padding: 0 5px;
+    margin: 0 2px;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
 /* --- Filter sections (using <details>) --- */
 .filters-section details {
     background: #fff;
@@ -572,6 +605,28 @@ body.sidebar-collapsed .sidebar-toggle {
     font-size: 0.85em;
     padding: 2px 0;
     cursor: pointer;
+}
+
+/* Alternate chapter/halakhah numbering overlay (Vilna / Lieberman-Zuckermandel)
+   -- a distinct blue-grey rather than the warm brown/red used by the
+   apparatus sup-note system, so the two overlays never read as the same
+   kind of thing. Only the schemes that actually differ from our own
+   chapter/halakhah grid in the loaded tractate get a visible checkbox. */
+.numbering-panel .panel-title {
+    font-weight: 600;
+    font-size: 0.9em;
+    margin-bottom: 4px;
+    color: #3a2e20;
+}
+
+.numbering-panel label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85em;
+    padding: 2px 0;
+    cursor: pointer;
+    color: #4a6b7a;
 }
 
 /* Full witness-text strips shown below a halakha's apparatus */
@@ -828,6 +883,11 @@ body.sidebar-collapsed .sidebar-toggle {
     min-width: 26px;
 }
 
+#manuscript-fullscreen.active {
+    background: #6b5b47;
+    color: #fff;
+}
+
 .synopsis-footer-toggle {
     display: flex;
     align-items: center;
@@ -855,6 +915,15 @@ body.sidebar-collapsed .sidebar-toggle {
 
 .manuscript-footer-body.ms-dragging {
     cursor: grabbing;
+}
+
+/* Fullscreen API replaces this element's normal box with a viewport-filling
+   one but doesn't give it a background, so without this the page behind
+   would show through around the (usually narrower) manuscript image. */
+.manuscript-footer-body:fullscreen,
+.manuscript-footer-body:-webkit-full-screen {
+    background: #fffdf9;
+    padding: 20px;
 }
 
 .synopsis-footer-body .witness-synopsis-scroll {
@@ -983,6 +1052,18 @@ body.sidebar-collapsed .sidebar-toggle {
 body.synopsis-footer-open .main-content,
 body.manuscript-footer-open .main-content {
     padding-bottom: 42vh;
+}
+
+/* Shrink the sticky sidebars by the same amount, so their bottom edge
+   never sits underneath the fixed footer row either. Desktop only -- on
+   mobile .sidebar becomes a fixed full-height off-canvas drawer instead. */
+@media (min-width: 901px) {
+    body.synopsis-footer-open .sidebar,
+    body.manuscript-footer-open .sidebar,
+    body.synopsis-footer-open .toc-nav,
+    body.manuscript-footer-open .toc-nav {
+        height: calc(100vh - 60px - 42vh);
+    }
 }
 
 /* Indented child filters */

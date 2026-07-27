@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=4">
+    <link rel="stylesheet" href="styles.css?v=12">
     <title>תוספתא עם חילופי נוסח</title>
 </head>
 <body>
@@ -62,6 +62,13 @@
                 <label><input type="checkbox" class="witness-strip-toggle" data-siglum="ל"> ל <span class="detail-count">(לונדון)</span></label>
                 <label><input type="checkbox" class="witness-strip-toggle" data-siglum="ג"> ג <span class="detail-count">(קטעי גניזה)</span></label>
                 <label><input type="checkbox" class="witness-strip-toggle" data-siglum="ש"> ש <span class="detail-count">(שוקן, קטעי)</span></label>
+            </section>
+
+            <section class="filters-section numbering-panel" id="numbering-panel" hidden
+                      title="הצג היכן מהדורה אחרת פותחת פרק/הלכה, כשכבת־על מעל הטקסט שלנו -- מוצג רק כשהחלוקה של אותה מהדורה שונה משלנו במסכת הנוכחית">
+                <div class="panel-title">חלוקה לפי מהדורה אחרת</div>
+                <label id="numbering-overlay-vilna-wrap" hidden><input type="checkbox" id="numbering-overlay-vilna"> וילנא</label>
+                <label id="numbering-overlay-lz-wrap" hidden><input type="checkbox" id="numbering-overlay-lz"> צוקרמנדל</label>
             </section>
 
             <section class="filters-section">
@@ -147,8 +154,9 @@
                 <span id="manuscript-footer-label" class="manuscript-footer-label"></span>
                 <div class="manuscript-zoom-controls">
                     <button type="button" id="manuscript-zoom-out" title="הקטן">－</button>
-                    <button type="button" id="manuscript-zoom-reset" title="התאם לרוחב">⤢</button>
+                    <button type="button" id="manuscript-zoom-reset" title="התאם לרוחב">▫</button>
                     <button type="button" id="manuscript-zoom-in" title="הגדל">＋</button>
+                    <button type="button" id="manuscript-fullscreen" title="תצוגת מסך מלא">⤢</button>
                 </div>
                 <button type="button" id="manuscript-footer-close" class="manuscript-footer-close" title="סגור">✕</button>
             </div>
@@ -156,12 +164,16 @@
         </div>
     </div>
 
-    <script src="tosefta_parsing_tools.js?v=4"></script>
+    <script src="tosefta_parsing_tools.js?v=12"></script>
     <script>
         let currentTextData = null;
         let currentVariantsData = null;
         let currentWitnessData = null;
         let currentManuscriptData = null;
+        let currentEditionsData = null;
+        // Which alternate-edition overlays are toggled on; persists across tractate loads
+        // within the page (each tractate load hides/unchecks whichever is native there).
+        let editionOverlayState = { vilna: false, lz: false };
         let refreshCurrentDisplay = null;
 
         // --- Sidebar toggle (mobile) ---
@@ -605,17 +617,19 @@ if (reason === 'word order difference') return 'סדר מילים';
                 getToseftaText(selectedLocation),
                 getToseftavariants(selectedLocation),
                 getWitnessAlignment(selectedLocation),
+                getEditionAlignment(selectedLocation),
                 ...MANUSCRIPT_WITNESS_SLUGS.map(slug => getManuscriptImageData(selectedLocation, slug))
             ])
-            .then(([textData, variantsData, witnessData, ...manuscriptDataList]) => {
+            .then(([textData, variantsData, witnessData, editionsData, ...manuscriptDataList]) => {
                 currentTextData = textData;
                 currentVariantsData = variantsData;
                 currentWitnessData = witnessData;
+                currentEditionsData = editionsData;
                 const manuscriptDataBySlug = {};
                 MANUSCRIPT_WITNESS_SLUGS.forEach((slug, i) => { manuscriptDataBySlug[slug] = manuscriptDataList[i]; });
                 currentManuscriptData = manuscriptDataBySlug;
                 renderClassificationDetailControls(variantsData);
-                displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug);
+                displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData);
                 buildTocNav(textData);
             })
             .catch(error => {
@@ -874,7 +888,7 @@ function setNavToggleOn(id, on) {
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
 }
 
-function displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug){
+function displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData){
     const contentContainer = document.getElementById('content-container');
     const showHiddenCheckbox = document.getElementById('showHidden');
     const hideMinorOrthographyCheckbox = document.getElementById('hideMinorOrthography');
@@ -1159,6 +1173,24 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         msZoom = 1;
         if (msBoxEl) centerOnHighlightBox();
         else if (msWrapEl) { applyZoomWidth(); manuscriptFooterBody.scrollTo({ left: 0, top: 0, behavior: 'smooth' }); }
+    });
+
+    // Fullscreen toggles the Fullscreen API directly on .manuscript-footer-body
+    // rather than moving the image into a separate overlay -- the element
+    // stays put in the DOM, so the zoom/pan/drag listeners already bound to
+    // it keep working unchanged while it's promoted to fill the screen.
+    const manuscriptFullscreenBtn = document.getElementById('manuscript-fullscreen');
+    manuscriptFullscreenBtn.addEventListener('click', () => {
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        } else {
+            manuscriptFooterBody.requestFullscreen();
+        }
+    });
+    document.addEventListener('fullscreenchange', () => {
+        const isFs = document.fullscreenElement === manuscriptFooterBody;
+        manuscriptFullscreenBtn.title = isFs ? 'צאת ממסך מלא' : 'תצוגת מסך מלא';
+        manuscriptFullscreenBtn.classList.toggle('active', isFs);
     });
 
     // Ctrl/pinch + wheel zooms at the pointer (trackpad pinch is reported as a
@@ -1495,14 +1527,65 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         document.body.classList.toggle('manuscript-footer-open', manuscriptModeOn);
         if (manuscriptModeOn) renderManuscriptFooter();
 
+        // Alternate-edition numbering overlay (Vilna / Lieberman-Zuckermandel):
+        // a scheme's checkbox is only shown when this tractate actually has
+        // that scheme's alignment data AND it's not "native" (structurally
+        // identical to our own chapter/halakhah grid, in which case the
+        // overlay would draw no line anywhere ours doesn't already). Hidden
+        // schemes reset to unchecked so state doesn't carry over silently
+        // across tractate switches.
+        const activeOverlaySchemes = [];
+        let anySchemeAvailable = false;
+        ['vilna', 'lz'].forEach(key => {
+            const wrap = document.getElementById(`numbering-overlay-${key}-wrap`);
+            const checkbox = document.getElementById(`numbering-overlay-${key}`);
+            const schemeData = editionsData && editionsData[key];
+            // Both overlays are also pointless (not just when structurally
+            // native) whenever the tractate's own base text already comes
+            // from that same tradition -- showing "X vs. itself" would just
+            // surface our text's own minor normalization noise, not a real
+            // alternate numbering: lz when our base is Lieberman's Codex
+            // Vienna JTS edition, vilna when our base is itself sourced from
+            // Machon Mamre (mechon-mamre.org -- confirmed via Sefaria's own
+            // version metadata to BE the Vilna print tradition, see
+            // [[edition_numbering_overlay]]).
+            const ourBaseIsMachonMamre = /mechon-mamre/i.test(textData.versionTitle || '');
+            const pointless = !schemeData || schemeData.native
+                || (key === 'lz' && schemeData.edition === 'lieberman')
+                || (key === 'vilna' && ourBaseIsMachonMamre);
+            const available = !pointless;
+            wrap.hidden = !available;
+            if (!available) {
+                editionOverlayState[key] = false;
+                checkbox.checked = false;
+            } else {
+                anySchemeAvailable = true;
+                checkbox.checked = editionOverlayState[key];
+                if (editionOverlayState[key]) {
+                    activeOverlaySchemes.push({ key, name: EDITION_SCHEME_NAMES[key], breakpoints: schemeData.breakpoints });
+                }
+            }
+        });
+        document.getElementById('numbering-panel').hidden = !anySchemeAvailable;
+
         textArray.forEach((textPerek, perekIndex) => {
             const chapterWitness = hasWitnessData ? witnessData.chapters[perekIndex] : null;
-            const { ranges: halakhaWordRanges } = chapterWitness ? computeChapterWordIndex(textPerek) : { ranges: null };
+            const needsWordIndex = chapterWitness || activeOverlaySchemes.length;
+            const { ranges: halakhaWordRanges } = needsWordIndex ? computeChapterWordIndex(textPerek) : { ranges: null };
             // Add chapter header
             const chapterHeader = document.createElement('h2');
             chapterHeader.className = 'chapter-header';
             chapterHeader.id = `perek-${perekIndex}`;
             chapterHeader.textContent = `פרק ${ convert_number(perekIndex + 1)}`;
+            activeOverlaySchemes.forEach(scheme => {
+                const altLabel = editionChapterHeaderLabel(scheme.breakpoints, scheme.name, perekIndex);
+                if (altLabel) {
+                    const altSpan = document.createElement('span');
+                    altSpan.className = 'chapter-header-alt';
+                    altSpan.textContent = altLabel;
+                    chapterHeader.appendChild(altSpan);
+                }
+            });
             contentContainer.appendChild(chapterHeader);
 
             const chapterIsKiy = isKiyChapter(variantsArray[perekIndex]);
@@ -1642,8 +1725,16 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
                 );
                 textParagraph.innerHTML = updatedText;
                 const range = halakhaWordRanges ? halakhaWordRanges[halachaIndex] : null;
-                if (chapterWitness && range) {
+                if (range) {
                     annotateWordsWithBaseIdx(textParagraph, range[0]);
+                }
+                if (activeOverlaySchemes.length && range) {
+                    activeOverlaySchemes.forEach(scheme => {
+                        const hereBreakpoints = editionBreakpointsInHalakha(scheme.breakpoints, perekIndex, halachaIndex);
+                        if (hereBreakpoints.length) {
+                            insertEditionMarkers(textParagraph, hereBreakpoints, scheme.name, range[0]);
+                        }
+                    });
                 }
 
                 // Sotah two-column / marked modes: render Vienna and Erfurt as a
@@ -1899,6 +1990,12 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         setNavToggleOn('manuscriptMode', !isNavToggleOn('manuscriptMode'));
         updateDisplay();
     };
+    ['vilna', 'lz'].forEach(key => {
+        document.getElementById(`numbering-overlay-${key}`).onchange = (e) => {
+            editionOverlayState[key] = e.target.checked;
+            updateDisplay();
+        };
+    });
 
 }
 
