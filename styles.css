@@ -2001,7 +2001,8 @@ body.parallel-extents-on .text-content {
 }
 
 .parallel-bar:hover,
-.parallel-bar.focused {
+.parallel-bar.focused,
+.parallel-bar.open {
     opacity: 1;
     inline-size: 6px;
 }
@@ -2066,6 +2067,13 @@ body.parallel-extents-on .text-content {
     color: #8a7a63;
     font-size: 0.9em;
     margin: 0;
+}
+
+/* What this panel is not showing, and where it went. */
+.parallels-note {
+    margin: 0;
+    font-size: 0.8em;
+    color: #9a8a70;
 }
 
 .parallel-group {
@@ -2237,81 +2245,127 @@ body.parallels-beside .variant-content {
     width: auto;
 }
 
-/* One grid row per subunit, so an opened passage can sit level with the words it
-   parallels. The second column exists only where something is open: a halakhah
-   with nothing open keeps the full reading measure, which matters because the
-   reading column is already sharing the window with the filters and the dock. */
+/* One grid row per subparagraph, so a citation -- and the passage it opens into --
+   sits level with the words it belongs to. The list column is always there, since
+   a subparagraph's citations are the first thing to read about it; what it does
+   not always get is ROOM, and the widths below are the compromise: a narrow strip
+   for closed citations, a real second column once a passage is open. Reserving
+   half the measure for closed citations everywhere cost the whole chapter its
+   readability -- four or five words to a line. */
 .parallel-split {
     display: grid;
-    grid-template-columns: 1fr;
-    column-gap: 18px;
-    align-items: baseline;
+    grid-template-columns: 1fr minmax(7rem, 20%);
+    column-gap: 16px;
+    align-items: start;
 }
 
+.parallel-split:not(.has-cites) {
+    grid-template-columns: 1fr;
+}
+
+/* Deliberately not transitioned: opening a passage scrolls it to its aligned
+   words, and that measurement has to happen at the settled width. An animated
+   grid-template-columns would have it measuring mid-flight. */
 .parallel-split.has-open {
-    grid-template-columns: 1fr minmax(15rem, 48%);
+    grid-template-columns: 1fr minmax(15rem, 42%);
 }
 
 .parallel-split-row {
     display: grid;
     grid-column: 1 / -1;
     grid-template-columns: subgrid;
-    padding-block: 1px;
 }
 
-/* Only a row that actually begins a subunit gets a rule, so a halakhah with no
-   parallels reads as continuous prose rather than as a table. */
+/* A subparagraph break is a paragraph break, so it is spaced like one rather than
+   ruled like a table row. The breaks now land on the text's own punctuation (see
+   snapToPause), which is what makes plain spacing legible: each block starts at a
+   sentence or a clause, so the eye needs no line to be told where it began. */
 .parallel-split-row + .parallel-split-row {
-    border-top: 1px dotted #e6ddcc;
-    margin-top: 3px;
-    padding-top: 3px;
+    margin-top: 0.5em;
 }
 
 .parallel-split-text {
+    position: relative;
     font-family: 'Noto Serif Hebrew', serif;
+    padding-inline-end: calc(var(--parallel-lanes, 0) * 7px);
 }
 
 .parallel-split-refs {
     display: flex;
-    flex-wrap: wrap;
-    align-content: flex-start;
-    gap: 3px 5px;
-    padding-top: 2px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+    min-width: 0;
+    padding-top: 0.15em;
 }
 
-/* The covered words ARE the affordance: a hairline under the run, slightly
-   stronger where parallels overlap. Deliberately not coloured by work -- with a
-   dozen overlapping parallels a colour-coded reading text becomes a heat map, and
-   what the reader needs from the body text is "something is claimed here", with
-   the identity one click away. */
+/* Covered words carry no permanent decoration: the bars in the gutter mark the
+   extents, and underlining the runs as well left most of the chapter underlined at
+   three weights, which reads as texture. They stay clickable, and say so on
+   hover -- and light up when their citation is hovered or opened. */
 .body-word.parallel-span {
     cursor: pointer;
-    border-bottom: 1px solid rgba(120, 100, 70, 0.35);
-}
-
-.body-word.parallel-span[data-parallel-depth="2"] {
-    border-bottom-color: rgba(120, 100, 70, 0.55);
-}
-
-.body-word.parallel-span[data-parallel-depth="3"] {
-    border-bottom-width: 2px;
-    border-bottom-color: rgba(120, 100, 70, 0.65);
 }
 
 .body-word.parallel-span:hover {
     background: #f3efe4;
 }
 
-/* A run's ends get a tick, so where one parallel stops and the next starts is
-   visible without hovering every word. */
-.body-word.parallel-span-start {
-    border-inline-start: 2px solid rgba(120, 100, 70, 0.45);
-    padding-inline-start: 1px;
+/* --- the citation list in the near margin --- */
+.parallel-cite-item {
+    border-inline-start: 2px solid transparent;
+    padding-inline-start: 5px;
+    min-width: 0;
 }
 
-.body-word.parallel-span-end {
-    border-inline-end: 2px solid rgba(120, 100, 70, 0.45);
-    padding-inline-end: 1px;
+.parallel-cite-item.focused,
+.parallel-cite-item.open {
+    border-inline-start-color: var(--parallel-color, #8a7a63);
+}
+
+.parallel-cite {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 5px;
+    inline-size: 100%;
+    border: 0;
+    background: none;
+    padding: 1px 0;
+    text-align: start;
+    font-family: inherit;
+    font-size: 0.78em;
+    line-height: 1.35;
+    color: var(--parallel-color, #6b5b45);
+    cursor: pointer;
+}
+
+.parallel-cite:hover .parallel-cite-ref,
+.parallel-cite-item.focused .parallel-cite-ref {
+    text-decoration: underline;
+}
+
+.parallel-cite-ref {
+    min-width: 0;
+    overflow-wrap: break-word;
+}
+
+.parallel-cite-item.open .parallel-cite-ref {
+    font-weight: 600;
+}
+
+.parallel-cite .parallel-strength {
+    flex: none;
+    font-size: 0.55em;
+    letter-spacing: 0.5px;
+    color: #b8ab95;
+    opacity: 0.9;
+}
+
+/* An open passage sits under its own citation, indented to it, so a column with
+   three open passages still reads as three citations and not as three texts. */
+.parallel-cite-item > .parallel-open {
+    margin-top: 3px;
 }
 
 /* Words whose parallel is currently open, so the text says which passage the
@@ -2369,12 +2423,15 @@ body.parallels-beside .variant-content {
     color: #6b5b45;
 }
 
+/* position: relative so the aligned span's offsetTop is measured against this
+   box, which is what openParallelPassages scrolls. */
 .parallel-open-text {
+    position: relative;
     font-family: 'Noto Serif Hebrew', serif;
     font-size: 0.88em;
     line-height: 1.7;
     color: #3a2e20;
-    max-block-size: 18em;
+    max-block-size: 13em;
     overflow-y: auto;
 }
 
@@ -2401,28 +2458,31 @@ body.parallels-beside .variant-content {
     border-inline-start: 2px solid #eee6d8;
 }
 
-/* Beside-mode marks extents in the text itself and opens the passage beside them,
-   so it draws no gutter and needs no room reserved for one. */
+/* Beside-mode reserves its gutter per subparagraph, not once for the halakhah:
+   the bars have to stop at the subparagraph they belong to. So the halakhah-wide
+   reservation is released here, and .parallel-split-text makes its own. */
 body.parallels-beside.parallel-extents-on .text-content {
     padding-inline-end: 0;
 }
 
-/* Rows with nothing open collapse to the text alone, so an unopened halakhah
-   reads as prose rather than as a half-empty table. */
-.parallel-split-refs:empty {
-    display: none;
-}
-
 @media (max-width: 900px) {
-    /* No room for two columns: the citations go under their subunit instead of
-       beside it, which keeps the pairing even though it loses the alignment. */
+    /* No room for two columns: the citations go under their subparagraph instead
+       of beside it, which keeps the pairing even though it loses the alignment. */
     .parallel-split,
     .parallel-split-row {
         display: block;
     }
 
     .parallel-split-refs {
-        margin-block: 2px 6px;
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 2px 10px;
+        margin-block: 3px 8px;
+    }
+
+    .parallel-split-refs .parallel-cite-item {
+        flex: 1 1 8rem;
     }
 }
 

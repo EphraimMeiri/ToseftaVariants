@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="vendor/midrash-viewer-core/midrash-viewer-core.css?v=10">
-    <link rel="stylesheet" href="styles.css?v=16">
+    <link rel="stylesheet" href="styles.css?v=20">
     <title>תוספתא עם חילופי נוסח</title>
 </head>
 <body>
@@ -95,11 +95,12 @@
                       title="חלוקת ההלכה לתת־יחידות לפי ראשי המקבילות -- החלוקה להלכות נשארת כשהיתה">
                 <div class="panel-title">מקבילות</div>
                 <label><input type="checkbox" id="parallel-subunits"> חלוקה לתת־יחידות לפי המקבילות</label>
-                <!-- Beside-mode gives the parallels the apparatus column and
-                     breaks the halakhah into subunits so each one's citations sit
-                     level with it. The variants aren't lost -- they move to a
-                     collapsed block under the halakhah. -->
-                <label title="המקבילות בטור שלצד הטקסט, וחילופי הנוסח עוברים לבלוק מתקפל מתחת להלכה"><input type="checkbox" id="parallel-beside"> המקבילות לצד הטקסט</label>
+                <!-- Beside-mode gives the parallels the apparatus column: the
+                     halakhah is broken into subparagraphs at its own punctuation
+                     and each one's citations are listed level with it, opening
+                     into the parallel's text in place. The variants aren't lost
+                     -- they move to a collapsed block under the halakhah. -->
+                <label title="רשימת המקבילות בטור שלצד הטקסט, ולחיצה על מקבילה פותחת את לשונה במקום; חילופי הנוסח עוברים לבלוק מתקפל מתחת להלכה"><input type="checkbox" id="parallel-beside"> המקבילות לצד הטקסט</label>
             </section>
 
             <section class="filters-section numbering-panel" id="numbering-panel" hidden
@@ -210,7 +211,7 @@
 
     <script src="vendor/midrash-viewer-core/midrash-viewer-core.js?v=10"></script>
     <script src="tosefta_parsing_tools.js?v=17"></script>
-    <script src="parallels_layer.js?v=1"></script>
+    <script src="parallels_layer.js?v=8"></script>
     <script src="viewer_layers.js?v=11"></script>
     <script>
         let currentTextData = null;

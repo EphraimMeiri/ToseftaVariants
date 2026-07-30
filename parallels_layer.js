@@ -8,7 +8,7 @@
 // version covers this whole halakhah or only its opening clause. So the layer
 // has two halves, registered separately because they live in different places:
 //
-//   parallels           a dock panel, in the side dock beside the commentaries:
+//   parallels           a dock panel, in the far margin the commentaries share:
 //                       the citations, grouped by work, each opening to show the
 //                       parallel's own text with the aligned words marked.
 //   parallel-extents    an inline layer that decorates the reading column
@@ -19,6 +19,13 @@
 //
 // They share one nav button and one focus channel, so clicking a bar raises its
 // citation and opening a citation lights up its bar.
+//
+// Beside-mode (layoutParallelsBeside) redraws that division. It splits the
+// halakhah into subparagraphs at the text's own punctuation, gives each one a
+// citation list in the NEAR margin -- level with its words, opening into the
+// parallel's text in place -- and leaves the far margin holding only what could
+// not be placed there. Extents stay geometry throughout: bars, measured, one
+// gutter per subparagraph.
 //
 // Extents come from data/parallels/Parallels_<Tractate>.json, where
 // build_tosefta_parallels.py has already aligned each parallel's text against
@@ -80,6 +87,27 @@ const PARALLEL_PRECISION_LABELS = {
 // rather than a word: it is a rough confidence, and spelling it out would give
 // it more authority than it has.
 const PARALLEL_TIER_WEIGHT = { strong: 3, medium: 2, weak: 1, 'single-source': 1 };
+
+// Corroboration as a dot count: how many independent sources say this, capped at
+// what the tier distinguishes. A single-source citation and one four editions
+// agree on are very different claims, and the difference is worth two pixels.
+function parallelStrength(entry) {
+    return Math.min(4, Math.max(entry.numSources || 1,
+                                PARALLEL_TIER_WEIGHT[entry.tier] || 1));
+}
+
+function parallelSourceList(entry) {
+    return (entry.sources || [])
+        .map(s => PARALLEL_SOURCE_NAMES[s] || s)
+        .join(' · ');
+}
+
+function parallelColor(entry) {
+    return (PARALLEL_GROUP_BY_ID.get(entry.group) || {}).color || '#8a7a63';
+}
+
+// Reading rank, for the margin list: the order PARALLEL_GROUPS is written in.
+const PARALLEL_GROUP_RANK = new Map(PARALLEL_GROUPS.map((g, i) => [g.id, i]));
 
 
 // --- focus channel ----------------------------------------------------------
@@ -268,6 +296,14 @@ function createParallelsPanel({ root, labels = {} }) {
     heading.className = 'parallels-heading';
     container.appendChild(heading);
 
+    // What this panel is NOT showing. In beside-mode the placeable parallels have
+    // moved to the margin beside the text, and a dock that said nothing about
+    // that would read as "these are all of them".
+    const note = document.createElement('p');
+    note.className = 'parallels-note';
+    note.hidden = true;
+    container.appendChild(note);
+
     const list = document.createElement('div');
     list.className = 'parallels-list';
     container.appendChild(list);
@@ -284,11 +320,7 @@ function createParallelsPanel({ root, labels = {} }) {
     let expanded = new Set();
     const rowById = new Map();
 
-    function sourceList(entry) {
-        return (entry.sources || [])
-            .map(s => PARALLEL_SOURCE_NAMES[s] || s)
-            .join(' · ');
-    }
+    const sourceList = parallelSourceList;
 
     function buildRow(entry) {
         const row = document.createElement('div');
@@ -322,11 +354,9 @@ function createParallelsPanel({ root, labels = {} }) {
         // Corroboration as dots: how many independent sources say this, capped
         // at what the tier distinguishes. A single-source citation and one four
         // editions agree on are very different claims.
-        const strength = Math.min(4, Math.max(
-            entry.numSources || 1, PARALLEL_TIER_WEIGHT[entry.tier] || 1));
         const dots = document.createElement('span');
         dots.className = 'parallel-strength';
-        dots.textContent = '●'.repeat(strength);
+        dots.textContent = '●'.repeat(parallelStrength(entry));
         dots.title = `${entry.numSources || 1} מקורות: ${sourceList(entry)}`;
         meta.appendChild(dots);
 
@@ -478,11 +508,14 @@ function createParallelsPanel({ root, labels = {} }) {
     });
 
     return {
-        setEntries(nextEntries, headingText, nextTexts) {
+        setEntries(nextEntries, headingText, nextTexts, opts = {}) {
             entries = nextEntries || [];
             texts = nextTexts || {};
             heading.textContent = headingText || '';
             heading.hidden = !headingText;
+            note.textContent = opts.note || '';
+            note.hidden = !opts.note;
+            empty.textContent = opts.emptyText || text.noParallels;
             render();
         },
         clear() {
@@ -490,6 +523,7 @@ function createParallelsPanel({ root, labels = {} }) {
             expanded = new Set();
             heading.textContent = '';
             heading.hidden = true;
+            note.hidden = true;
             render();
             empty.textContent = text.noSelection;
         },
@@ -532,10 +566,47 @@ const PARALLELS_LAYER = {
 
         panel = createParallelsPanel({ root: container });
 
+        // What the panel says before the reader has selected anything. It differs
+        // by mode because the instruction differs: in plain mode a word click
+        // fills this panel, and in beside-mode it opens a passage in the margin
+        // and fills this panel only with what the margin couldn't take.
+        function showResting() {
+            if (beside) {
+                panel.setEntries([], '', texts,
+                    { emptyText: 'כאן יופיעו מקבילות שלא אותרו במדויק' });
+            } else {
+                panel.clear();
+            }
+        }
+        showResting();
+
         return {
             select(addr) {
                 if (!index || !addr || addr.chapter == null) {
-                    panel.clear();
+                    showResting();
+                    return;
+                }
+                // Beside-mode divides the list between the two margins by what
+                // can be placed. Every span-anchored parallel now has a home in
+                // the near column, level with the words it covers, so repeating
+                // it here would be one list rendered twice. What has no home
+                // there is what we could NOT place -- a citation known only to
+                // the halakhah or the chapter -- and that is exactly what a
+                // list, as opposed to a margin, is good for. It is scoped to the
+                // chapter rather than to the click, so it stops churning as the
+                // reader moves through the text.
+                if (beside) {
+                    const all = index.chapter(addr.chapter).entries;
+                    const rest = all.filter(e => e.precision !== 'span');
+                    const placed = all.length - rest.length;
+                    panel.setEntries(rest,
+                        `פרק ${convert_number(addr.chapter + 1)} — מקבילות שלא אותרו במדויק`,
+                        texts, {
+                            note: placed
+                                ? `${placed} מקבילות שהיקפן זוהה מוצגות בטור שלצד הטקסט`
+                                : '',
+                            emptyText: 'כל המקבילות בפרק זה ממוקמות בטור שלצד הטקסט',
+                        });
                     return;
                 }
                 if (addr.halakhah == null) {
@@ -567,7 +638,7 @@ const PARALLELS_LAYER = {
             },
             setContext(next) {
                 setCtx(next);
-                panel.clear();
+                showResting();
             },
             destroy() { panel.destroy(); },
         };
@@ -607,20 +678,97 @@ const PARALLEL_EXTENTS_LAYER = {
 };
 
 
+// --- where a subparagraph may begin -----------------------------------------
+// A parallel's aligned start is a fact about the alignment, not about the
+// sentence: the builder found where the other text's words begin to match, and
+// that lands mid-clause about as often as not -- cutting "ר' שמעון" in half, or
+// leaving a bare "ר'" hanging at the end of a subparagraph. So a break is not
+// drawn where the parallel starts; it is drawn at the nearest place the text
+// itself pauses, and the parallel's own extent is shown by its bar, which is
+// measured and needs no help from the layout.
+//
+// The base text is punctuated -- roughly five hundred full stops and six hundred
+// commas to a tractate -- so there is usually something to snap to within a few
+// words. A full stop wins over a comma at any distance inside the window, since
+// a subparagraph that ends at a sentence end reads as a unit.
+const STRONG_PUNCT = /[.:?!׃]['"׳״\])\]]*$/;
+const WEAK_PUNCT = /[,;]['"׳״\])\]]*$/;
+
+// How far to look for a pause, and how short a subparagraph may be. Both are in
+// words. The window is deliberately small: a break moved eight words from where
+// its parallel begins no longer marks that parallel at all.
+const SNAP_WINDOW = 6;
+const MIN_SUBPARAGRAPH = 5;
+
+function wordEndsSentence(el) {
+    return el ? STRONG_PUNCT.test(el.textContent.trim()) : false;
+}
+
+function wordEndsClause(el) {
+    return el ? WEAK_PUNCT.test(el.textContent.trim()) : false;
+}
+
+// The index of the word that should OPEN a subparagraph, given where a parallel
+// begins. A candidate index j is a boundary when the word before it closed a
+// sentence or a clause; the nearest such j inside the window wins, ties going
+// backwards so the parallel's own opening words stay in the subparagraph the
+// parallel is listed against. Returns the raw index when the window holds no
+// punctuation at all -- an unsnapped break still aligns a passage, which is what
+// the row is for.
+function snapToPause(idx, byIdx, from, to) {
+    for (const test of [wordEndsSentence, wordEndsClause]) {
+        for (let d = 0; d <= SNAP_WINDOW; d++) {
+            for (const j of (d === 0 ? [idx] : [idx - d, idx + d])) {
+                if (j <= from || j > to) continue;
+                if (byIdx.has(j) && test(byIdx.get(j - 1))) return j;
+            }
+        }
+    }
+    return idx;
+}
+
+// Break points for one paragraph: each parallel's start snapped to a pause, then
+// thinned so no subparagraph is a sliver. Distinct parallels routinely begin a
+// word or two apart -- a Mishnah and the Bavli quoting it -- and after snapping
+// they usually coincide exactly, which is the point.
+function subparagraphStarts(index, chapterIndex, halakhah, byIdx, range) {
+    const [from, to] = range;
+    const raw = index.subunitStarts(chapterIndex, halakhah, [from, to + 1]);
+    const starts = [];
+    raw.forEach(idx => {
+        const snapped = snapToPause(idx, byIdx, from, to);
+        if (snapped - from < MIN_SUBPARAGRAPH) return;
+        if (to - snapped < MIN_SUBPARAGRAPH) return;
+        const last = starts[starts.length - 1];
+        if (last != null && snapped - last < MIN_SUBPARAGRAPH) return;
+        starts.push(snapped);
+    });
+    return starts;
+}
+
+
 // --- beside layout ----------------------------------------------------------
 // The reading mode the parallels apparatus actually wants: the parallel's own
 // text opens in the column the variant apparatus normally occupies, level with
 // the words it belongs to, and the halakhah is broken into the subunits its
 // parallels carve it into so that alignment is possible at all.
 //
-// What marks a parallel is THE TEXT ITSELF -- the covered words are the clickable
-// affordance. An earlier version put a citation chip in this column and the same
-// citation again as a card in the dock, which was one list rendered twice; the
-// chip said nothing the reader couldn't get by clicking the words it pointed at.
-// So the near column is reserved for the one thing it is uniquely good for:
-// holding the parallel passage beside the passage it parallels. Everything else
-// about a citation -- who attests it, how precisely it is anchored, its other
-// occurrences -- stays in the dock, which is where a list belongs.
+// The near column is a list that becomes a text. Each subparagraph's parallels
+// are named beside it -- so the reader can see at a glance that this clause has a
+// Mishnah and a Yerushalmi and the next has only a late midrash, which is a
+// finding in itself -- and clicking one opens its passage in place, under its own
+// citation, still level with the words it parallels. Nothing moves and nothing
+// opens elsewhere; the list is where the reading happens.
+//
+// Extent is not the list's job. It is marked in a gutter of bars between the text
+// and the list, measured off the rendered lines, because an extent is geometry
+// and a citation is not. That division is why the breaks below can be moved to
+// the nearest pause without lying about anything: the bar still starts exactly
+// where the alignment says it starts.
+//
+// The far margin -- the shared dock, where the commentaries live -- keeps what
+// this column cannot hold: the citations we could not place, plus the attestation
+// detail for any of them. See PARALLELS_LAYER.select.
 //
 // The variants keep their place in the document: they move to a collapsed block
 // under the halakhah, not out of it. This site exists to show them.
@@ -648,12 +796,15 @@ function layoutParallelsBeside(container, index) {
         const first = Number(words[0].dataset.baseIdx);
         const last = Number(words[words.length - 1].dataset.baseIdx);
 
+        const byIdx = new Map(words.map(el => [Number(el.dataset.baseIdx), el]));
         const entries = index.chapter(chapterIndex).entries.filter(
             e => e.endIdx >= first && e.baseIdx <= last);
 
-        // Break points are the subunit starts, but here they must be starts of
-        // ROWS, so an entry beginning before this paragraph doesn't open one.
-        const starts = index.subunitStarts(chapterIndex, halakhah, [first, last + 1]);
+        // Break points, snapped to where the text pauses. They must be starts of
+        // SUBPARAGRAPHS here, so an entry beginning before this paragraph doesn't
+        // open one.
+        const starts = subparagraphStarts(index, chapterIndex, halakhah, byIdx,
+                                          [first, last]);
         const rows = splitTextIntoRows(textColumn, starts);
         if (!rows.length) return;
 
@@ -668,24 +819,36 @@ function layoutParallelsBeside(container, index) {
             row.nodes.forEach(node => textCell.appendChild(node));
             rowEl.appendChild(textCell);
 
-            // Where an opened passage goes. Empty until the reader clicks, and
-            // addressed by the row's word range so any entry starting in this row
-            // can find its slot -- including one opened from a different halakhah.
-            const slot = document.createElement('div');
-            slot.className = 'parallel-split-refs';
-            slot.dataset.rowFrom = String(row.from);
-            slot.dataset.rowTo = String(row.to === Infinity ? last : row.to);
-            rowEl.appendChild(slot);
+            // The list, and where its passages open. A parallel is listed against
+            // the subparagraph its own start falls in -- once, not once per
+            // subparagraph it runs through, which is what the bars are for.
+            const rowTo = row.to === Infinity ? last : row.to;
+            const listed = entries.filter(e => e.precision === 'span'
+                && e.baseIdx >= row.from && e.baseIdx <= rowTo);
+            const refs = document.createElement('div');
+            refs.className = 'parallel-split-refs';
+            refs.dataset.rowFrom = String(row.from);
+            refs.dataset.rowTo = String(rowTo);
+            sortForMargin(listed).forEach(entry => {
+                refs.appendChild(buildCitationItem(entry));
+            });
+            rowEl.appendChild(refs);
 
             split.appendChild(rowEl);
         });
 
+        // A halakhah with nothing cited against it keeps the full reading measure.
+        // Plenty of them have no placeable parallel at all, and holding a fifth of
+        // the width for an empty column down the whole chapter is a real cost in a
+        // window already shared with the filters and the dock.
+        split.classList.toggle('has-cites', !!split.querySelector('.parallel-cite-item'));
         textColumn.appendChild(split);
 
-        // The words themselves are the affordance. A word can be covered by
-        // several parallels at once, so each carries every id covering it and the
-        // click resolves to the most specific -- the narrowest extent, which is
-        // the one the reader is pointing at rather than the sugya containing it.
+        // Covered words carry the ids covering them, so a click in the text
+        // resolves to the narrowest parallel there -- the one being pointed at
+        // rather than the sugya containing it. They get no permanent decoration:
+        // the bars mark the extents, and a dozen underlines would only compete
+        // with them. The marks appear when a citation is hovered or opened.
         markParallelSpanWords(textColumn, entries);
 
         // The apparatus, evicted but not discarded. Kept in the DOM with its
@@ -702,6 +865,50 @@ function layoutParallelsBeside(container, index) {
             paragraph.appendChild(details);
         }
     });
+}
+
+// Reading order for the margin: the works in the order a reader ranks them --
+// the Mishnah our baraita comments on before the Talmudim that quote it -- and
+// within a work, the widest extent first, so the sugya containing a clause is
+// named above the clause. Position deliberately does not sort: everything in one
+// subparagraph's list is already at the same place in the text.
+function sortForMargin(entries) {
+    return entries.slice().sort((a, b) =>
+        (PARALLEL_GROUP_RANK.get(a.group) ?? 99) - (PARALLEL_GROUP_RANK.get(b.group) ?? 99)
+        || (b.endIdx - b.baseIdx) - (a.endIdx - a.baseIdx)
+        || a.ref.localeCompare(b.ref));
+}
+
+// One citation in the margin: the reference, its corroboration, and the room its
+// passage will occupy when opened. Closed, it is a line of text; open, it is the
+// passage under that line. Both live in the same element so the passage cannot
+// drift from the citation it belongs to.
+function buildCitationItem(entry) {
+    const item = document.createElement('div');
+    item.className = 'parallel-cite-item';
+    item.dataset.entryId = entry.id;
+    item.style.setProperty('--parallel-color', parallelColor(entry));
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'parallel-cite';
+    button.dataset.entryId = entry.id;
+    button.setAttribute('aria-expanded', 'false');
+
+    const ref = document.createElement('span');
+    ref.className = 'parallel-cite-ref';
+    ref.textContent = entry.heRef || entry.ref;
+    ref.dir = 'auto';
+    button.appendChild(ref);
+
+    const dots = document.createElement('span');
+    dots.className = 'parallel-strength';
+    dots.textContent = '●'.repeat(parallelStrength(entry));
+    dots.title = `${entry.numSources || 1} מקורות: ${parallelSourceList(entry)}`;
+    button.appendChild(dots);
+
+    item.appendChild(button);
+    return item;
 }
 
 // Cut a text paragraph's child nodes into row groups at the given base indices.
@@ -755,10 +962,14 @@ function splitTextIntoRows(textColumn, starts) {
     return rows.filter(row => row.nodes.length);
 }
 
-// Mark every word covered by a span-anchored parallel, and record which parallels
-// cover it. Only span-anchored ones: a citation we could place no more precisely
-// than "this halakhah" has no words of its own to mark, and underlining the whole
-// halakhah for it would assert a precision we don't have.
+// Record which parallels cover each word. Only span-anchored ones: a citation we
+// could place no more precisely than "this halakhah" has no words of its own.
+//
+// This marks the words for RESOLUTION, not for display -- a click needs to know
+// what it landed on. The visible extent is the bar; earlier versions underlined
+// every covered word, with the underline thickening where parallels overlapped,
+// and on a chapter of Berakhot that is most of the text underlined at three
+// different weights, which reads as a texture rather than as information.
 function markParallelSpanWords(textColumn, entries) {
     const spans = entries.filter(e => e.precision === 'span');
     if (!spans.length) return;
@@ -774,16 +985,7 @@ function markParallelSpanWords(textColumn, entries) {
             if (!ids.includes(entry.id)) ids.push(entry.id);
             el.dataset.parallelIds = ids.join(' ');
             el.classList.add('parallel-span');
-            // Depth, not identity: with a dozen overlapping parallels, colouring
-            // by work would turn the reading text into a heat map. One mark that
-            // gets slightly stronger where parallels pile up says the useful part
-            // -- "more is claimed here" -- and stays readable.
-            el.dataset.parallelDepth = String(Math.min(3, ids.length));
         }
-        const startEl = byIdx.get(entry.baseIdx);
-        if (startEl) startEl.classList.add('parallel-span-start');
-        const endEl = byIdx.get(entry.endIdx);
-        if (endEl) endEl.classList.add('parallel-span-end');
     });
 }
 
@@ -808,8 +1010,7 @@ function buildOpenedPassage(entry, texts, onClose) {
     const box = document.createElement('div');
     box.className = 'parallel-open';
     box.dataset.entryId = entry.id;
-    box.style.setProperty('--parallel-color',
-        (PARALLEL_GROUP_BY_ID.get(entry.group) || {}).color || '#8a7a63');
+    box.style.setProperty('--parallel-color', parallelColor(entry));
 
     const head = document.createElement('div');
     head.className = 'parallel-open-head';
@@ -940,61 +1141,143 @@ function drawParallelExtents(container, index, withSubunits, opts = {}) {
         const here = chapterData.spans.filter(e => e.endIdx >= first && e.baseIdx <= last);
 
         if (withSubunits) {
-            markParallelSubunits(index, chapterIndex, halakhah, byIdx, [first, last + 1]);
+            markParallelSubunits(index, chapterIndex, halakhah, byIdx, [first, last]);
         }
         if (here.length) {
             measurable.push({ textColumn, byIdx, first, last, here, chapterData });
         }
     });
 
-    // Beside-mode marks the extents in the text itself and opens the passage next
-    // to them, so bars there would be a second answer to a question already
-    // answered. They are the plain mode's only way to show an extent.
-    if (parallelExtentsState.withBeside) return;
+    // Beside-mode measures per subparagraph instead, because that is the box its
+    // bars have to sit beside: a gutter down the whole halakhah would run past the
+    // subparagraph rules and past the citation lists it is supposed to point at.
+    if (parallelExtentsState.withBeside) {
+        drawBesideBars(container, index);
+        return;
+    }
 
     // Now measure and draw. The bars are absolutely positioned inside the reading
     // column, which no longer reflows.
     measurable.forEach(({ textColumn, byIdx, first, last, here, chapterData }) => {
-        const gutter = document.createElement('div');
-        gutter.className = 'parallel-gutter';
-        textColumn.appendChild(gutter);
-        const columnRect = textColumn.getBoundingClientRect();
+        drawBarsIn(textColumn, byIdx, first, last, here,
+                   entry => chapterData.lanes.get(entry.id) || 0);
+    });
+}
 
-        here.forEach(entry => {
-            // Clip to this paragraph: a parallel spanning three halakhot is three
-            // bar segments, one per paragraph, each capped only where the parallel
-            // itself actually starts or ends. A single bar couldn't be drawn --
-            // the paragraphs are separate boxes with the apparatus column between.
-            const startIdx = Math.max(entry.baseIdx, first);
-            const endIdx = Math.min(entry.endIdx, last);
-            const startEl = nearestWord(byIdx, startIdx, 1, last);
-            const endEl = nearestWord(byIdx, endIdx, -1, first);
-            if (!startEl || !endEl) return;
-            const top = startEl.getBoundingClientRect().top - columnRect.top;
-            const bottom = endEl.getBoundingClientRect().bottom - columnRect.top;
+// One gutter of bars in one measuring box: a bar per parallel, spanning from the
+// top of its first covered line to the bottom of its last.
+//
+// The box is a paragraph's reading column in plain mode and a single subparagraph
+// in beside-mode, and clipping is what makes both work: a parallel running through
+// three boxes is three segments, each capped only where the parallel itself
+// actually starts or ends, so it reads as one extent interrupted by the layout.
+function drawBarsIn(host, byIdx, first, last, entries, laneOf) {
+    const gutter = document.createElement('div');
+    gutter.className = 'parallel-gutter';
+    host.appendChild(gutter);
+    const hostRect = host.getBoundingClientRect();
 
-            const bar = document.createElement('button');
-            bar.type = 'button';
-            bar.className = 'parallel-bar';
-            bar.dataset.entryId = entry.id;
-            bar.style.setProperty('--parallel-lane',
-                String(chapterData.lanes.get(entry.id) || 0));
-            bar.style.setProperty('--parallel-color',
-                (PARALLEL_GROUP_BY_ID.get(entry.group) || {}).color || '#8a7a63');
-            bar.style.top = `${Math.max(0, top)}px`;
-            bar.style.height = `${Math.max(6, bottom - top)}px`;
-            if (entry.baseIdx < first) bar.classList.add('continues-above');
-            if (entry.endIdx > last) bar.classList.add('continues-below');
-            bar.title = `${entry.heRef || entry.ref}${entry.dh ? ' — ' + entry.dh : ''}`;
-            bar.setAttribute('aria-label', bar.title);
-            gutter.appendChild(bar);
+    entries.forEach(entry => {
+        const startIdx = Math.max(entry.baseIdx, first);
+        const endIdx = Math.min(entry.endIdx, last);
+        const startEl = nearestWord(byIdx, startIdx, 1, last);
+        const endEl = nearestWord(byIdx, endIdx, -1, first);
+        if (!startEl || !endEl) return;
+        const top = startEl.getBoundingClientRect().top - hostRect.top;
+        const bottom = endEl.getBoundingClientRect().bottom - hostRect.top;
 
-            for (let i = startIdx; i <= endIdx; i++) {
-                const el = byIdx.get(i);
-                if (el) el.classList.add('parallel-covered');
-            }
+        const bar = document.createElement('button');
+        bar.type = 'button';
+        bar.className = 'parallel-bar';
+        bar.dataset.entryId = entry.id;
+        bar.style.setProperty('--parallel-lane', String(laneOf(entry)));
+        bar.style.setProperty('--parallel-color', parallelColor(entry));
+        bar.style.top = `${Math.max(0, top)}px`;
+        bar.style.height = `${Math.max(6, bottom - top)}px`;
+        if (entry.baseIdx < first) bar.classList.add('continues-above');
+        if (entry.endIdx > last) bar.classList.add('continues-below');
+        // Bars are drawn after the reader's open passages have been restored, so
+        // the open state is read here rather than pushed by highlightOpenState.
+        if (openParallels.has(entry.id)) bar.classList.add('open');
+        bar.title = `${entry.heRef || entry.ref}${entry.dh ? ' — ' + entry.dh : ''}`;
+        bar.setAttribute('aria-label', bar.title);
+        gutter.appendChild(bar);
+
+        for (let i = startIdx; i <= endIdx; i++) {
+            const el = byIdx.get(i);
+            if (el) el.classList.add('parallel-covered');
+        }
+    });
+}
+
+// The bars for beside-mode: one gutter per subparagraph, between the text and the
+// citations listed against it.
+//
+// Lanes are packed per subparagraph rather than per chapter. Chapter-wide packing
+// is what the plain mode wants -- an entry keeps its lane while the reader scrolls
+// -- but here it would reserve every subparagraph the widest gutter any one of
+// them needed, which on a chapter with eight overlapping parallels is most of an
+// inch of nothing. A subparagraph is short enough that stability doesn't arise:
+// its bars are drawn once, together.
+//
+// Two passes, and the reason is subtle: reserving a gutter is a padding change on
+// the text cell, so it relays that cell's lines. Measuring first and reserving
+// after leaves every bar positioned against the previous line breaks.
+function drawBesideBars(container, index) {
+    const cells = [];
+    container.querySelectorAll('.parallel-split-text').forEach(cell => {
+        const paragraph = cell.closest('.paragraph-pair[id]');
+        const match = paragraph && /^hal-(\d+)-\d+$/.exec(paragraph.id);
+        if (!match) return;
+        const words = [...cell.querySelectorAll('.body-word[data-base-idx]')];
+        if (!words.length) return;
+        const first = Number(words[0].dataset.baseIdx);
+        const last = Number(words[words.length - 1].dataset.baseIdx);
+        const here = index.chapter(Number(match[1])).spans
+            .filter(e => e.endIdx >= first && e.baseIdx <= last);
+        // Set to zero rather than removed: the reading column carries a
+        // chapter-wide --parallel-lanes for the plain mode's single gutter, and a
+        // cell that removed its own would inherit that and reserve room for eight
+        // lanes of bars it hasn't got.
+        if (!here.length) {
+            cell.style.setProperty('--parallel-lanes', '0');
+            return;
+        }
+        const lanes = packLanesWithin(here, first, last);
+        cell.style.setProperty('--parallel-lanes', String(lanes.count));
+        cells.push({
+            cell, first, last, here,
+            byIdx: new Map(words.map(el => [Number(el.dataset.baseIdx), el])),
+            laneOf: entry => lanes.of.get(entry.id) || 0,
         });
     });
+
+    cells.forEach(({ cell, byIdx, first, last, here, laneOf }) => {
+        drawBarsIn(cell, byIdx, first, last, here, laneOf);
+    });
+}
+
+// Greedy first-fit over the extents CLIPPED to one box, so two parallels that
+// overlap elsewhere in the chapter but not here share a lane.
+function packLanesWithin(entries, first, last) {
+    const clipped = entries.map(e => ({
+        id: e.id,
+        from: Math.max(e.baseIdx, first),
+        to: Math.min(e.endIdx, last),
+    })).sort((a, b) => a.from - b.from || b.to - a.to);
+    const laneEnds = [];
+    const of = new Map();
+    clipped.forEach(c => {
+        let lane = laneEnds.findIndex(end => end < c.from);
+        if (lane === -1) {
+            lane = laneEnds.length;
+            laneEnds.push(c.to);
+        } else {
+            laneEnds[lane] = c.to;
+        }
+        of.set(c.id, lane);
+    });
+    return { of, count: Math.max(1, laneEnds.length) };
 }
 
 // The nearest word element in a direction, for a span whose exact boundary word
@@ -1020,7 +1303,7 @@ function nearestWord(byIdx, from, step, limit) {
 // second, competing renderer. (Beside-mode does re-parent, because there the rows
 // ARE the layout; see layoutParallelsBeside.)
 function markParallelSubunits(index, chapterIndex, halakhah, byIdx, range) {
-    const starts = index.subunitStarts(chapterIndex, halakhah, range);
+    const starts = subparagraphStarts(index, chapterIndex, halakhah, byIdx, range);
     if (!starts.length) return;
     let subunit = 0;
     const startSet = new Set(starts);
@@ -1055,26 +1338,46 @@ window.addEventListener('resize', () => {
 // them back rather than losing the reader's place.
 const openParallels = new Set();
 
-// Open a parallel's text in the near column, level with the words it covers.
+// Open a parallel's text under its own citation in the margin.
 //
-// It opens beside EVERY occurrence of the same passage in the chapter, not only
-// the one clicked. Our halakhot are long, and one Mishnah is often parallel to
-// two or three separate clauses of a single chapter; seeing those together is the
+// It opens at EVERY occurrence of the same passage in the chapter, not only the
+// one clicked. Our halakhot are long, and one Mishnah is often parallel to two or
+// three separate clauses of a single chapter; seeing those together is the
 // comparison the apparatus exists for, and it is precisely what a list of
-// citations cannot show. The other occurrences sit in their own halakhot, so they
-// come into view as the reader scrolls rather than being pulled out of place.
+// citations cannot show. The other occurrences sit in their own subparagraphs, so
+// they come into view as the reader scrolls rather than being pulled out of place.
 function openParallelPassages(container, index, texts, entry) {
     const related = index.chapter(entry.chapter).entries.filter(
         e => e.ref === entry.ref && e.precision === 'span');
+    const opened = [];
     (related.length ? related : [entry]).forEach(target => {
-        const slot = slotFor(container, target);
-        if (!slot) return;
+        const item = citationItemFor(container, target.id);
+        if (!item) return;
         openParallels.add(target.id);
-        if (slot.querySelector(`.parallel-open[data-entry-id="${target.id}"]`)) return;
-        slot.appendChild(buildOpenedPassage(target, texts,
-            () => closeParallelGroup(container, index, target)));
+        if (item.querySelector('.parallel-open')) return;
+        const box = buildOpenedPassage(target, texts,
+            () => closeParallelGroup(container, index, target));
+        item.appendChild(box);
+        item.classList.add('open');
+        const button = item.querySelector('.parallel-cite');
+        if (button) button.setAttribute('aria-expanded', 'true');
+        opened.push(box);
     });
     highlightOpenState(container);
+    // Open on the aligned words, not on the top of the daf. The surrounding sugya
+    // is kept -- it is how a reader judges whether the alignment found the right
+    // passage -- but scrolled past, since what was asked for is the parallel and
+    // on a Bavli daf it can sit several screens down inside its own context.
+    //
+    // After highlightOpenState, not before: that is what widens the column, and
+    // an offsetTop measured at the closed width is a different number.
+    opened.forEach(box => {
+        const scroller = box.querySelector('.parallel-open-text');
+        const aligned = box.querySelector('.parallel-aligned');
+        if (scroller && aligned) {
+            scroller.scrollTop = Math.max(0, aligned.offsetTop - 12);
+        }
+    });
 }
 
 // Closing one occurrence closes the group it was opened with, because they were
@@ -1084,22 +1387,21 @@ function closeParallelGroup(container, index, entry) {
         .filter(e => e.ref === entry.ref)
         .forEach(e => {
             openParallels.delete(e.id);
-            container.querySelectorAll(`.parallel-open[data-entry-id="${e.id}"]`)
-                .forEach(box => box.remove());
+            const item = citationItemFor(container, e.id);
+            if (!item) return;
+            item.querySelectorAll('.parallel-open').forEach(box => box.remove());
+            item.classList.remove('open');
+            const button = item.querySelector('.parallel-cite');
+            if (button) button.setAttribute('aria-expanded', 'false');
         });
     highlightOpenState(container);
 }
 
-// The row slot whose word range contains where this parallel starts.
-function slotFor(container, entry) {
-    const paragraph = container.querySelector(`#hal-${entry.chapter}-${entry.halakhah}`);
-    if (!paragraph) return null;
-    const slots = [...paragraph.querySelectorAll('.parallel-split-refs')];
-    for (const slot of slots) {
-        if (entry.baseIdx >= Number(slot.dataset.rowFrom)
-            && entry.baseIdx <= Number(slot.dataset.rowTo)) return slot;
-    }
-    return slots[0] || null;
+// A citation's place in the margin. Every span-anchored parallel in a rendered
+// chapter has exactly one, in the subparagraph its start falls in, so there is no
+// searching by word range: the item IS the address.
+function citationItemFor(container, entryId) {
+    return container.querySelector(`.parallel-cite-item[data-entry-id="${entryId}"]`);
 }
 
 function highlightOpenState(container) {
@@ -1107,18 +1409,22 @@ function highlightOpenState(container) {
         const ids = (el.dataset.parallelIds || '').split(' ').filter(Boolean);
         el.classList.toggle('parallel-open-word', ids.some(id => openParallels.has(id)));
     });
-    // A halakhah only gives up reading width where the reader has actually opened
-    // something. Reserving the column everywhere cost the whole chapter its
-    // measure -- four or five words to a line -- to hold columns that were empty.
+    container.querySelectorAll('.parallel-bar').forEach(bar => {
+        bar.classList.toggle('open', openParallels.has(bar.dataset.entryId));
+    });
+    // A halakhah gives up reading width for a PASSAGE, not for the list: closed,
+    // the citations are a narrow strip of short lines, and reserving half the
+    // measure for them everywhere cost the whole chapter its readability.
     container.querySelectorAll('.parallel-split').forEach(split => {
         split.classList.toggle('has-open', !!split.querySelector('.parallel-open'));
     });
 }
 
 // Clicks and hovers on whatever names a parallel from inside the reading column:
-// a covered word in beside-mode, a gutter bar in the plain mode. Delegated once at
-// the container -- a chapter carries hundreds of both.
-const PARALLEL_TARGETS = '.parallel-bar, .body-word.parallel-span';
+// a citation in the margin, its bar in the gutter, or a covered word in the text.
+// All three mean the same parallel, and any of them opens it. Delegated once at
+// the container -- a chapter carries hundreds.
+const PARALLEL_TARGETS = '.parallel-cite, .parallel-bar, .body-word.parallel-span';
 
 function wireParallelBarInteractions(container, { activate, select } = {}) {
     container.addEventListener('click', (event) => {
@@ -1132,8 +1438,17 @@ function wireParallelBarInteractions(container, { activate, select } = {}) {
         if (state.withBeside) {
             // The reader asked for the text, not for the list, so the passage
             // opens here and the dock is left as it was.
-            if (openParallels.has(entry.id)) closeParallelGroup(container, state.index, entry);
-            else openParallelPassages(container, state.index, state.texts, entry);
+            if (openParallels.has(entry.id)) {
+                closeParallelGroup(container, state.index, entry);
+            } else {
+                openParallelPassages(container, state.index, state.texts, entry);
+                // A parallel is listed against the subparagraph it STARTS in, so a
+                // bar clicked where it merely continues -- it began in an earlier
+                // halakhah -- opens its passage above the reader's viewport. Going
+                // there is the honest answer: that is where the parallel starts.
+                const item = citationItemFor(container, entry.id);
+                if (item) item.scrollIntoView({ block: 'nearest' });
+            }
         } else if (activate) {
             // Plain mode has nowhere beside the text to put a passage, so the
             // dock answers instead.
@@ -1202,13 +1517,16 @@ function findEntryAnywhere(index, container, entryId) {
 // parallel -- the same Mishnah answering three separate clauses. The second is
 // the relationship a citation list flattens away, so it is drawn, faintly.
 parallelsFocus.subscribe((entryId) => {
-    document.querySelectorAll('.parallel-bar.focused, .parallel-open.focused')
+    document.querySelectorAll('.parallel-bar.focused, .parallel-open.focused, .parallel-cite-item.focused')
         .forEach(el => el.classList.remove('focused'));
     document.querySelectorAll('.body-word.parallel-focus, .body-word.parallel-focus-related')
         .forEach(el => el.classList.remove('parallel-focus', 'parallel-focus-related'));
     if (!entryId || !parallelExtentsState) return;
 
-    document.querySelectorAll(`.parallel-bar[data-entry-id="${entryId}"], .parallel-open[data-entry-id="${entryId}"]`)
+    // The three faces of one parallel, lit together: its citation in the margin,
+    // its bar in the gutter, its passage if open. Hovering any of them is how the
+    // reader learns which bar goes with which citation.
+    document.querySelectorAll(`.parallel-bar[data-entry-id="${entryId}"], .parallel-open[data-entry-id="${entryId}"], .parallel-cite-item[data-entry-id="${entryId}"]`)
         .forEach(el => el.classList.add('focused'));
 
     const { container, index } = parallelExtentsState;
@@ -1218,7 +1536,12 @@ parallelsFocus.subscribe((entryId) => {
     const siblings = index.chapter(entry.chapter).entries.filter(
         e => e.ref === entry.ref && e.id !== entry.id && e.precision === 'span');
 
-    container.querySelectorAll('.body-word[data-base-idx]').forEach(el => {
+    // Only covered words can be highlighted, and this runs on every hover, so the
+    // sweep is over those rather than over the chapter's several thousand words.
+    // Two classes because the two modes mark coverage for different reasons:
+    // beside-mode needs it for click resolution, plain mode as a by-product of
+    // drawing the bars.
+    container.querySelectorAll('.body-word.parallel-span, .body-word.parallel-covered').forEach(el => {
         const idx = Number(el.dataset.baseIdx);
         if (idx >= entry.baseIdx && idx <= entry.endIdx) {
             el.classList.add('parallel-focus');
