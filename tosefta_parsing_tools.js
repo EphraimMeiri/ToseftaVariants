@@ -4,6 +4,10 @@ const WITNESSES_DATA_BASE = "data/witnesses/";
 const MANUSCRIPT_IMAGES_DATA_BASE = "data/manuscript_images/";
 const EDITIONS_DATA_BASE = "data/editions/";
 const COMMENTARIES_DATA_BASE = "data/commentaries/";
+// Merged parallel-passage links, anchored to our word stream and carrying the
+// parallels' own text. Built by sefaria-tosefta's build_tosefta_parallels.py
+// from jointParallels' union of the apparatus databases.
+const PARALLELS_DATA_BASE = "data/parallels/";
 // Commentaries available as apparatus layers, keyed by the file-name prefix in
 // data/commentaries/. Lieberman's two cover only Zeraim through Nezikin (33 of
 // our 59 tractates); tractates without a file simply get no layer.
@@ -104,6 +108,17 @@ function getEditionUrl(location) {
 
 function getEditionAlignment(location) {
     return fetch(getEditionUrl(location))
+        .then(response => response.ok ? response.json() : null)
+        .catch(() => null);
+}
+
+function getParallelsUrl(location) {
+    const tractateSlug = location.split("/").pop().replace("Tosefta%20", "Parallels_");
+    return PARALLELS_DATA_BASE + tractateSlug + ".json";
+}
+
+function getParallelsData(location) {
+    return fetch(getParallelsUrl(location))
         .then(response => response.ok ? response.json() : null)
         .catch(() => null);
 }

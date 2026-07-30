@@ -510,12 +510,33 @@ function createToseftaViewer() {
             // with different presets; a profile lists what's ON, so a layer
             // absent here is off rather than unavailable.
             'variant-lab': ['manuscript'],
-            'reading': ['brief', 'kifshuta', 'chasdei-david', 'tekhelet-mordechai'],
+            'reading': ['brief', 'kifshuta', 'chasdei-david', 'tekhelet-mordechai',
+                        'parallels', 'parallel-extents'],
         },
     });
 
     registry.register(MANUSCRIPT_LAYER);
     COMMENTARY_LAYERS.forEach(layer => registry.register(layer));
+    // Parallels come as a pair: the citation panel in the side dock and the
+    // extent bars inline in the reading column (see parallels_layer.js). Two
+    // layers, one nav button -- the grouping below already handles that.
+    registry.register(PARALLELS_LAYER);
+    registry.register(PARALLEL_EXTENTS_LAYER);
+    // Clicking an extent bar has to raise the parallels tab, since the side dock
+    // is shared with the commentaries and may well be showing one of them.
+    registry.showParallels = function () {
+        const dock = registry.dock('side');
+        if (!dock || !dock.layerIds.includes('parallels')) return;
+        dock.show();
+        dock.activate('parallels');
+    };
+    wireParallelBarInteractions(document.getElementById('content-container'), {
+        activate: () => registry.showParallels(),
+        select: (chapter, halakhah, baseIdx) => selection.set(
+            MidrashViewerCore.address.makeAddress(
+                registry.context && registry.context.masechet, chapter, halakhah, baseIdx),
+            { source: 'parallel', targetLayer: 'parallels' }),
+    });
 
     // A nav button may govern SEVERAL layers (every commentary shares one).
     // Group by button so a button is shown when any of its layers has data,
