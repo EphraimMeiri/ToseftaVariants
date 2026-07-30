@@ -8,13 +8,19 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="vendor/midrash-viewer-core/midrash-viewer-core.css?v=10">
-    <link rel="stylesheet" href="styles.css?v=15">
+    <link rel="stylesheet" href="styles.css?v=16">
     <title>תוספתא עם חילופי נוסח</title>
 </head>
 <body>
     <header class="site-header">
         <div class="header-title">
             <button class="sidebar-toggle" id="sidebar-toggle" aria-label="הצג/הסתר סרגל צד" title="הצג/הסתר סרגל צד">☰</button>
+            <!-- Mobile-only: opens the perek/halakhah TOC as a drawer, since
+                 .toc-nav's own sticky column has no room on a phone (see the
+                 mobile rules for .toc-nav). Hidden until JS finds the TOC has
+                 content and we're at a mobile width -- see the bottom tab bar
+                 script near the sidebar-toggle wiring. -->
+            <button class="toc-toggle" id="toc-toggle" aria-label="ניווט לפי פרקים והלכות" title="ניווט לפי פרקים והלכות" hidden>📖</button>
             <h1>תוספתא עם חילופי נוסח</h1>
         </div>
         <div class="masechet-selector">
@@ -40,6 +46,15 @@
                 <button type="button" class="nav-toggle-btn" id="commentaryMode" hidden aria-pressed="false"
                         title="פירושים" aria-label="פירושים">
                     <span class="nav-toggle-icon">פי׳</span>
+                </button>
+                <!-- Parallels: one button for both halves of the layer -- the
+                     citation panel in the side dock and the extent bars down the
+                     edge of the reading column. They are separate layers because
+                     they render in different places, but a reader turning
+                     "parallels" on means both. -->
+                <button type="button" class="nav-toggle-btn" id="parallelsMode" hidden aria-pressed="false"
+                        title="מקבילות" aria-label="מקבילות">
+                    <span class="nav-toggle-icon">מק׳</span>
                 </button>
                 <button id="export-docx" class="nav-export" title="ייצוא ל‑Word" aria-label="ייצוא ל‑Word">
                     <span class="nav-export-w">W</span><span class="nav-export-arrow">↓</span>
@@ -70,6 +85,21 @@
                 <label><input type="checkbox" class="witness-strip-toggle" data-siglum="ל"> ל <span class="detail-count">(לונדון)</span></label>
                 <label><input type="checkbox" class="witness-strip-toggle" data-siglum="ג"> ג <span class="detail-count">(קטעי גניזה)</span></label>
                 <label><input type="checkbox" class="witness-strip-toggle" data-siglum="ש"> ש <span class="detail-count">(שוקן, קטעי)</span></label>
+            </section>
+
+            <!-- Subunit division belongs with the display options rather than in
+                 the parallels dock: it changes the reading text itself, which is
+                 the one thing the dock never does. Shown only where there is
+                 parallels data to divide by. -->
+            <section class="filters-section parallels-panel-options" id="parallels-options-panel" hidden
+                      title="חלוקת ההלכה לתת־יחידות לפי ראשי המקבילות -- החלוקה להלכות נשארת כשהיתה">
+                <div class="panel-title">מקבילות</div>
+                <label><input type="checkbox" id="parallel-subunits"> חלוקה לתת־יחידות לפי המקבילות</label>
+                <!-- Beside-mode gives the parallels the apparatus column and
+                     breaks the halakhah into subunits so each one's citations sit
+                     level with it. The variants aren't lost -- they move to a
+                     collapsed block under the halakhah. -->
+                <label title="המקבילות בטור שלצד הטקסט, וחילופי הנוסח עוברים לבלוק מתקפל מתחת להלכה"><input type="checkbox" id="parallel-beside"> המקבילות לצד הטקסט</label>
             </section>
 
             <section class="filters-section numbering-panel" id="numbering-panel" hidden
@@ -171,33 +201,98 @@
          where the tab strip actually earns its keep. -->
     <aside class="side-dock dock-region" id="side-dock" hidden></aside>
 
+    <!-- Mobile-only tab bar. Empty until JS relocates the panel-toggle
+         buttons into it below a certain width -- see the bottom-tabbar script
+         near the sidebar-toggle wiring. Reachable at the bottom of the screen
+         without a trip back up to the header, and desktop is untouched since
+         nothing ever moves there above the breakpoint. -->
+    <nav class="bottom-tabbar" id="bottom-tabbar" hidden></nav>
+
     <script src="vendor/midrash-viewer-core/midrash-viewer-core.js?v=10"></script>
     <script src="tosefta_parsing_tools.js?v=17"></script>
-    <script src="viewer_layers.js?v=10"></script>
+    <script src="parallels_layer.js?v=1"></script>
+    <script src="viewer_layers.js?v=11"></script>
     <script>
         let currentTextData = null;
         let currentVariantsData = null;
         let currentWitnessData = null;
         let currentManuscriptData = null;
         let currentEditionsData = null;
+        let currentParallelsData = null;
         let currentCommentaryData = null;
         // Which alternate-edition overlays are toggled on; persists across tractate loads
         // within the page (each tractate load hides/unchecks whichever is native there).
         let editionOverlayState = { vilna: false, lz: false };
         let refreshCurrentDisplay = null;
+        // Re-runs the inline apparatus layers over the already-rendered body,
+        // for options that change only what they draw.
+        let refreshInlineLayers = null;
 
-        // --- Sidebar toggle (mobile) ---
+        // --- Sidebar / TOC drawer toggles (mobile) ---
+        // Two off-canvas drawers share one backdrop: the filters sidebar
+        // (slides in from the inline-end edge) and the perek/halakhah TOC
+        // (slides in from the inline-start edge, see .toc-nav's mobile
+        // rules). Only one is ever open at a time -- opening one closes the
+        // other rather than stacking them, since both want the full screen.
         const sidebarEl = document.getElementById('sidebar');
         const sidebarToggleBtn = document.getElementById('sidebar-toggle');
         const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const tocNavEl = document.getElementById('toc-nav');
+        const tocToggleBtn = document.getElementById('toc-toggle');
 
+        function closeDrawers() {
+            sidebarEl.classList.remove('open');
+            tocNavEl.classList.remove('open');
+            sidebarOverlay.classList.remove('visible');
+        }
         function toggleSidebar() {
-            sidebarEl.classList.toggle('open'); // mobile: slide the drawer in/out
-            sidebarOverlay.classList.toggle('visible'); // mobile: dim backdrop
+            const opening = !sidebarEl.classList.contains('open');
+            tocNavEl.classList.remove('open');
+            sidebarEl.classList.toggle('open', opening); // mobile: slide the drawer in/out
+            sidebarOverlay.classList.toggle('visible', opening); // mobile: dim backdrop
             document.body.classList.toggle('sidebar-collapsed'); // desktop: hide/show entirely
         }
+        function toggleTocNav() {
+            const opening = !tocNavEl.classList.contains('open');
+            sidebarEl.classList.remove('open');
+            tocNavEl.classList.toggle('open', opening);
+            sidebarOverlay.classList.toggle('visible', opening);
+        }
         sidebarToggleBtn.addEventListener('click', toggleSidebar);
-        sidebarOverlay.addEventListener('click', toggleSidebar);
+        tocToggleBtn.addEventListener('click', toggleTocNav);
+        sidebarOverlay.addEventListener('click', closeDrawers);
+
+        // --- Mobile bottom tab bar ---
+        // Relocates the panel-toggle controls (sidebar, TOC, synopsis,
+        // manuscript, commentary, parallels) into a fixed bar at the bottom of
+        // the screen below the responsive breakpoint, where they're reachable
+        // without a trip back to the header. Moves the actual elements rather
+        // than cloning them: viewer_layers.js's nav-button sync (hidden/active
+        // state) and this file's own click listeners above are keyed to these
+        // same ids, so cloning would either duplicate ids or need a second
+        // sync path. Reparenting a node keeps its id and listeners intact and
+        // is trivially reversible above the breakpoint.
+        (function () {
+            const bar = document.getElementById('bottom-tabbar');
+            const mq = window.matchMedia('(max-width: 900px)');
+            const homes = ['sidebar-toggle', 'toc-toggle', 'synopsisMode', 'manuscriptMode', 'commentaryMode', 'parallelsMode']
+                .map(id => document.getElementById(id))
+                .filter(Boolean)
+                .map(el => ({ el, parent: el.parentNode, next: el.nextSibling }));
+
+            function apply(isMobile) {
+                closeDrawers();
+                if (isMobile) {
+                    homes.forEach(h => bar.appendChild(h.el));
+                    bar.hidden = false;
+                } else {
+                    homes.forEach(h => h.parent.insertBefore(h.el, h.next));
+                    bar.hidden = true;
+                }
+            }
+            apply(mq.matches);
+            mq.addEventListener('change', e => apply(e.matches));
+        })();
 
         // --- Parent/child filter interaction ---
         // Any checkbox whose id matches a filter-children[data-parent] dims that container when checked
@@ -569,7 +664,11 @@ if (reason === 'word order difference') return 'סדר מילים';
             }
 
             const textArray = textData.text;
-            if (!textArray || textArray.length === 0) return;
+            if (!textArray || textArray.length === 0) {
+                tocToggleBtn.hidden = true;
+                return;
+            }
+            tocToggleBtn.hidden = false;
 
             textArray.forEach((textPerek, perekIndex) => {
                 const group = document.createElement('div');
@@ -581,6 +680,7 @@ if (reason === 'word order difference') return 'סדר מילים';
                 label.href = `#perek-${perekIndex}`;
                 label.addEventListener('click', (e) => {
                     e.preventDefault();
+                    closeDrawers();
                     document.getElementById(`perek-${perekIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 });
                 group.appendChild(label);
@@ -595,6 +695,7 @@ if (reason === 'word order difference') return 'סדר מילים';
                     link.dataset.halId = `hal-${perekIndex}-${halachaIndex}`;
                     link.addEventListener('click', (e) => {
                         e.preventDefault();
+                        closeDrawers();
                         document.getElementById(`hal-${perekIndex}-${halachaIndex}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     });
                     halakhot.appendChild(link);
@@ -628,11 +729,12 @@ if (reason === 'word order difference') return 'סדר מילים';
                 getToseftavariants(selectedLocation),
                 getWitnessAlignment(selectedLocation),
                 getEditionAlignment(selectedLocation),
+                getParallelsData(selectedLocation),
                 ...MANUSCRIPT_WITNESS_SLUGS.map(slug => getManuscriptImageData(selectedLocation, slug)),
                 ...COMMENTARY_SLUGS.map(slug => getCommentaryData(selectedLocation, slug)),
                 ...OCR_COMMENTARY_SLUGS.map(slug => getOcrCommentaryData(selectedLocation, slug))
             ])
-            .then(([textData, variantsData, witnessData, editionsData, ...rest]) => {
+            .then(([textData, variantsData, witnessData, editionsData, parallelsData, ...rest]) => {
                 const manuscriptDataList = rest.slice(0, MANUSCRIPT_WITNESS_SLUGS.length);
                 const commentaryDataList = rest.slice(
                     MANUSCRIPT_WITNESS_SLUGS.length,
@@ -651,8 +753,9 @@ if (reason === 'word order difference') return 'סדר מילים';
                 currentCommentaryData = commentaryBySlug;
                 const ocrCommentaryBySlug = {};
                 OCR_COMMENTARY_SLUGS.forEach((slug, i) => { ocrCommentaryBySlug[slug] = ocrCommentaryDataList[i]; });
+                currentParallelsData = parallelsData;
                 renderClassificationDetailControls(variantsData);
-                displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData, commentaryBySlug, ocrCommentaryBySlug);
+                displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData, commentaryBySlug, ocrCommentaryBySlug, parallelsData);
                 buildTocNav(textData);
             })
             .catch(error => {
@@ -916,7 +1019,7 @@ function setNavToggleOn(id, on) {
 // once, outlives every tractate load -- see viewer_layers.js for the layers.
 let viewer = null;
 
-function displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData, commentaryBySlug, ocrCommentaryBySlug){
+function displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData, commentaryBySlug, ocrCommentaryBySlug, parallelsData){
     const masechetName = (variantsData.title || '').replace('Variants on ', '');
 
     // Mounted panels outlive a tractate switch and take the new data through
@@ -928,7 +1031,12 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
     viewer.setContext({
         masechet: masechetName,
         textData, variantsData, witnessData, manuscriptDataBySlug, editionsData,
-        commentaryBySlug, ocrCommentaryBySlug,
+        commentaryBySlug, ocrCommentaryBySlug, parallelsData,
+        // A display option, not data -- but the inline layer reads its whole
+        // world from ctx, so it travels the same way rather than the layer
+        // reaching into the DOM for a checkbox.
+        parallelSubunits: document.getElementById('parallel-subunits').checked,
+        parallelsBeside: document.getElementById('parallel-beside').checked,
     });
 
     const contentContainer = document.getElementById('content-container');
@@ -1343,6 +1451,9 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
             }
         });
         document.getElementById('numbering-panel').hidden = !anySchemeAvailable;
+        document.getElementById('parallels-options-panel').hidden =
+            !(parallelsData && parallelsData.chapters
+              && Object.keys(parallelsData.chapters).length);
 
         textArray.forEach((textPerek, perekIndex) => {
             const chapterWitness = hasWitnessData ? witnessData.chapters[perekIndex] : null;
@@ -1731,7 +1842,32 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         // just on load: a filter change rebuilds the whole body, which would
         // otherwise leave the follower watching detached elements.
         viewer.scrollFollower.setContext(viewer.context);
+
+        // Inline layers decorate the finished body. They run last, after the
+        // words have been wrapped and the overlays inserted, because what they
+        // add is measured off the rendered text -- the parallels layer's extent
+        // bars need to know where the lines actually broke.
+        applyInlineLayers();
     }
+
+    // Inline layers must also be re-applied without rebuilding the body, for
+    // changes that only affect them (switching subunit division on). Whether a
+    // layer is on is the registry's business, so this just asks it.
+    function applyInlineLayers() {
+        const container = document.getElementById('content-container');
+        const enabled = viewer.inline();
+        if (!enabled.length) {
+            container.querySelectorAll('.parallel-gutter, .parallel-subunit-break')
+                .forEach(el => el.remove());
+            document.body.classList.remove('parallel-extents-on');
+            return;
+        }
+        enabled.forEach(layer => {
+            try { layer.decorate(container, viewer.context); }
+            catch (err) { console.error(`[layer ${layer.id}] decorate failed`, err); }
+        });
+    }
+    refreshInlineLayers = applyInlineLayers;
 
     // Initial display
     updateDisplay();
@@ -1775,6 +1911,31 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
     // One button, every commentary: opens the dock with a tab per commentary
     // that has data for this tractate, and shuts them all.
     document.getElementById('commentaryMode').onclick = () => viewer.toggleNavGroup('commentaryMode');
+    // Both halves of the parallels layer -- the dock panel and the extent bars
+    // -- move together. Switching them on has to redraw the bars, since the
+    // inline half draws nothing while it is off.
+    document.getElementById('parallelsMode').onclick = () => {
+        viewer.toggleNavGroup('parallelsMode');
+        applyInlineLayers();
+        // Turning the group on should land the reader on the parallels tab
+        // rather than on whichever commentary was last open in the shared dock.
+        if (viewer.isEnabled('parallels')) viewer.showParallels();
+    };
+    document.getElementById('parallel-subunits').onchange = (e) => {
+        viewer.setContext({ ...viewer.context, parallelSubunits: e.target.checked });
+        applyInlineLayers();
+    };
+    // Beside-mode moves rendered nodes -- the text into per-subunit rows, the
+    // apparatus into a collapsed block -- so unlike the other parallels options
+    // it can't be undone by re-decorating. A full re-render is the way back out.
+    document.getElementById('parallel-beside').onchange = (e) => {
+        document.body.classList.remove('parallels-beside');
+        // Context first, then the re-render: updateDisplay rebuilds the body and
+        // hands the layers whatever ctx currently says, so setting the flag
+        // afterwards would decorate this pass with the previous answer.
+        viewer.setContext({ ...viewer.context, parallelsBeside: e.target.checked });
+        refreshCurrentDisplay();
+    };
     ['vilna', 'lz'].forEach(key => {
         document.getElementById(`numbering-overlay-${key}`).onchange = (e) => {
             editionOverlayState[key] = e.target.checked;

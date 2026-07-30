@@ -178,7 +178,8 @@ body {
     transition: margin-right 0.3s ease;
 }
 
-.sidebar-toggle {
+.sidebar-toggle,
+.toc-toggle {
     width: 38px;
     height: 38px;
     flex-shrink: 0;
@@ -915,12 +916,103 @@ body.side-dock-open .main-content {
 }
 
 @media (max-width: 900px) {
+    /* --site-header-height defaults to a single-row desktop measurement
+       (3.5rem); the mobile header wraps to two or three rows instead (see
+       .site-header's flex-wrap rule), so anchoring the dock to that value
+       left its top third hidden behind -- but painted OVER, since the dock's
+       z-index is higher -- the header's lower rows. Ignoring the variable and
+       covering the full height (like a mobile sheet) sidesteps needing to
+       track the header's real, variable height at all. */
     .side-dock {
         inline-size: 100vw;
+        inset-block: 0 var(--bottom-tabbar-h, 0px);
     }
 
     body.side-dock-open .main-content {
         margin-inline-end: 0;
+    }
+
+    /* Same full-height-sheet treatment for the bottom docks, and -- the
+       actual ask -- an even split between them instead of each being capped
+       at a fixed 42vh regardless of how much of the screen is free. Stacked
+       vertically rather than side-by-side row: at phone widths two panels
+       sharing a row leaves neither wide enough to read comfortably. */
+    /* top:0 gives the container a definite height so its (up to two) open
+       children can split it evenly -- but that also makes it a full-screen
+       box regardless of whether anything is actually open, silently
+       swallowing clicks to the page underneath. pointer-events:none on the
+       (usually empty) container, re-enabled on the children that actually
+       render, keeps the hit-testing scoped to real content. */
+    .bottom-panels {
+        top: 0;
+        bottom: var(--bottom-tabbar-h, 0px);
+        flex-direction: column;
+        pointer-events: none;
+    }
+
+    .synopsis-footer,
+    .bottom-panels .dock-region {
+        max-height: none;
+        min-height: 0;
+        flex: 1 1 0;
+        pointer-events: auto;
+    }
+
+    .synopsis-footer + .dock-region {
+        border-inline-start: none;
+        border-top: 2px solid #d8ccb8;
+    }
+
+}
+
+/* --- Mobile bottom tab bar ---------------------------------------------
+   Holds the panel-toggle buttons (filters, TOC, synopsis, manuscript,
+   commentary, parallels) below the responsive breakpoint; index.html moves
+   the actual button elements in here (see the bottom-tabbar script) rather
+   than duplicating them, so this only needs to lay out whatever it's handed. */
+.bottom-tabbar {
+    display: none;
+}
+
+.bottom-tabbar[hidden] {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    .bottom-tabbar {
+        display: flex;
+        position: fixed;
+        inset-inline: 0;
+        bottom: 0;
+        z-index: 600;
+        background: #fff;
+        border-top: 1px solid #d8ccb8;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
+        block-size: var(--bottom-tabbar-h, 54px);
+        padding-inline: env(safe-area-inset-right, 0px) env(safe-area-inset-left, 0px);
+        padding-block-end: env(safe-area-inset-bottom, 0px);
+    }
+
+    .bottom-tabbar[hidden] {
+        display: none;
+    }
+
+    /* Bigger, evenly-split touch targets -- these are the same buttons as in
+       the header nav, just relocated, so their own rules (.nav-toggle-btn,
+       .sidebar-toggle, .toc-toggle) still set color/active state; only the
+       layout changes here. */
+    .bottom-tabbar > * {
+        flex: 1 1 0;
+        min-width: 0;
+        height: 100%;
+        border-radius: 0;
+        border: none;
+        border-inline-start: 1px solid #eee2cf;
+        margin: 0;
+    }
+
+    .bottom-tabbar > *:first-child {
+        border-inline-start: none;
     }
 }
 
@@ -1068,6 +1160,18 @@ body.side-dock-open .main-content {
 body.synopsis-footer-open .main-content,
 body.manuscript-dock-open .main-content {
     padding-bottom: 42vh;
+}
+
+/* On mobile an open panel is a full-height sheet rather than a 42vh strip
+   (see the .bottom-panels mobile rules), so reserve the whole scrollable
+   height instead of an amount that no longer matches what's covering the
+   content. Must come after the unscoped rule above to win the tie -- same
+   specificity, later wins. */
+@media (max-width: 900px) {
+    body.synopsis-footer-open .main-content,
+    body.manuscript-dock-open .main-content {
+        padding-bottom: calc(100vh - var(--bottom-tabbar-h, 0px));
+    }
 }
 
 /* Shrink the sticky sidebars by the same amount, so their bottom edge
@@ -1336,6 +1440,14 @@ sup.note-ref.highlight {
 
 /* --- Responsive --- */
 @media (max-width: 900px) {
+    /* Height of the fixed bottom-tabbar (see far below); referenced by the
+       docks so they leave room for it instead of sitting underneath it. Set
+       on body rather than :root purely by convention with the other
+       mobile-only state classes living on body in this file. */
+    body {
+        --bottom-tabbar-h: 54px;
+    }
+
     .sidebar {
         position: fixed;
         top: 0;
@@ -1364,8 +1476,29 @@ sup.note-ref.highlight {
         display: block;
     }
 
+    /* The perek/halakhah TOC has no room for its own sticky column on a
+       phone, so it becomes a second off-canvas drawer -- opened from the
+       bottom tab bar (#toc-toggle), sliding in from the opposite edge to the
+       filters sidebar so the two are never visually confused. JS toggles
+       .open on only one of the two at a time; see closeDrawers/toggleSidebar/
+       toggleTocNav in index.html. */
     .toc-nav {
-        display: none;
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        width: 200px;
+        z-index: 150;
+        background: #fdfcfa;
+        box-shadow: 4px 0 16px rgba(0,0,0,0.12);
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        padding: 66px 6px 16px;
+    }
+
+    .toc-nav.open {
+        transform: translateX(0);
     }
 
     .main-content {
@@ -1380,8 +1513,22 @@ sup.note-ref.highlight {
         font-size: 1.2em;
     }
 
+    /* The selector row (label + <select> + button + edition-note) is wider
+       than a phone screen as a single nowrap line -- wrap it, and let the
+       edition-note pill wrap its own text instead of forcing width. Without
+       this the row was overflowing the viewport by ~160px (see the pill's
+       long edition names), dragging the whole page into horizontal scroll. */
+    .masechet-selector {
+        flex-wrap: wrap;
+    }
+
     .masechet-selector select {
         max-width: 140px;
+    }
+
+    .edition-note {
+        white-space: normal;
+        max-width: 100%;
     }
 
     .paragraph-pair {
@@ -1812,4 +1959,486 @@ td.witness-col {
 
 td.witness-col:hover {
     background: #ece7de !important;
+}
+
+/* --- Parallels layer -------------------------------------------------------
+   Two halves, styled together: the extent bars in a gutter down the inline-end
+   edge of the reading column, and the citation panel in the side dock. */
+
+/* The gutter lives inside .text-content's own inline-end padding rather than in
+   the gap between the text and apparatus columns: the gap is 20px and a chapter
+   can want five lanes, and stealing it would let the bars collide with the
+   apparatus text. Reserving padding instead means the column narrows by exactly
+   what the bars need, and only while the layer is on. */
+.text-content {
+    position: relative;
+}
+
+body.parallel-extents-on .text-content {
+    padding-inline-end: calc(6px + var(--parallel-lanes, 1) * 7px);
+}
+
+.parallel-gutter {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    inline-size: calc(var(--parallel-lanes, 1) * 7px);
+    pointer-events: none;
+}
+
+.parallel-bar {
+    position: absolute;
+    inset-inline-end: calc(var(--parallel-lane, 0) * 7px);
+    inline-size: 4px;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    background: var(--parallel-color, #8a7a63);
+    opacity: 0.5;
+    cursor: pointer;
+    pointer-events: auto;
+    transition: opacity 0.12s, inline-size 0.12s;
+}
+
+.parallel-bar:hover,
+.parallel-bar.focused {
+    opacity: 1;
+    inline-size: 6px;
+}
+
+/* A bar clipped at a paragraph boundary loses its cap on that side, so a
+   parallel running through three halakhot reads as one extent interrupted by the
+   layout rather than as three separate parallels. */
+.parallel-bar.continues-above {
+    border-start-start-radius: 0;
+    border-start-end-radius: 0;
+}
+
+.parallel-bar.continues-below {
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+}
+
+/* Covered words get no styling of their own -- with a dozen overlapping
+   parallels the text would be unreadable. Only the FOCUSED parallel's words are
+   marked, and then only faintly. */
+.body-word.parallel-focus {
+    background: #eef3ea;
+    box-shadow: 0 1px 0 #7c9a6a;
+}
+
+/* Subunit division: alternating tint plus a break mark, so the articulation the
+   parallels imply is visible without renumbering anything. */
+.parallel-subunit-break {
+    display: inline-block;
+    inline-size: 0.75em;
+    color: #b5a68c;
+    font-size: 0.8em;
+    vertical-align: 0.15em;
+}
+
+.parallel-subunit-break::before {
+    content: '❙';
+}
+
+.body-word[data-parallel-subunit="1"] {
+    background: rgba(160, 140, 100, 0.07);
+}
+
+/* --- the dock panel --- */
+.parallels-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+    overflow-y: auto;
+}
+
+.parallels-heading {
+    font-family: 'Suez One', serif;
+    font-size: 0.95em;
+    color: #6b5b45;
+    border-bottom: 1px solid #e0dbd4;
+    padding-bottom: 6px;
+}
+
+.parallels-empty {
+    color: #8a7a63;
+    font-size: 0.9em;
+    margin: 0;
+}
+
+.parallel-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.parallel-group-title {
+    margin: 6px 0 2px;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--parallel-color, #6b5b45);
+    border-inline-start: 3px solid var(--parallel-color, #6b5b45);
+    padding-inline-start: 7px;
+}
+
+.parallel-row {
+    border: 1px solid #e6e0d6;
+    border-radius: 4px;
+    background: #fffefb;
+}
+
+.parallel-row.focused {
+    border-color: var(--parallel-color, #b5a68c);
+    box-shadow: 0 0 0 2px rgba(120, 100, 70, 0.08);
+}
+
+.parallel-row-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    inline-size: 100%;
+    padding: 6px 9px;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    text-align: start;
+    font: inherit;
+    color: #3a2e20;
+}
+
+.parallel-row-header:hover {
+    background: #f7f3ea;
+}
+
+.parallel-ref {
+    font-size: 0.95em;
+}
+
+.parallel-row-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    flex: none;
+}
+
+.parallel-strength {
+    color: #a89880;
+    font-size: 0.6em;
+    letter-spacing: 1px;
+}
+
+/* Precision is shown only when it is WORSE than a measured span -- the absence
+   of this label is what "we located the extent" looks like. */
+.parallel-precision {
+    font-size: 0.72em;
+    color: #9a8a70;
+    white-space: nowrap;
+}
+
+.parallel-row-body {
+    padding: 2px 9px 8px;
+    border-top: 1px solid #f0ebe1;
+}
+
+.parallel-dh {
+    font-weight: 600;
+    font-size: 0.9em;
+    color: #6b5b45;
+    margin-bottom: 4px;
+}
+
+.parallel-passage {
+    font-family: 'Noto Serif Hebrew', serif;
+    font-size: 0.95em;
+    line-height: 1.75;
+    color: #3a2e20;
+    max-block-size: 22em;
+    overflow-y: auto;
+}
+
+/* The aligned stretch against its context: the surrounding words are kept and
+   dimmed rather than cut, because seeing what sits around the match is how a
+   reader judges whether the alignment found the right passage. */
+.parallel-aligned {
+    background: #eef3ea;
+    box-shadow: 0 1px 0 #7c9a6a;
+}
+
+.parallel-context {
+    color: #9a8f80;
+}
+
+.parallel-passage-missing {
+    font-family: inherit;
+    font-size: 0.85em;
+    color: #9a8a70;
+    font-style: italic;
+}
+
+.parallel-row-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 7px;
+    font-size: 0.8em;
+    color: #7a6a52;
+}
+
+.parallel-cited {
+    font-family: 'Noto Serif Hebrew', serif;
+}
+
+.parallel-sefaria-link {
+    color: #2a5b8c;
+    white-space: nowrap;
+}
+
+.parallel-sources {
+    margin-top: 3px;
+    font-size: 0.74em;
+    color: #a89880;
+    line-height: 1.5;
+}
+
+/* Narrow screens: the reading column has no room to give up, so the bars sit in
+   the margin between the text and the screen edge instead of inside it. */
+@media (max-width: 900px) {
+    body.parallel-extents-on .text-content {
+        padding-inline-end: 10px;
+    }
+
+    .parallel-gutter {
+        inline-size: 8px;
+    }
+
+    .parallel-bar {
+        inset-inline-end: calc(var(--parallel-lane, 0) * 3px);
+        inline-size: 2px;
+    }
+}
+
+/* --- Parallels beside the text ---------------------------------------------
+   The reading mode the parallels apparatus actually wants: the citations take
+   the column the variant apparatus normally holds, and each subunit of the
+   halakhah sits level with the parallels claimed for it. The variants keep their
+   place in the document -- they move to a collapsed block under the halakhah,
+   not out of it. */
+
+body.parallels-beside .paragraph-pair {
+    display: block;
+    padding-inline-end: 36px;
+}
+
+body.parallels-beside .text-content,
+body.parallels-beside .variant-content {
+    width: auto;
+}
+
+/* One grid row per subunit, so an opened passage can sit level with the words it
+   parallels. The second column exists only where something is open: a halakhah
+   with nothing open keeps the full reading measure, which matters because the
+   reading column is already sharing the window with the filters and the dock. */
+.parallel-split {
+    display: grid;
+    grid-template-columns: 1fr;
+    column-gap: 18px;
+    align-items: baseline;
+}
+
+.parallel-split.has-open {
+    grid-template-columns: 1fr minmax(15rem, 48%);
+}
+
+.parallel-split-row {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    padding-block: 1px;
+}
+
+/* Only a row that actually begins a subunit gets a rule, so a halakhah with no
+   parallels reads as continuous prose rather than as a table. */
+.parallel-split-row + .parallel-split-row {
+    border-top: 1px dotted #e6ddcc;
+    margin-top: 3px;
+    padding-top: 3px;
+}
+
+.parallel-split-text {
+    font-family: 'Noto Serif Hebrew', serif;
+}
+
+.parallel-split-refs {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 3px 5px;
+    padding-top: 2px;
+}
+
+/* The covered words ARE the affordance: a hairline under the run, slightly
+   stronger where parallels overlap. Deliberately not coloured by work -- with a
+   dozen overlapping parallels a colour-coded reading text becomes a heat map, and
+   what the reader needs from the body text is "something is claimed here", with
+   the identity one click away. */
+.body-word.parallel-span {
+    cursor: pointer;
+    border-bottom: 1px solid rgba(120, 100, 70, 0.35);
+}
+
+.body-word.parallel-span[data-parallel-depth="2"] {
+    border-bottom-color: rgba(120, 100, 70, 0.55);
+}
+
+.body-word.parallel-span[data-parallel-depth="3"] {
+    border-bottom-width: 2px;
+    border-bottom-color: rgba(120, 100, 70, 0.65);
+}
+
+.body-word.parallel-span:hover {
+    background: #f3efe4;
+}
+
+/* A run's ends get a tick, so where one parallel stops and the next starts is
+   visible without hovering every word. */
+.body-word.parallel-span-start {
+    border-inline-start: 2px solid rgba(120, 100, 70, 0.45);
+    padding-inline-start: 1px;
+}
+
+.body-word.parallel-span-end {
+    border-inline-end: 2px solid rgba(120, 100, 70, 0.45);
+    padding-inline-end: 1px;
+}
+
+/* Words whose parallel is currently open, so the text says which passage the
+   column beside it belongs to. */
+.body-word.parallel-open-word {
+    background: #eef3ea;
+}
+
+/* The parallel passage, opened next to the words it parallels. */
+.parallel-open {
+    border: 1px solid #e6e0d6;
+    border-inline-start: 3px solid var(--parallel-color, #8a7a63);
+    border-radius: 3px;
+    background: #fffdf8;
+    padding: 4px 7px 6px;
+    margin-bottom: 5px;
+}
+
+.parallel-open.focused {
+    border-color: var(--parallel-color, #8a7a63);
+    box-shadow: 0 0 0 2px rgba(120, 100, 70, 0.08);
+}
+
+.parallel-open-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 3px;
+}
+
+.parallel-open-ref {
+    font-size: 0.8em;
+    color: var(--parallel-color, #6b5b45);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.parallel-open-ref:hover {
+    text-decoration: underline;
+}
+
+.parallel-open-close {
+    flex: none;
+    border: 0;
+    background: none;
+    padding: 0 2px;
+    font-size: 0.75em;
+    color: #b5a68c;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.parallel-open-close:hover {
+    color: #6b5b45;
+}
+
+.parallel-open-text {
+    font-family: 'Noto Serif Hebrew', serif;
+    font-size: 0.88em;
+    line-height: 1.7;
+    color: #3a2e20;
+    max-block-size: 18em;
+    overflow-y: auto;
+}
+
+.parallel-open-note {
+    font-size: 0.7em;
+    color: #a89880;
+    margin-top: 2px;
+}
+
+.parallel-beside-apparatus {
+    margin-top: 6px;
+    font-size: 0.9em;
+}
+
+.parallel-beside-apparatus > summary {
+    cursor: pointer;
+    color: #8a7a63;
+    font-size: 0.85em;
+}
+
+.parallel-beside-apparatus .variant-content {
+    margin-top: 4px;
+    padding-inline-start: 10px;
+    border-inline-start: 2px solid #eee6d8;
+}
+
+/* Beside-mode marks extents in the text itself and opens the passage beside them,
+   so it draws no gutter and needs no room reserved for one. */
+body.parallels-beside.parallel-extents-on .text-content {
+    padding-inline-end: 0;
+}
+
+/* Rows with nothing open collapse to the text alone, so an unopened halakhah
+   reads as prose rather than as a half-empty table. */
+.parallel-split-refs:empty {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    /* No room for two columns: the citations go under their subunit instead of
+       beside it, which keeps the pairing even though it loses the alignment. */
+    .parallel-split,
+    .parallel-split-row {
+        display: block;
+    }
+
+    .parallel-split-refs {
+        margin-block: 2px 6px;
+    }
+}
+
+/* Which of our words a citation covers, under the ref. Present because several
+   rows can otherwise be the same ref at different places in one halakhah. */
+.parallel-anchor-text {
+    display: block;
+    font-family: 'Noto Serif Hebrew', serif;
+    font-size: 0.8em;
+    color: #9a8a70;
+    margin-top: 1px;
+}
+
+/* Related occurrences of the focused passage elsewhere in the chapter -- the same
+   Mishnah answering a second clause. Fainter than the focused extent because it is
+   a weaker statement: related, not the thing pointed at. */
+.body-word.parallel-focus-related {
+    background: #f6f2e8;
 }
