@@ -18,6 +18,15 @@ const COMMENTARY_SLUGS = ["BriefCommentary", "Kifshuta"];
 // fewer tabs. Exported by editionsDigitization/export_commentary_layers.py.
 const OCR_COMMENTARIES_DATA_BASE = "data/commentaries-ocr/";
 const OCR_COMMENTARY_SLUGS = ["ChasdeiDavid", "TekheletMordechai"];
+// Lieberman's מסורת התוספתא. Not a commentary layer -- it gets no tab of its
+// own -- but it arrives in the same Sefaria note shape (<b>DH.</b> body, nested
+// chapter/halakhah/note) and is anchored through the same tested path. It
+// belongs to the parallels margin, which renders it as the apparatus it is,
+// with its references live inside the sentence. Built by
+// sefaria-tosefta's pipelines/apparatus_parsing/export_masoret_layer.py; covers
+// the 33 tractates Lieberman edited and no others.
+const APPARATUS_DATA_BASE = "data/apparatus/";
+const APPARATUS_SLUG = "MasoretHaTosefta";
 // Display names for the alternate numbering schemes in data/editions/Editions_<Tractate>.json.
 // "lz" is only ever shown when its edition is Zuckermandel -- see the
 // (key === 'lz' && schemeData.edition === 'lieberman') hide-check in
@@ -127,6 +136,21 @@ function getParallelsData(location) {
         .then(response => response.ok ? response.json() : null)
         .then(data => (data && typeof sanitizeParallelsData === "function")
             ? sanitizeParallelsData(data) : data)
+        .catch(() => null);
+}
+
+function getApparatusUrl(location) {
+    const tractateSlug = location.split("/").pop()
+        .replace("Tosefta%20", APPARATUS_SLUG + "_");
+    return APPARATUS_DATA_BASE + tractateSlug + ".json";
+}
+
+// Lieberman's מסורת התוספתא as printed, for the parallels margin's note mode.
+// Absent for the 26 tractates outside his edition, where the margin falls back
+// to the citation list -- so a null here is the normal case, not a failure.
+function getApparatusData(location) {
+    return fetch(getApparatusUrl(location))
+        .then(response => response.ok ? response.json() : null)
         .catch(() => null);
 }
 

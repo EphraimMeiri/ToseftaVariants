@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="vendor/midrash-viewer-core/midrash-viewer-core.css?v=10">
-    <link rel="stylesheet" href="styles.css?v=21">
+    <link rel="stylesheet" href="styles.css?v=23">
     <title>תוספתא עם חילופי נוסח</title>
 </head>
 <body>
@@ -237,8 +237,8 @@
     <nav class="bottom-tabbar" id="bottom-tabbar" hidden></nav>
 
     <script src="vendor/midrash-viewer-core/midrash-viewer-core.js?v=10"></script>
-    <script src="tosefta_parsing_tools.js?v=17"></script>
-    <script src="parallels_layer.js?v=15"></script>
+    <script src="tosefta_parsing_tools.js?v=18"></script>
+    <script src="parallels_layer.js?v=19"></script>
     <script src="viewer_layers.js?v=11"></script>
     <script>
         let currentTextData = null;
@@ -774,11 +774,13 @@ if (reason === 'word order difference') return 'סדר מילים';
                 getWitnessAlignment(selectedLocation),
                 getEditionAlignment(selectedLocation),
                 getParallelsData(selectedLocation),
+                getApparatusData(selectedLocation),
                 ...MANUSCRIPT_WITNESS_SLUGS.map(slug => getManuscriptImageData(selectedLocation, slug)),
                 ...COMMENTARY_SLUGS.map(slug => getCommentaryData(selectedLocation, slug)),
                 ...OCR_COMMENTARY_SLUGS.map(slug => getOcrCommentaryData(selectedLocation, slug))
             ])
-            .then(([textData, variantsData, witnessData, editionsData, parallelsData, ...rest]) => {
+            .then(([textData, variantsData, witnessData, editionsData, parallelsData,
+                    apparatusData, ...rest]) => {
                 const manuscriptDataList = rest.slice(0, MANUSCRIPT_WITNESS_SLUGS.length);
                 const commentaryDataList = rest.slice(
                     MANUSCRIPT_WITNESS_SLUGS.length,
@@ -799,7 +801,7 @@ if (reason === 'word order difference') return 'סדר מילים';
                 OCR_COMMENTARY_SLUGS.forEach((slug, i) => { ocrCommentaryBySlug[slug] = ocrCommentaryDataList[i]; });
                 currentParallelsData = parallelsData;
                 renderClassificationDetailControls(variantsData);
-                displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData, commentaryBySlug, ocrCommentaryBySlug, parallelsData);
+                displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData, commentaryBySlug, ocrCommentaryBySlug, parallelsData, apparatusData);
                 buildTocNav(textData);
             })
             .catch(error => {
@@ -1063,7 +1065,7 @@ function setNavToggleOn(id, on) {
 // once, outlives every tractate load -- see viewer_layers.js for the layers.
 let viewer = null;
 
-function displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData, commentaryBySlug, ocrCommentaryBySlug, parallelsData){
+function displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData, commentaryBySlug, ocrCommentaryBySlug, parallelsData, apparatusData){
     const masechetName = (variantsData.title || '').replace('Variants on ', '');
 
     // Mounted panels outlive a tractate switch and take the new data through
@@ -1075,7 +1077,7 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
     viewer.setContext({
         masechet: masechetName,
         textData, variantsData, witnessData, manuscriptDataBySlug, editionsData,
-        commentaryBySlug, ocrCommentaryBySlug, parallelsData,
+        commentaryBySlug, ocrCommentaryBySlug, parallelsData, apparatusData,
         // A display option, not data -- but the inline layer reads its whole
         // world from ctx, so it travels the same way rather than the layer
         // reaching into the DOM for a checkbox.
@@ -1093,7 +1095,8 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
     document.getElementById('sidebar-tab-parallels').hidden = !hasParallels;
     if (hasParallels) {
         renderParallelsFilterUI(document.getElementById('parallels-filters'),
-                                parallelsData, onParallelsFilterChange);
+                                parallelsData, onParallelsFilterChange,
+                                { hasApparatus: parallelsApparatusAvailable(apparatusData) });
     } else {
         document.getElementById('parallels-filters').innerHTML = '';
         showSidebarPane('sidebar-pane-text');

@@ -2269,6 +2269,85 @@ body.parallel-extents-on .text-content {
     overflow-y: auto;
 }
 
+/* --- note mode: the apparatus as printed ---------------------------------
+   Set as running prose, not as a list of rows: the note is a sentence, and the
+   references are words in it. Everything below is about keeping that true while
+   still letting four kinds of reference be told apart at a glance. */
+.apparatus-note {
+    border-bottom: 1px solid #f2ede4;
+    padding: 7px 9px;
+}
+.apparatus-note:last-child { border-bottom: none; }
+
+.apparatus-note-line {
+    font-family: 'Noto Serif Hebrew', serif;
+    font-size: 0.92em;
+    line-height: 1.85;
+    color: #3a2e20;
+    margin: 0;
+}
+
+.apparatus-note-lemma {
+    font-weight: 700;
+    color: #6b4c2a;
+}
+
+/* A reference the reader can act on. Deliberately not a button-looking button:
+   it sits inside a sentence, so it is marked the way a citation is marked in
+   print -- a coloured underline -- and grows a background only under the
+   pointer. */
+.apparatus-ref {
+    font: inherit;
+    color: inherit;
+    padding: 0 1px;
+    border: none;
+    background: none;
+}
+
+.apparatus-ref-live,
+.apparatus-ref-link {
+    cursor: pointer;
+    color: #1f4f78;
+    text-decoration: underline;
+    text-decoration-color: #a8c4dc;
+    text-underline-offset: 2px;
+    border-radius: 3px;
+}
+.apparatus-ref-live:hover,
+.apparatus-ref-link:hover,
+.apparatus-ref-live.focused {
+    background: #e8f0f7;
+    text-decoration-color: #1f4f78;
+}
+.apparatus-ref-live.open {
+    background: #dce8f3;
+    font-weight: 600;
+}
+
+/* Recognised, unplaceable: the midrashic works, which the parser can name but
+   not address. Dotted rather than solid, and inert -- the reader should see
+   that Lieberman cited it and that we cannot take them there. */
+.apparatus-ref-unplaceable {
+    color: #7a6a52;
+    text-decoration: underline dotted;
+    text-decoration-color: #c4b49a;
+    text-underline-offset: 2px;
+    cursor: help;
+}
+
+/* Filtered out, and only visible at all because "הצג ציונים מסוננים" is on. */
+.apparatus-ref-filtered {
+    color: #a4998a;
+    text-decoration: line-through;
+    text-decoration-color: #cbbfae;
+}
+
+.apparatus-note-body {
+    margin-top: 6px;
+    border-top: 1px solid #f0ebe1;
+    padding: 6px 0 0;
+}
+
 /* The aligned stretch against its context: the surrounding words are kept and
    dimmed rather than cut, because seeing what sits around the match is how a
    reader judges whether the alignment found the right passage. */
@@ -2603,4 +2682,15 @@ body.parallels-beside.parallel-extents-on .text-content {
    a weaker statement: related, not the thing pointed at. */
 .body-word.parallel-focus-related {
     background: #f6f2e8;
+}
+
+/* Attribution for the apparatus, which is CC-BY: a licence condition, so it is
+   part of the panel rather than a footnote someone has to remember. */
+.parallels-credit {
+    margin: 8px 9px 4px;
+    padding-top: 6px;
+    border-top: 1px solid #f0ebe1;
+    font-size: 0.72em;
+    color: #9a8a70;
+    line-height: 1.5;
 }

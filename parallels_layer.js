@@ -125,6 +125,65 @@ const PARALLEL_PRECISION_LABELS = {
     chapter: 'פרק בלבד',
 };
 
+
+// --- note mode ---------------------------------------------------------------
+// Two ways to read the same margin.
+//
+//   notes  Lieberman's מסורת התוספתא as printed -- the note whole, with its
+//          references live inside the sentence. This is what the apparatus
+//          actually says, and in the 33 tractates he edited it is the default.
+//   list   The derived index: every citation from every source, resolved,
+//          merged and regrouped by the work it points at.
+//
+// The list is more complete and the notes are more faithful, and neither is a
+// substitute for the other. What the list cannot show is the note: one printed
+// comment citing the Yerushalmi, the Bavli and אבות דר"ן becomes three rows
+// under three headings, and the אבות דר"ן reference becomes nothing at all,
+// because we can recognise midrashic works without being able to place them.
+// In note mode that reference is on screen, marked as unplaceable rather than
+// silently dropped -- which is the whole reason the mode exists.
+//
+// Note mode shows Lieberman and only Lieberman: the other sources have no note
+// to appear inside. They are one switch away in list mode.
+const PARALLEL_MODES = { notes: 'notes', list: 'list' };
+
+function parallelsApparatusAvailable(apparatusData) {
+    return !!(apparatusData && Array.isArray(apparatusData.text)
+              && apparatusData.text.length);
+}
+
+// A reference span the parser resolved to a Sefaria address is clickable; one it
+// merely recognised is marked and inert; an edition citation ("עמ' 14", "הוצ'
+// בובר") is not a reference at all and stays as prose. Roughly 79 / 6 / 7 of
+// every 100 printed spans, with the remaining 8 unparsed and likewise prose.
+// The variants sidebar's "הוסתרו N מתוך M", for the references inside the notes
+// on screen. Without it a filter that de-activates half the apparatus does so
+// silently -- the note text is unchanged, so nothing else on screen moves.
+function apparatusFilterNote(notes, resolve) {
+    let total = 0;
+    let hidden = 0;
+    (notes || []).forEach(note => {
+        (note.spans || []).forEach(span => {
+            if (span.t !== 'ref' || !span.ref) return;
+            const entry = resolve(span.ref);
+            if (!entry) return;
+            total++;
+            if (!parallelsFilter.matches(entry)) hidden++;
+        });
+    });
+    if (!hidden) return '';
+    return parallelsFilter.showFiltered
+        ? `${hidden} מתוך ${total} הציונים מסוננים, ומוצגים כמחוקים`
+        : `${hidden} מתוך ${total} הציונים מסוננים ואינם לחיצים`;
+}
+
+function apparatusSpanKind(span) {
+    if (span.t !== 'ref') return 'text';
+    if (span.status === 'resolved' || span.ref) return 'ref';
+    if (span.status === 'midrash') return 'unplaceable';
+    return 'text';
+}
+
 // A tier the merge assigns from how well the sources agree. Shown as a dot count
 // rather than a word: it is a rough confidence, and spelling it out would give
 // it more authority than it has.
@@ -231,6 +290,12 @@ function createParallelsFilter() {
         soloSource: null,       // show only what this source itself cites
         hideCompare: false,     // drop the ועיין / השווה cross-references
         hideBacklinks: false,   // drop notes printed on some other passage
+        // How the margin reads, not what is in it -- so it lives here with the
+        // rest of the reader's standing choices, but `matches` never consults it.
+        mode: PARALLEL_MODES.notes,
+        // The variants sidebar's "הצג חילופים מוסתרים", for note mode: bring the
+        // filtered-out references back, marked, instead of leaving them as prose.
+        showFiltered: false,
     };
     let version = 0;
 
@@ -279,6 +344,19 @@ function createParallelsFilter() {
         set hideBacklinks(on) {
             if (state.hideBacklinks === !!on) return;
             state.hideBacklinks = !!on;
+            notify();
+        },
+        get mode() { return state.mode; },
+        set mode(next) {
+            const value = PARALLEL_MODES[next] || PARALLEL_MODES.list;
+            if (state.mode === value) return;
+            state.mode = value;
+            notify();
+        },
+        get showFiltered() { return state.showFiltered; },
+        set showFiltered(on) {
+            if (state.showFiltered === !!on) return;
+            state.showFiltered = !!on;
             notify();
         },
         // "הצג הכל" means all of it, including whatever a per-tractate default
@@ -410,15 +488,18 @@ function createParallelsIndex(parallelsData, textData) {
             // Stale versions are dead weight -- a reader ticking through a dozen
             // works would otherwise accumulate a dozen copies of every chapter.
             if (cache.size > 32) cache.clear();
-            const raw = ((parallelsData.chapters || {})[String(chapterIndex)] || [])
-                .filter(e => parallelsFilter.matches(e));
+            const all = (parallelsData.chapters || {})[String(chapterIndex)] || [];
+            const raw = all.filter(e => parallelsFilter.matches(e));
             // Entries arrive sorted by position from the builder; re-sorting here
             // keeps the lane assignment correct even if that ever changes.
             const entries = raw.slice().sort((a, b) =>
                 a.baseIdx - b.baseIdx || a.endIdx - b.endIdx || a.ref.localeCompare(b.ref));
             const spans = entries.filter(e => e.precision === 'span');
             const { lanes, laneCount } = assignParallelLanes(spans);
-            cache.set(key, { entries, spans, lanes, laneCount });
+            // Note mode needs the filtered-out ones too: a reference the reader
+            // has switched off still has to be recognised as a reference, so it
+            // can be shown as filtered rather than as unresolvable.
+            cache.set(key, { entries, spans, lanes, laneCount, entriesUnfiltered: all });
         }
         return cache.get(key);
     }
@@ -467,6 +548,76 @@ function createParallelsIndex(parallelsData, textData) {
 
         texts: parallelsData.texts || {},
         chapterCount: (textData && textData.text) ? textData.text.length : 0,
+    };
+}
+
+
+// --- the apparatus, as printed ----------------------------------------------
+// Anchoring is not reimplemented here. `createCommentaryIndex` already takes
+// exactly this shape -- Sefaria's nested chapter/halakhah/note arrays of
+// "<b>dibbur hamatchil.</b> body" -- places each note by matching its dibbur
+// hamatchil against our word stream, and thereby corrects the halakhah the
+// source JSON filed it under, which drifts because Lieberman's divisions are
+// finer than the ones our text is numbered by. That path is covered by
+// test/commentary_anchoring.test.mjs, and the anchor rate IS the quality claim,
+// so the apparatus goes through it rather than beside it.
+//
+// What it does not carry is the reference spans, which live in a parallel
+// `spans` array in the source file. They are zipped back on by walk index: the
+// ids that anchoring mints end `-<chapter>-<sourceHalakhah>-<seq>`, and `seq`
+// counts notes across the chapter in the same order this walk does.
+function createApparatusIndex(apparatusData, textData) {
+    if (!parallelsApparatusAvailable(apparatusData)) return null;
+    const anchored = createCommentaryIndex(apparatusData, textData, 'masoret');
+    const byChapter = new Map();
+
+    function spansForChapter(chapterIndex) {
+        const flat = [];
+        ((apparatusData.spans || [])[chapterIndex] || []).forEach(halakhah => {
+            (halakhah || []).forEach(noteSpans => flat.push(noteSpans || []));
+        });
+        return flat;
+    }
+
+    return {
+        get title() { return apparatusData.heTitle || apparatusData.title || ''; },
+        get credit() { return apparatusData.versionTitle || ''; },
+
+        chapter(chapterIndex) {
+            if (!byChapter.has(chapterIndex)) {
+                const flatSpans = spansForChapter(chapterIndex);
+                const notes = anchored.chapter(chapterIndex).map(note => {
+                    const seq = Number(String(note.id).split('-').pop());
+                    return Object.assign({}, note, {
+                        spans: flatSpans[seq] || [],
+                    });
+                });
+                byChapter.set(chapterIndex, notes);
+            }
+            return byChapter.get(chapterIndex);
+        },
+
+        // Notes belonging to one halakhah, in the order they are printed. The
+        // halakhah is the anchored one, not the one the source filed the note
+        // under -- see anchorCommentaryChapter.
+        forHalakhah(chapterIndex, halakhah) {
+            return this.chapter(chapterIndex).filter(n => n.halakhah === halakhah);
+        },
+
+        // How the apparatus itself wrote a reference we hold as a Sefaria
+        // address -- "בבלי ח' ב'" for Berakhot 8b. List mode has a field for
+        // this and until now had nothing true to put in it.
+        printedFor(chapterIndex) {
+            const map = new Map();
+            this.chapter(chapterIndex).forEach(note => {
+                (note.spans || []).forEach(span => {
+                    if (span.t === 'ref' && span.ref && !map.has(span.ref)) {
+                        map.set(span.ref, span.s);
+                    }
+                });
+            });
+            return map;
+        },
     };
 }
 
@@ -527,6 +678,7 @@ function createParallelsPanel({ root, labels = {} }) {
     const text = {
         noSelection: 'לחצו על מילה בטקסט כדי להציג את המקבילות',
         noParallels: 'אין מקבילות רשומות לקטע זה',
+        noNotes: 'אין הערה במסורת התוספתא לקטע זה',
         missingText: 'הטקסט של המקבילה אינו זמין כאן',
         openOnSefaria: 'פתיחה בספריא',
         ...labels,
@@ -556,12 +708,28 @@ function createParallelsPanel({ root, labels = {} }) {
     empty.textContent = text.noSelection;
     container.appendChild(empty);
 
+    // Note mode reproduces Lieberman's apparatus, which Sefaria releases CC-BY.
+    // Attribution is the licence condition, so the credit is part of the panel
+    // rather than something to remember to add.
+    const credit = document.createElement('p');
+    credit.className = 'parallels-credit';
+    credit.hidden = true;
+    container.appendChild(credit);
+
     root.appendChild(container);
 
     let entries = [];
     let texts = {};
     let expanded = new Set();
     const rowById = new Map();
+
+    // Note mode's parallel state. Chips are registered by entry id alongside the
+    // list's rows so one focus channel lights whichever of the two is on screen.
+    let notes = [];
+    let resolveEntry = () => null;
+    let viewMode = PARALLEL_MODES.list;
+    let printedFor = null;
+    const chipsById = new Map();
 
     const sourceList = parallelSourceList;
 
@@ -669,12 +837,19 @@ function createParallelsPanel({ root, labels = {} }) {
         // it. On a tractate where Vilna and Lieberman divide the halakhot
         // differently this is the difference between a citation that lands and
         // one that doesn't, so it is shown rather than buried in the data.
+        //
+        // The printed form comes from the apparatus's own segmented text where
+        // we have it. It used to come from `citations[0]`, which is a merged bag
+        // with no record of which source contributed what: 61% of the time that
+        // was the dibbur hamatchil -- already displayed above -- and the rest of
+        // the time a normalized heRef. It was never what the page said.
         const scheme = entry.citedScheme === 'vilna' ? 'וילנא'
                      : entry.citedScheme === 'lieberman' ? 'ליברמן' : '';
-        cited.textContent = (entry.citations && entry.citations.length)
-            ? entry.citations[0]
-            : `${entry.ref}`;
-        if (scheme) cited.title = `מספור ${scheme}, ${entry.citedRef}`;
+        const printed = printedFor && printedFor.get(entry.ref);
+        cited.textContent = printed || entry.heRef || entry.ref;
+        cited.title = printed
+            ? `כלשון מסורת התוספתא${scheme ? `; מספור ${scheme}, ${entry.citedRef}` : ''}`
+            : (scheme ? `מספור ${scheme}, ${entry.citedRef}` : '');
         footer.appendChild(cited);
 
         const link = document.createElement('a');
@@ -693,9 +868,162 @@ function createParallelsPanel({ root, labels = {} }) {
         body.appendChild(sources);
     }
 
-    function render() {
+    // --- note mode ----------------------------------------------------------
+
+    // Everything up to and including the lemma, split into what is bold and what
+    // isn't. Taken from the note's own HTML rather than from the parsed `dh`,
+    // which has been trimmed for matching (elisions dropped, brackets stripped)
+    // and is a search key, not a reading. A few notes open before the bold --
+    // `[<b>(את.)</b> …` -- so the leading text is kept rather than assumed away;
+    // the split here is the same one the export used to cut the tail.
+    function noteLead(html) {
+        const source = html || '';
+        const end = source.indexOf('</b>');
+        if (end < 0) return { before: '', lemma: '' };
+        const open = source.indexOf('<b>');
+        if (open < 0 || open > end) return { before: '', lemma: '' };
+        return {
+            before: source.slice(0, open).replace(/<[^>]+>/g, ''),
+            lemma: source.slice(open + 3, end).replace(/<[^>]+>/g, ''),
+        };
+    }
+
+    // One reference inside a note. Four outcomes, and the reader can tell them
+    // apart:
+    //   live         resolved, and we hold the passage -- opens it below
+    //   link         resolved, but no entry of ours -- goes to Sefaria
+    //   unplaceable  a work we recognise and cannot address (the midrashim)
+    //   filtered     resolved, but the reader has switched its work off
+    // A filtered reference reads as plain text, exactly as a hidden variant
+    // leaves its word alone; "הצג מוסתרים" brings it back struck through rather
+    // than restoring it, so the reader can see what the filter is costing.
+    function buildRefSpan(span, block) {
+        // An edition citation ("עמ' 14", "הוצ' בובר") and a pointer the parser
+        // could not read are both marked `ref` upstream -- the export records
+        // everything the parser touched -- but neither is somewhere a reader can
+        // be sent. They read as what they are: prose.
+        const kind = apparatusSpanKind(span);
+        if (kind === 'text') return document.createTextNode(span.s);
+
+        const entry = span.ref ? resolveEntry(span.ref) : null;
+        const filtered = entry && !parallelsFilter.matches(entry);
+
+        if (filtered && !parallelsFilter.showFiltered) {
+            return document.createTextNode(span.s);
+        }
+        if (filtered) {
+            const out = document.createElement('span');
+            out.className = 'apparatus-ref apparatus-ref-filtered';
+            out.textContent = span.s;
+            out.title = 'מסונן על ידי הסינון הפעיל';
+            return out;
+        }
+        if (kind === 'unplaceable') {
+            const out = document.createElement('span');
+            out.className = 'apparatus-ref apparatus-ref-unplaceable';
+            out.textContent = span.s;
+            out.title = span.work
+                ? `${span.work} -- מזוהה אך לא ניתן לאתר את מיקומו המדויק`
+                : 'מזוהה אך לא ניתן לאתר את מיקומו המדויק';
+            return out;
+        }
+        if (!entry) {
+            // Resolved to an address we simply have no aligned passage for.
+            // Still a real citation, so it still goes somewhere.
+            const out = document.createElement('a');
+            out.className = 'apparatus-ref apparatus-ref-link';
+            out.textContent = span.s;
+            out.href = sefariaUrl(span.ref);
+            out.target = '_blank';
+            out.rel = 'noopener';
+            out.title = `${span.ref} -- פתיחה בספריא`;
+            return out;
+        }
+
+        const out = document.createElement('button');
+        out.type = 'button';
+        out.className = 'apparatus-ref apparatus-ref-live';
+        out.textContent = span.s;
+        out.title = entry.heRef || entry.ref;
+        out.addEventListener('click', () => {
+            const body = block.querySelector('.apparatus-note-body');
+            const open = block.dataset.openId === entry.id;
+            body.innerHTML = '';
+            body.dataset.filled = '';
+            if (open) {
+                block.dataset.openId = '';
+                body.hidden = true;
+            } else {
+                block.dataset.openId = entry.id;
+                fillBody(body, entry);
+                body.hidden = false;
+            }
+            block.querySelectorAll('.apparatus-ref-live')
+                .forEach(el => el.classList.toggle('open', el === out && !open));
+            parallelsFocus.set(open ? null : entry.id, { source: 'panel' });
+        });
+        out.addEventListener('mouseenter', () => {
+            parallelsFocus.set(entry.id, { source: 'panel-hover', transient: true });
+        });
+        chipsById.set(entry.id, out);
+        return out;
+    }
+
+    function buildNoteBlock(note) {
+        const block = document.createElement('div');
+        block.className = 'apparatus-note';
+
+        const line = document.createElement('p');
+        line.className = 'apparatus-note-line';
+
+        const lead = noteLead(note.html);
+        if (lead.before) line.appendChild(document.createTextNode(lead.before));
+        if (lead.lemma) {
+            const b = document.createElement('b');
+            b.className = 'apparatus-note-lemma';
+            b.textContent = lead.lemma;
+            line.appendChild(b);
+        }
+        // A note the export could not segment still reads: its text goes in
+        // whole, with nothing clickable. Better a dead note than a missing one.
+        (note.spans && note.spans.length
+            ? note.spans
+            : [{ t: 'text', s: (note.html || '').replace(/^[\s\S]*?<\/b>/, '') }]
+        ).forEach(span => {
+            line.appendChild(span.t === 'ref'
+                ? buildRefSpan(span, block)
+                : document.createTextNode(span.s));
+        });
+        block.appendChild(line);
+
+        const body = document.createElement('div');
+        body.className = 'apparatus-note-body parallel-row-body';
+        body.hidden = true;
+        block.appendChild(body);
+
+        return block;
+    }
+
+    function renderNotes() {
         list.innerHTML = '';
         rowById.clear();
+        chipsById.clear();
+        if (!notes.length) {
+            empty.hidden = false;
+            return;
+        }
+        empty.hidden = true;
+        const section = document.createElement('section');
+        section.className = 'apparatus-notes';
+        notes.forEach(n => section.appendChild(buildNoteBlock(n)));
+        list.appendChild(section);
+    }
+
+    function render() {
+        if (viewMode === PARALLEL_MODES.notes) { renderNotes(); return; }
+        list.innerHTML = '';
+        rowById.clear();
+        chipsById.clear();
         if (!entries.length) {
             empty.hidden = false;
             return;
@@ -734,10 +1062,16 @@ function createParallelsPanel({ root, labels = {} }) {
 
     const unsubscribe = parallelsFocus.subscribe((entryId, meta) => {
         rowById.forEach((row, id) => row.classList.toggle('focused', id === entryId));
+        chipsById.forEach((chip, id) => chip.classList.toggle('focused', id === entryId));
         // A click on a bar in the text should bring its citation into view and
         // open it; a hover should only light it up. Otherwise brushing past the
         // gutter would expand rows the reader never asked for.
         if (!entryId || meta.transient) return;
+        // In note mode the citation is a word inside a sentence, so the most it
+        // can do is scroll itself into view lit up. Opening the passage under a
+        // note the reader never clicked would push the apparatus off screen.
+        const chip = chipsById.get(entryId);
+        if (chip) { chip.scrollIntoView({ block: 'nearest' }); return; }
         const row = rowById.get(entryId);
         if (!row) return;
         if (meta.source !== 'panel' && meta.expand !== false && !expanded.has(entryId)) {
@@ -752,8 +1086,11 @@ function createParallelsPanel({ root, labels = {} }) {
 
     return {
         setEntries(nextEntries, headingText, nextTexts, opts = {}) {
+            viewMode = PARALLEL_MODES.list;
             entries = nextEntries || [];
             texts = nextTexts || {};
+            printedFor = opts.printedFor || null;
+            credit.hidden = true;
             heading.textContent = headingText || '';
             heading.hidden = !headingText;
             note.textContent = opts.note || '';
@@ -761,8 +1098,30 @@ function createParallelsPanel({ root, labels = {} }) {
             empty.textContent = opts.emptyText || text.noParallels;
             render();
         },
+
+        // The apparatus itself. `resolve` maps a Sefaria ref to one of our
+        // entries, which is what turns a printed reference into something that
+        // can open its passage; the panel does not know how that lookup works.
+        setNotes(nextNotes, headingText, nextTexts, resolve, opts = {}) {
+            viewMode = PARALLEL_MODES.notes;
+            notes = nextNotes || [];
+            texts = nextTexts || {};
+            resolveEntry = resolve || (() => null);
+            heading.textContent = headingText || '';
+            heading.hidden = !headingText;
+            note.textContent = opts.note || '';
+            note.hidden = !opts.note;
+            empty.textContent = opts.emptyText || text.noNotes;
+            credit.textContent = opts.credit || '';
+            credit.hidden = !opts.credit || !notes.length;
+            render();
+        },
         clear() {
             entries = [];
+            // Notes too, or a tractate switch leaves the previous tractate's
+            // apparatus on screen: clear() re-renders, and render() dispatches on
+            // a viewMode that is still `notes`.
+            notes = [];
             expanded = new Set();
             heading.textContent = '';
             heading.hidden = true;
@@ -795,6 +1154,7 @@ const PARALLELS_LAYER = {
         let index = null;
         let panel = null;
         let texts = {};
+        let apparatus = null;
 
         let beside = false;
 
@@ -803,9 +1163,33 @@ const PARALLELS_LAYER = {
             index = (data && next.textData)
                 ? createParallelsIndex(data, next.textData) : null;
             texts = index ? index.texts : {};
+            apparatus = (next && next.textData)
+                ? createApparatusIndex(next.apparatusData, next.textData) : null;
             beside = !!(next && next.parallelsBeside);
         }
         setCtx(ctx);
+
+        // Note mode reads only where the apparatus exists. Everywhere else the
+        // margin is the list, whatever the reader last chose -- there is no note
+        // to show in Kodashim, and an empty margin would be the only sign of it.
+        function inNoteMode() {
+            return !!apparatus && parallelsFilter.mode === PARALLEL_MODES.notes;
+        }
+
+        // A printed reference names a passage; our entries name a passage and a
+        // span of it, so one printed reference can match several. Prefer the one
+        // whose extent we actually measured -- that is the one with a bar in the
+        // gutter and words to highlight.
+        function entryResolver(chapterIndex) {
+            const all = index ? index.chapter(chapterIndex).entriesUnfiltered : [];
+            return ref => {
+                if (!ref) return null;
+                const hits = all.filter(e => e.ref === ref
+                                             || e.ref.startsWith(ref + ':'));
+                if (!hits.length) return null;
+                return hits.find(e => e.precision === 'span') || hits[0];
+            };
+        }
 
         panel = createParallelsPanel({ root: container });
 
@@ -860,16 +1244,37 @@ const PARALLELS_LAYER = {
                         });
                     return;
                 }
+                if (inNoteMode()) {
+                    const heading = addr.halakhah == null
+                        ? `פרק ${convert_number(addr.chapter + 1)}`
+                        : `פרק ${convert_number(addr.chapter + 1)}, הלכה ${addr.halakhah + 1}`;
+                    const chapterNotes = addr.halakhah == null
+                        ? apparatus.chapter(addr.chapter)
+                        : apparatus.forHalakhah(addr.chapter, addr.halakhah);
+                    const resolve = entryResolver(addr.chapter);
+                    panel.setNotes(chapterNotes, heading, texts, resolve, {
+                        note: apparatusFilterNote(chapterNotes, resolve),
+                        credit: apparatus.title
+                            ? `${apparatus.title} · ${apparatus.credit} · CC-BY`
+                            : '',
+                    });
+                    return;
+                }
+                // List mode still borrows one thing from the apparatus: how it
+                // wrote the references it shares with us, for the "as printed"
+                // line under each citation.
+                const printedFor = apparatus ? apparatus.printedFor(addr.chapter) : null;
                 if (addr.halakhah == null) {
                     panel.setEntries(index.chapter(addr.chapter).entries,
-                                     `פרק ${convert_number(addr.chapter + 1)}`, texts);
+                                     `פרק ${convert_number(addr.chapter + 1)}`, texts,
+                                     { printedFor });
                     return;
                 }
                 const entries = index.forHalakhah(addr.chapter, addr.halakhah);
                 panel.setEntries(
                     entries,
                     `פרק ${convert_number(addr.chapter + 1)}, הלכה ${addr.halakhah + 1}`,
-                    texts);
+                    texts, { printedFor });
                 // A word-precise click means "what is parallel HERE", so the
                 // parallel covering that word is raised. A halakhah-scoped
                 // selection (a scroll, a TOC jump) deliberately raises nothing.
@@ -1890,19 +2295,19 @@ let parallelsFilterStatusUnsub = null;
 // and on everywhere it does. The row stays in the list with its count, and the
 // status line plus the reset button say that something is being held back.
 //
-// And the other way round: where he DID edit, his apparatus is what this site is
-// an edition of, so the margin opens as he left it -- solo mode on, the later
-// editions and Sefaria's link graph a click away rather than mixed in. That is
-// 412 of Berakhot's 699 citations, 640 of Sotah's; the rest are one untick away
-// and the status line says how many are waiting.
+// Where he DID edit, note mode is what opens instead: the apparatus itself
+// rather than a filtered view of the index derived from it. That supersedes the
+// solo-Lieberman default this function used to apply -- two switches saying
+// nearly the same thing, and solo would have emptied everything note mode does
+// not show anyway. Solo remains a manual choice for list mode.
 //
-// Solo mode is a single global slot, so it has to be cleared on the way out as
-// firmly as it is set on the way in: left on into Chullin it would empty the
-// margin, since nothing there is his.
+// What survives here is the clearing half, which is not about defaults at all
+// but about a global slot: solo left on from a tractate he edited would empty
+// the margin in Chullin, where nothing is his.
 //
-// Per tractate but not sticky-per-tractate: both defaults fire only while the
-// reader has left that control alone. One click -- in either direction -- and
-// they stop overriding them, here and in every tractate after.
+// Per tractate but not sticky-per-tractate: this fires only while the reader has
+// left that control alone. One click -- in either direction -- and it stops
+// overriding them, here and in every tractate after.
 function applyParallelsTractateDefaults(counts) {
     let changed = false;
     PARALLEL_HOME_BEARING_SOURCES.forEach(slug => {
@@ -1917,21 +2322,16 @@ function applyParallelsTractateDefaults(counts) {
             }
         }
 
-        if (!parallelsFilter.touched('solo', slug)) {
-            const on = parallelsFilter.state.soloSource === slug;
-            if (edits && !on) {
-                parallelsFilter.state.soloSource = slug;
-                changed = true;
-            } else if (!edits && on) {
-                parallelsFilter.state.soloSource = null;
-                changed = true;
-            }
+        if (!edits && parallelsFilter.state.soloSource === slug
+            && !parallelsFilter.touched('solo', slug)) {
+            parallelsFilter.state.soloSource = null;
+            changed = true;
         }
     });
     return changed;
 }
 
-function renderParallelsFilterUI(root, parallelsData, onChange) {
+function renderParallelsFilterUI(root, parallelsData, onChange, opts = {}) {
     // One live status subscriber at a time: this is re-run on every tractate
     // load and on reset, and a subscriber per run would keep the discarded DOM
     // alive along with it.
@@ -1947,6 +2347,49 @@ function renderParallelsFilterUI(root, parallelsData, onChange) {
     if (applyParallelsTractateDefaults(counts)) parallelsFilter.changed();
 
     const notify = () => { parallelsFilter.changed(); if (onChange) onChange(); };
+
+    // --- how the margin reads -----------------------------------------------
+    // Only offered where there is an apparatus to read: outside Lieberman's 33
+    // tractates the margin is the list and a switch with one working position
+    // would be a puzzle rather than a choice.
+    if (opts.hasApparatus) {
+        const modes = parallelsFilterSection('תצוגת השוליים', { open: true });
+        const pick = (value, label, title) => {
+            const wrap = document.createElement('label');
+            wrap.className = 'filter-parent';
+            wrap.title = title;
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'parallels-mode';
+            radio.value = value;
+            radio.checked = parallelsFilter.mode === value;
+            radio.onchange = () => { if (radio.checked) { parallelsFilter.mode = value; notify(); } };
+            wrap.append(radio, document.createTextNode(' ' + label));
+            modes.body.appendChild(wrap);
+        };
+        pick(PARALLEL_MODES.notes, 'הערות מסורת התוספתא',
+             'לשון ההערה כפי שנדפסה, והציונים שבתוכה לחיצים -- כולל ציונים שלא ניתן לאתרם, המסומנים ככאלה');
+        pick(PARALLEL_MODES.list, 'רשימת ציונים',
+             'כל הציונים מכל המקורות, ממוינים לפי החיבור שאליו הם מפנים');
+
+        // Note mode's version of "הצג חילופים מוסתרים": a filtered reference
+        // reads as plain text, and this brings it back struck through so the
+        // reader can see what the filter is holding back.
+        const showFiltered = parallelsFilterRow('הצג ציונים מסוננים', null,
+            parallelsFilter.showFiltered,
+            checked => { parallelsFilter.showFiltered = checked; notify(); },
+            { title: 'ציונים שסוננו יוצגו בלשון ההערה כמחוקים, במקום כטקסט רגיל' });
+        showFiltered.label.hidden = parallelsFilter.mode !== PARALLEL_MODES.notes;
+        modes.body.appendChild(showFiltered.label);
+        modes.body.addEventListener('change', () => {
+            showFiltered.label.hidden = parallelsFilter.mode !== PARALLEL_MODES.notes;
+        });
+        root.appendChild(modes.section);
+    } else if (parallelsFilter.mode === PARALLEL_MODES.notes) {
+        // Nothing to switch, and nothing on screen would say why the margin is
+        // a list. Leave the reader's standing choice alone -- the dock falls
+        // back on its own (inNoteMode) and restores it on the way back.
+    }
 
     // --- works, grouped -----------------------------------------------------
     const works = parallelsFilterSection('חיבורים', { open: true });
