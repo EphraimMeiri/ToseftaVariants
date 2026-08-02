@@ -1221,6 +1221,28 @@ const PARALLELS_LAYER = {
                     showResting();
                     return;
                 }
+                // Note mode is asked for explicitly, so it wins over how the page
+                // happens to be laid out. It used to sit below the beside branch,
+                // which meant that with the parallels in the near margin the
+                // reader could tick "הערות מסורת התוספתא", watch nothing change,
+                // and reasonably conclude the mode showed citations. Beside-mode
+                // still owns the near margin; this is only the dock.
+                if (inNoteMode()) {
+                    const heading = addr.halakhah == null
+                        ? `פרק ${convert_number(addr.chapter + 1)}`
+                        : `פרק ${convert_number(addr.chapter + 1)}, הלכה ${addr.halakhah + 1}`;
+                    const chapterNotes = addr.halakhah == null
+                        ? apparatus.chapter(addr.chapter)
+                        : apparatus.forHalakhah(addr.chapter, addr.halakhah);
+                    const resolve = entryResolver(addr.chapter);
+                    panel.setNotes(chapterNotes, heading, texts, resolve, {
+                        note: apparatusFilterNote(chapterNotes, resolve),
+                        credit: apparatus.title
+                            ? `${apparatus.title} · ${apparatus.credit} · CC-BY`
+                            : '',
+                    });
+                    return;
+                }
                 // Beside-mode divides the list between the two margins by what
                 // can be placed. Every span-anchored parallel now has a home in
                 // the near column, level with the words it covers, so repeating
@@ -1242,22 +1264,6 @@ const PARALLELS_LAYER = {
                                 : '',
                             emptyText: 'כל המקבילות בפרק זה ממוקמות בטור שלצד הטקסט',
                         });
-                    return;
-                }
-                if (inNoteMode()) {
-                    const heading = addr.halakhah == null
-                        ? `פרק ${convert_number(addr.chapter + 1)}`
-                        : `פרק ${convert_number(addr.chapter + 1)}, הלכה ${addr.halakhah + 1}`;
-                    const chapterNotes = addr.halakhah == null
-                        ? apparatus.chapter(addr.chapter)
-                        : apparatus.forHalakhah(addr.chapter, addr.halakhah);
-                    const resolve = entryResolver(addr.chapter);
-                    panel.setNotes(chapterNotes, heading, texts, resolve, {
-                        note: apparatusFilterNote(chapterNotes, resolve),
-                        credit: apparatus.title
-                            ? `${apparatus.title} · ${apparatus.credit} · CC-BY`
-                            : '',
-                    });
                     return;
                 }
                 // List mode still borrows one thing from the apparatus: how it
