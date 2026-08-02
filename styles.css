@@ -1432,10 +1432,61 @@ body.manuscript-dock-open .main-content {
     scroll-margin-top: 68px;
     position: relative;
     display: flex;
+    /* Wraps so an apparatus band can take a full-width line under the columns
+       without either of them being restructured: the band is just a flex child
+       at 100%, and which register occupies the column above it is decided by
+       whoever put it there. */
+    flex-wrap: wrap;
     justify-content: space-between;
     padding-right: 36px;
     margin-bottom: 12px;
     gap: 20px;
+}
+
+/* The apparatus that is not holding the column beside the text. Same rule and
+   the same label treatment whichever register it is, because the arrangement is
+   the reader's choice and neither position is a demotion. */
+.apparatus-band {
+    width: 100%;
+    margin-top: 10px;
+    padding-top: 7px;
+    border-top: 1px solid #ece5d8;
+}
+
+.apparatus-band-label {
+    font-size: 0.72em;
+    letter-spacing: 0.04em;
+    color: #a2937c;
+    margin-bottom: 4px;
+}
+
+.apparatus-band-variants .variant-content {
+    width: 100%;
+}
+
+/* In the band the citations run as a wrapped row rather than a tall column:
+   below the text there is width to spare and no reason to make the halakhah
+   twice as tall as it needs to be. */
+.apparatus-band-parallels .parallel-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    margin-bottom: 4px;
+}
+
+.apparatus-band-parallels .parallel-group-title {
+    margin: 0;
+    flex: 0 0 auto;
+}
+
+.apparatus-band-parallels .parallel-row {
+    flex: 0 1 auto;
+}
+
+/* An opened passage needs the whole width back. */
+.apparatus-band-parallels .parallel-row.open {
+    flex: 1 1 100%;
 }
 
 .paragraph-number {
@@ -2620,23 +2671,6 @@ body.parallels-beside .variant-content {
     font-size: 0.7em;
     color: #a89880;
     margin-top: 2px;
-}
-
-.parallel-beside-apparatus {
-    margin-top: 6px;
-    font-size: 0.9em;
-}
-
-.parallel-beside-apparatus > summary {
-    cursor: pointer;
-    color: #8a7a63;
-    font-size: 0.85em;
-}
-
-.parallel-beside-apparatus .variant-content {
-    margin-top: 4px;
-    padding-inline-start: 10px;
-    border-inline-start: 2px solid #eee6d8;
 }
 
 /* Beside-mode reserves its gutter per subparagraph, not once for the halakhah:

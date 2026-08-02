@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="vendor/midrash-viewer-core/midrash-viewer-core.css?v=10">
-    <link rel="stylesheet" href="styles.css?v=23">
+    <link rel="stylesheet" href="styles.css?v=24">
     <title>תוספתא עם חילופי נוסח</title>
 </head>
 <body>
@@ -169,19 +169,17 @@
             </div><!-- /sidebar-pane-text -->
 
             <div class="sidebar-pane" id="sidebar-pane-parallels" role="tabpanel" hidden>
-                <!-- Subunit division belongs with the display options rather than
-                     in the parallels dock: it changes the reading text itself,
-                     which is the one thing the dock never does. -->
-                <section class="filters-section parallels-panel-options" id="parallels-options-panel"
-                          title="חלוקת ההלכה לתת־יחידות לפי ראשי המקבילות -- החלוקה להלכות נשארת כשהיתה">
-                    <div class="panel-title">תצוגה</div>
-                    <label><input type="checkbox" id="parallel-subunits"> חלוקה לתת־יחידות לפי המקבילות</label>
-                    <!-- Beside-mode gives the parallels the apparatus column: the
-                         halakhah is broken into subparagraphs at its own punctuation
-                         and each one's citations are listed level with it, opening
-                         into the parallel's text in place. The variants aren't lost
-                         -- they move to a collapsed block under the halakhah. -->
-                    <label title="רשימת המקבילות בטור שלצד הטקסט, ולחיצה על מקבילה פותחת את לשונה במקום; חילופי הנוסח עוברים לבלוק מתקפל מתחת להלכה"><input type="checkbox" id="parallel-beside"> המקבילות לצד הטקסט</label>
+                <!-- Both registers of the apparatus live in the halakhah they
+                     belong to. What the reader chooses is which of them holds the
+                     column level with the text: the other stacks in a band below
+                     it, in the same paragraph, always visible. Neither is hidden
+                     and neither is in a far margin -- that split is what this
+                     control replaced. -->
+                <section class="filters-section parallels-panel-options" id="parallels-options-panel">
+                    <div class="panel-title">לצד הטקסט</div>
+                    <label title="חילופי הנוסח בטור שלצד הטקסט, והמקבילות ברצועה שמתחת להלכה"><input type="radio" name="apparatus-beside" id="apparatus-beside-variants" value="variants" checked> חילופי נוסח</label>
+                    <label title="המקבילות בטור שלצד הטקסט, כל אחת בגובה המילים שהיא מכסה, ולחיצה פותחת את לשונה במקום; חילופי הנוסח עוברים לרצועה שמתחת להלכה"><input type="radio" name="apparatus-beside" id="apparatus-beside-parallels" value="parallels"> מקבילות</label>
+                    <label class="filter-parent" title="חלוקת ההלכה לתת־יחידות לפי ראשי המקבילות -- החלוקה להלכות נשארת כשהיתה"><input type="checkbox" id="parallel-subunits"> חלוקה לתת־יחידות לפי המקבילות</label>
                 </section>
 
                 <!-- Built from the loaded tractate's own parallels, so the rows
@@ -238,7 +236,7 @@
 
     <script src="vendor/midrash-viewer-core/midrash-viewer-core.js?v=10"></script>
     <script src="tosefta_parsing_tools.js?v=18"></script>
-    <script src="parallels_layer.js?v=20"></script>
+    <script src="parallels_layer.js?v=24"></script>
     <script src="viewer_layers.js?v=11"></script>
     <script>
         let currentTextData = null;
@@ -1082,7 +1080,7 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         // world from ctx, so it travels the same way rather than the layer
         // reaching into the DOM for a checkbox.
         parallelSubunits: document.getElementById('parallel-subunits').checked,
-        parallelsBeside: document.getElementById('parallel-beside').checked,
+        parallelsBeside: document.getElementById('apparatus-beside-parallels').checked,
     });
 
     // The parallels settings tab: rebuilt once per tractate load (not per
@@ -2000,17 +1998,22 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         viewer.setContext({ ...viewer.context, parallelSubunits: e.target.checked });
         applyInlineLayers();
     };
-    // Beside-mode moves rendered nodes -- the text into per-subunit rows, the
-    // apparatus into a collapsed block -- so unlike the other parallels options
-    // it can't be undone by re-decorating. A full re-render is the way back out.
-    document.getElementById('parallel-beside').onchange = (e) => {
-        document.body.classList.remove('parallels-beside');
-        // Context first, then the re-render: updateDisplay rebuilds the body and
-        // hands the layers whatever ctx currently says, so setting the flag
-        // afterwards would decorate this pass with the previous answer.
-        viewer.setContext({ ...viewer.context, parallelsBeside: e.target.checked });
-        refreshCurrentDisplay();
-    };
+    // Giving the column to the parallels moves rendered nodes -- the text into
+    // per-subunit rows, the variants into a band -- so unlike the other parallels
+    // options it can't be undone by re-decorating. A full re-render is the way
+    // back out, in either direction.
+    document.querySelectorAll('input[name="apparatus-beside"]').forEach(radio => {
+        radio.onchange = () => {
+            if (!radio.checked) return;
+            document.body.classList.remove('parallels-beside');
+            // Context first, then the re-render: updateDisplay rebuilds the body
+            // and hands the layers whatever ctx currently says, so setting the
+            // flag afterwards would decorate this pass with the previous answer.
+            viewer.setContext({ ...viewer.context,
+                                parallelsBeside: radio.value === 'parallels' });
+            refreshCurrentDisplay();
+        };
+    });
     ['vilna', 'lz'].forEach(key => {
         document.getElementById(`numbering-overlay-${key}`).onchange = (e) => {
             editionOverlayState[key] = e.target.checked;

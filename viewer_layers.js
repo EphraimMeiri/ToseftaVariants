@@ -517,18 +517,19 @@ function createToseftaViewer() {
 
     registry.register(MANUSCRIPT_LAYER);
     COMMENTARY_LAYERS.forEach(layer => registry.register(layer));
-    // Parallels come as a pair: the citation panel in the side dock and the
-    // extent bars inline in the reading column (see parallels_layer.js). Two
-    // layers, one nav button -- the grouping below already handles that.
-    registry.register(PARALLELS_LAYER);
+    // The parallels are one inline layer now, not a dock panel plus bars: the
+    // apparatus renders in the paragraph it belongs to, beside the text or in a
+    // band below it, and the extent bars are drawn over the same pass (see
+    // renderApparatusBands in parallels_layer.js).
     registry.register(PARALLEL_EXTENTS_LAYER);
-    // Clicking an extent bar has to raise the parallels tab, since the side dock
-    // is shared with the commentaries and may well be showing one of them.
+    // Clicking an extent bar used to have to raise the parallels tab out of the
+    // shared side dock. There is no tab to raise -- the citation is already on
+    // the page, next to the words -- so this only has to make sure the layer is
+    // on, and the focus channel does the rest.
     registry.showParallels = function () {
-        const dock = registry.dock('side');
-        if (!dock || !dock.layerIds.includes('parallels')) return;
-        dock.show();
-        dock.activate('parallels');
+        if (!registry.isEnabled('parallel-extents')) {
+            registry.setEnabled('parallel-extents', true);
+        }
     };
     wireParallelBarInteractions(document.getElementById('content-container'), {
         activate: () => registry.showParallels(),
