@@ -100,9 +100,6 @@
         <h1>מקבילות פנימיות בתוספתא</h1>
         <div class="header-controls">
             <nav class="research-nav">
-                <a href="research_variance.html">מדדי שוני בין העדים</a>
-                <a href="research_citations.html">היקף ציטוטי מקרא</a>
-                <a href="research_aggadah.html">סיווג קטעי אגדה</a>
                 <a href="index.html">האתר הראשי</a>
             </nav>
         </div>
@@ -637,12 +634,24 @@ function buildCombinedSynopsis(sides) {
     const [A, B] = sides;
     if (!A.tokens.length || !B.tokens.length) return null;
     const { opcodes } = alignDenseHe(A.tokens, B.tokens);
+    const shorterLen = Math.min(A.tokens.length, B.tokens.length);
 
     // columns: {ai, bi} local token indices (null when absent on that side)
     let cols = [];
     opcodes.forEach(([tag, i1, i2, j1, j2]) => {
         if (tag === 'equal') {
-            for (let k = 0; k < i2 - i1; k++) cols.push({ ai: i1 + k, bi: j1 + k, eq: true });
+            // A short run found by scanning a huge, unanchored window isn't
+            // evidence of anything -- two long Mishnaic legal texts on
+            // related topics will always share a scattered "אמ' ... אין ...
+            // יש" by sheer vocabulary overlap. Same qualifying rule as the
+            // textRun metric (generate_research_parallels_data.js): only
+            // paint a run green if it's a real line, or covers a real
+            // fraction of the shorter side -- else it's still shown (the
+            // words genuinely are identical) but not highlighted as if it
+            // were the meaningful overlap.
+            const runLen = i2 - i1;
+            const qualifies = runLen >= 5 || (shorterLen > 0 && runLen / shorterLen >= 0.4);
+            for (let k = 0; k < runLen; k++) cols.push({ ai: i1 + k, bi: j1 + k, eq: qualifies });
         } else {
             const n = Math.max(i2 - i1, j2 - j1);
             for (let k = 0; k < n; k++) {
@@ -845,6 +854,18 @@ async function openPair(idx) {
     const ctxB = sideCtx('B', p.b, dataB, spanB, hebLoc(p.b));
     if (!ctxA.chapterWitness || !ctxB.chapterWitness) {
         combinedEl.innerHTML = '<p class="cmb-missing-note">אין נתוני עדי נוסח לאחד משני המקומות — לא ניתן לבנות סינופסיס משולב.</p>';
+        return;
+    }
+    // No qualifying textual overlap at all (p.textRun, computed offline with
+    // the same rule buildCombinedSynopsis uses for its 'eq' highlighting) --
+    // an aligned table has nothing to anchor its clipping on and would
+    // render the two full, essentially unrelated spans in their entirety
+    // (seen on Nedarim ו:ה <-> ז:א-ח: 625 columns for a topical, not
+    // textual, parallel). Say so plainly instead; the full texts are already
+    // above.
+    if (!p.textRun) {
+        combinedEl.innerHTML = '<p class="cmb-missing-note">לא נמצאה חפיפת נוסח משמעותית בין שני המקומות — ' +
+            'ייתכן שזו מקבילה עניינית (אותו נושא) ולא טקסטואלית. ראו את הטקסט המלא של כל מקום למעלה.</p>';
         return;
     }
     const combined = buildCombinedSynopsis([ctxA, ctxB]);
