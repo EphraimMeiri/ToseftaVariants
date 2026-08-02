@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="vendor/midrash-viewer-core/midrash-viewer-core.css?v=10">
-    <link rel="stylesheet" href="styles.css?v=20">
+    <link rel="stylesheet" href="styles.css?v=21">
     <title>תוספתא עם חילופי נוסח</title>
 </head>
 <body>
@@ -68,6 +68,20 @@
     <div class="page-layout">
         <!-- Sidebar: filters -->
         <aside class="sidebar" id="sidebar">
+            <!-- Two settings pages, not one long scroll. The variants filters and
+                 the parallels filters are answers to different questions -- what
+                 counts as a meaningful difference between witnesses, and which
+                 of the parallel literature is worth citing here -- and stacking
+                 them buried whichever one the reader wasn't using. The parallels
+                 tab is hidden entirely for a tractate with no parallels data. -->
+            <div class="sidebar-tabs" role="tablist">
+                <button type="button" class="sidebar-tab active" role="tab"
+                        data-pane="sidebar-pane-text" aria-selected="true">נוסח</button>
+                <button type="button" class="sidebar-tab" role="tab" id="sidebar-tab-parallels"
+                        data-pane="sidebar-pane-parallels" aria-selected="false" hidden>מקבילות</button>
+            </div>
+
+            <div class="sidebar-pane active" id="sidebar-pane-text" role="tabpanel">
             <section class="filters-section sotah-panel" id="sotah-panel" hidden>
                 <div class="panel-title">תצוגת סוטה (כי״ע)</div>
                 <label><input type="radio" name="sotahMode" value="default" checked> רגיל</label>
@@ -85,22 +99,6 @@
                 <label><input type="checkbox" class="witness-strip-toggle" data-siglum="ל"> ל <span class="detail-count">(לונדון)</span></label>
                 <label><input type="checkbox" class="witness-strip-toggle" data-siglum="ג"> ג <span class="detail-count">(קטעי גניזה)</span></label>
                 <label><input type="checkbox" class="witness-strip-toggle" data-siglum="ש"> ש <span class="detail-count">(שוקן, קטעי)</span></label>
-            </section>
-
-            <!-- Subunit division belongs with the display options rather than in
-                 the parallels dock: it changes the reading text itself, which is
-                 the one thing the dock never does. Shown only where there is
-                 parallels data to divide by. -->
-            <section class="filters-section parallels-panel-options" id="parallels-options-panel" hidden
-                      title="חלוקת ההלכה לתת־יחידות לפי ראשי המקבילות -- החלוקה להלכות נשארת כשהיתה">
-                <div class="panel-title">מקבילות</div>
-                <label><input type="checkbox" id="parallel-subunits"> חלוקה לתת־יחידות לפי המקבילות</label>
-                <!-- Beside-mode gives the parallels the apparatus column: the
-                     halakhah is broken into subparagraphs at its own punctuation
-                     and each one's citations are listed level with it, opening
-                     into the parallel's text in place. The variants aren't lost
-                     -- they move to a collapsed block under the halakhah. -->
-                <label title="רשימת המקבילות בטור שלצד הטקסט, ולחיצה על מקבילה פותחת את לשונה במקום; חילופי הנוסח עוברים לבלוק מתקפל מתחת להלכה"><input type="checkbox" id="parallel-beside"> המקבילות לצד הטקסט</label>
             </section>
 
             <section class="filters-section numbering-panel" id="numbering-panel" hidden
@@ -135,7 +133,13 @@
                             </div>
                         </details>
 
-                        <label class="filter-parent"><input type="checkbox" id="hideMinorOrthography"> כתיב חלופי</label>
+                        <!-- Hidden by default: כתיב חלופי (מלא/חסר, ם/ן, קיצורים) and the
+                             known letter-swap pairs under חילופי אותיות are spelling, not
+                             readings. Leaving them on makes a page of apparatus out of
+                             orthography and buries the variants a reader came for; both
+                             rows untick in one click, and "הצג חילופים מוסתרים" brings
+                             them back marked. -->
+                        <label class="filter-parent"><input type="checkbox" id="hideMinorOrthography" checked> כתיב חלופי</label>
                         <div class="filter-children" data-parent="hideMinorOrthography">
                             <div class="detail-slot" data-category="minor_orthography"></div>
                         </div>
@@ -143,7 +147,7 @@
                         <div class="filter-children" data-parent="hideNameOrthography">
                             <div class="detail-slot" data-category="name_orthography"></div>
                         </div>
-                        <label class="filter-parent"><input type="checkbox" id="hideMinor"> חילופי אותיות</label>
+                        <label class="filter-parent"><input type="checkbox" id="hideMinor" checked> חילופי אותיות</label>
                         <div class="filter-children" data-parent="hideMinor">
                             <div class="detail-slot" data-category="minor"></div>
                         </div>
@@ -162,6 +166,29 @@
                     </div>
                 </details>
             </section>
+            </div><!-- /sidebar-pane-text -->
+
+            <div class="sidebar-pane" id="sidebar-pane-parallels" role="tabpanel" hidden>
+                <!-- Subunit division belongs with the display options rather than
+                     in the parallels dock: it changes the reading text itself,
+                     which is the one thing the dock never does. -->
+                <section class="filters-section parallels-panel-options" id="parallels-options-panel"
+                          title="חלוקת ההלכה לתת־יחידות לפי ראשי המקבילות -- החלוקה להלכות נשארת כשהיתה">
+                    <div class="panel-title">תצוגה</div>
+                    <label><input type="checkbox" id="parallel-subunits"> חלוקה לתת־יחידות לפי המקבילות</label>
+                    <!-- Beside-mode gives the parallels the apparatus column: the
+                         halakhah is broken into subparagraphs at its own punctuation
+                         and each one's citations are listed level with it, opening
+                         into the parallel's text in place. The variants aren't lost
+                         -- they move to a collapsed block under the halakhah. -->
+                    <label title="רשימת המקבילות בטור שלצד הטקסט, ולחיצה על מקבילה פותחת את לשונה במקום; חילופי הנוסח עוברים לבלוק מתקפל מתחת להלכה"><input type="checkbox" id="parallel-beside"> המקבילות לצד הטקסט</label>
+                </section>
+
+                <!-- Built from the loaded tractate's own parallels, so the rows
+                     and their counts differ per tractate: see
+                     renderParallelsFilterUI in parallels_layer.js. -->
+                <div id="parallels-filters"></div>
+            </div><!-- /sidebar-pane-parallels -->
         </aside>
 
         <!-- Perek/Halakha navigation -->
@@ -211,7 +238,7 @@
 
     <script src="vendor/midrash-viewer-core/midrash-viewer-core.js?v=10"></script>
     <script src="tosefta_parsing_tools.js?v=17"></script>
-    <script src="parallels_layer.js?v=8"></script>
+    <script src="parallels_layer.js?v=14"></script>
     <script src="viewer_layers.js?v=11"></script>
     <script>
         let currentTextData = null;
@@ -262,6 +289,22 @@
         sidebarToggleBtn.addEventListener('click', toggleSidebar);
         tocToggleBtn.addEventListener('click', toggleTocNav);
         sidebarOverlay.addEventListener('click', closeDrawers);
+
+        // --- Sidebar tabs ---
+        function showSidebarPane(paneId) {
+            document.querySelectorAll('.sidebar-tab').forEach(tab => {
+                const on = tab.dataset.pane === paneId;
+                tab.classList.toggle('active', on);
+                tab.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            document.querySelectorAll('.sidebar-pane').forEach(pane => {
+                pane.hidden = pane.id !== paneId;
+                pane.classList.toggle('active', pane.id === paneId);
+            });
+        }
+        document.querySelectorAll('.sidebar-tab').forEach(tab => {
+            tab.addEventListener('click', () => showSidebarPane(tab.dataset.pane));
+        });
 
         // --- Mobile bottom tab bar ---
         // Relocates the panel-toggle controls (sidebar, TOC, synopsis,
@@ -1040,6 +1083,22 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         parallelsBeside: document.getElementById('parallel-beside').checked,
     });
 
+    // The parallels settings tab: rebuilt once per tractate load (not per
+    // re-render -- the rows carry this tractate's own counts, and rebuilding
+    // them under the reader would also collapse whatever they had opened).
+    // Hidden altogether where there is nothing to filter, with the reader
+    // pushed back to the first tab so they aren't left staring at a blank pane.
+    const hasParallels = !!(parallelsData && parallelsData.chapters
+                            && Object.keys(parallelsData.chapters).length);
+    document.getElementById('sidebar-tab-parallels').hidden = !hasParallels;
+    if (hasParallels) {
+        renderParallelsFilterUI(document.getElementById('parallels-filters'),
+                                parallelsData, onParallelsFilterChange);
+    } else {
+        document.getElementById('parallels-filters').innerHTML = '';
+        showSidebarPane('sidebar-pane-text');
+    }
+
     const contentContainer = document.getElementById('content-container');
     const showHiddenCheckbox = document.getElementById('showHidden');
     const hideMinorOrthographyCheckbox = document.getElementById('hideMinorOrthography');
@@ -1452,9 +1511,6 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
             }
         });
         document.getElementById('numbering-panel').hidden = !anySchemeAvailable;
-        document.getElementById('parallels-options-panel').hidden =
-            !(parallelsData && parallelsData.chapters
-              && Object.keys(parallelsData.chapters).length);
 
         textArray.forEach((textPerek, perekIndex) => {
             const chapterWitness = hasWitnessData ? witnessData.chapters[perekIndex] : null;
@@ -1869,6 +1925,21 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         });
     }
     refreshInlineLayers = applyInlineLayers;
+
+    // A filter change alters which parallels exist, so far as every consumer is
+    // concerned. The dock panel re-answers its own selection (it subscribes to
+    // the filter directly, so it keeps the reader's place); the gutter bars have
+    // to be redrawn, since lane packing is computed over the survivors. In
+    // beside-mode the parallels are the page layout -- rows of text built around
+    // them -- and that can only be rebuilt from the top.
+    function onParallelsFilterChange() {
+        if (viewer.context.parallelsBeside) {
+            document.body.classList.remove('parallels-beside');
+            updateDisplay();
+        } else {
+            applyInlineLayers();
+        }
+    }
 
     // Initial display
     updateDisplay();

@@ -109,6 +109,195 @@ function parallelColor(entry) {
 // Reading rank, for the margin list: the order PARALLEL_GROUPS is written in.
 const PARALLEL_GROUP_RANK = new Map(PARALLEL_GROUPS.map((g, i) => [g.id, i]));
 
+// Hebrew names for the individual works. Only the midrash group actually needs
+// them -- everywhere else the group IS the work -- but a fallback to the raw
+// English string means a work added upstream shows up named after itself rather
+// than not at all.
+const PARALLEL_WORK_NAMES = {
+    'Mishnah': 'משנה',
+    'Bavli': 'תלמוד בבלי',
+    'Yerushalmi': 'תלמוד ירושלמי',
+    'Tosefta': 'תוספתא',
+    'Tanakh': 'מקרא',
+    'Sifra': 'ספרא',
+    'Sifre Bamidbar (Kahana)': 'ספרי במדבר',
+    'Sifrei Devarim': 'ספרי דברים',
+    'Mekhilta DeRabbi Yishmael': 'מכילתא דר\' ישמעאל',
+    'Midrash Rabbah': 'מדרש רבה',
+    'Pesikta DeRav Kahana': 'פסיקתא דרב כהנא',
+    'Avot DeRabbi Natan': 'אבות דר\' נתן',
+    'Seder Olam': 'סדר עולם',
+};
+
+function parallelWorkName(work) {
+    return PARALLEL_WORK_NAMES[work] || work;
+}
+
+
+// Sources that are an apparatus TO the Tosefta -- printed at a particular
+// passage of it, so that each of their citations has a near end and a far end.
+// Only Lieberman's מסורת התוספתא is one today; everything else here is either a
+// link graph with no printed locus at all (Sefaria) or an apparatus to some
+// other work that happens to cite us (מסורת הש"ס, מסורת הספרא), where "which
+// end is this" is not a question that arises. The builder records the near end
+// as `apparatusHome`; this list is what makes its absence meaningful.
+const PARALLEL_HOME_BEARING_SOURCES = new Set(['lieberman_tosefta_apparatus']);
+
+// A citation that reaches this passage only as the far end of a note printed on
+// another one -- Lieberman writing "see Tosefta Chullin" in Bava Kamma, which
+// arrives here looking exactly like an apparatus note on Chullin. It is a real
+// parallel and stays by default; it is simply not this tractate's apparatus, and
+// mistaking the two is what makes Lieberman look like he annotated Kodashim.
+// An entry that any other source also vouches for is not far-end-only: the
+// Sefaria link stands on its own regardless of where Lieberman printed his note.
+function parallelIsFarEndOnly(entry) {
+    const sources = entry.sources || [];
+    if (!sources.length) return false;
+    const home = entry.apparatusHome || [];
+    return sources.every(s => PARALLEL_HOME_BEARING_SOURCES.has(s) && !home.includes(s));
+}
+
+
+// --- reader-side filtering --------------------------------------------------
+// Which parallels are worth seeing is a question about the reader's task, not
+// about the data. Someone tracing a halakhah through the two Talmuds does not
+// want four hundred Sifra citations in the margin; someone checking what
+// Lieberman himself cited does not want an OCR'd masoret hashas voting
+// alongside him. So the filter carries the four axes that actually separate one
+// citation from another -- which work it points at, who says so, how precisely
+// it is placed, and how many independent sources agree.
+//
+// State is stored by EXCLUSION rather than inclusion, so that a work or a source
+// added upstream tomorrow shows by default instead of vanishing because nobody
+// had ticked a box that did not exist when the reader last touched this panel.
+//
+// The filter is global rather than per-tractate: a reader who has switched the
+// Bavli off means it, and having it come back on every tractate switch would be
+// a bug, not a courtesy.
+function createParallelsFilter() {
+    const subscribers = new Set();
+    const state = {
+        groups: new Set(),      // excluded group ids
+        works: new Set(),       // excluded work names
+        sources: new Set(),     // excluded source slugs
+        precisions: new Set(),  // excluded precision levels
+        // Axis keys the reader has decided about themselves ("sources:slug").
+        // A per-tractate default may set an axis on load, but only until the
+        // reader touches it -- after that the default stops second-guessing them.
+        touched: new Set(),
+        minSources: 1,          // corroboration floor
+        soloSource: null,       // show only what this source itself cites
+        hideCompare: false,     // drop the ועיין / השווה cross-references
+        hideBacklinks: false,   // drop notes printed on some other passage
+    };
+    let version = 0;
+
+    function notify() {
+        version++;
+        subscribers.forEach(fn => {
+            try { fn(); } catch (err) { console.error(err); }
+        });
+    }
+
+    return {
+        get version() { return version; },
+        state,
+        subscribe(fn) { subscribers.add(fn); return () => subscribers.delete(fn); },
+        changed: notify,
+
+        excluded(axis, key) { return state[axis].has(key); },
+        touch(axis, key) { state.touched.add(`${axis}:${key}`); },
+        touched(axis, key) { return state.touched.has(`${axis}:${key}`); },
+        setExcluded(axis, key, excluded) {
+            const set = state[axis];
+            state.touched.add(`${axis}:${key}`);
+            if (excluded ? set.has(key) : !set.has(key)) return;
+            if (excluded) set.add(key); else set.delete(key);
+            notify();
+        },
+        get minSources() { return state.minSources; },
+        set minSources(n) {
+            if (state.minSources === n) return;
+            state.minSources = n;
+            notify();
+        },
+        get soloSource() { return state.soloSource; },
+        set soloSource(slug) {
+            if (state.soloSource === (slug || null)) return;
+            state.soloSource = slug || null;
+            notify();
+        },
+        get hideCompare() { return state.hideCompare; },
+        set hideCompare(on) {
+            if (state.hideCompare === !!on) return;
+            state.hideCompare = !!on;
+            notify();
+        },
+        get hideBacklinks() { return state.hideBacklinks; },
+        set hideBacklinks(on) {
+            if (state.hideBacklinks === !!on) return;
+            state.hideBacklinks = !!on;
+            notify();
+        },
+        // "הצג הכל" means all of it, including whatever a per-tractate default
+        // switched off -- so the defaults are marked decided rather than merely
+        // cleared, or the very next render would put them straight back.
+        reset() {
+            ['groups', 'works', 'sources', 'precisions'].forEach(a => state[a].clear());
+            PARALLEL_HOME_BEARING_SOURCES.forEach(s => state.touched.add(`sources:${s}`));
+            state.minSources = 1;
+            state.soloSource = null;
+            state.hideCompare = false;
+            state.hideBacklinks = false;
+            notify();
+        },
+        get active() {
+            return state.groups.size || state.works.size || state.sources.size
+                || state.precisions.size || state.minSources > 1 || state.soloSource
+                || state.hideCompare || state.hideBacklinks;
+        },
+
+        // Excluding a source means "this alone doesn't convince me", not "erase
+        // everything it ever touched": a citation the excluded source shares
+        // with Lieberman is still Lieberman's citation, so an entry survives as
+        // long as one source still standing vouches for it. Its corroboration
+        // count is judged on the survivors for the same reason.
+        //
+        // soloSource is the opposite question, and so is a separate axis rather
+        // than "exclude all the others": it asks to see one apparatus as its
+        // editor left it -- Lieberman's מסורת התוספתא and nothing else, with the
+        // later editions, the OCR'd masoret hashas and Sefaria's link graph all
+        // out of the way. Excluding by name could never express that, because
+        // the list of others is open-ended.
+        //
+        // And it asks for the apparatus ON this passage: `apparatusHome` names
+        // the sources whose note is actually printed here, as against the far
+        // end of a note printed somewhere else, which arrives carrying the same
+        // source name. Solo mode requires home, because a reader asking for
+        // Lieberman's apparatus on this halakhah does not mean "a Bava Kamma
+        // note that happens to mention this halakhah". hideBacklinks applies the
+        // same test without narrowing to one source.
+        matches(entry) {
+            if (state.groups.has(entry.group)) return false;
+            if (state.works.has(entry.work)) return false;
+            if (state.precisions.has(entry.precision)) return false;
+            if (state.hideCompare && entry.compare) return false;
+            if (state.hideBacklinks && parallelIsFarEndOnly(entry)) return false;
+            const home = entry.apparatusHome || [];
+            const sources = entry.sources || [];
+            if (state.soloSource && !home.includes(state.soloSource)) return false;
+            const kept = state.sources.size
+                ? sources.filter(s => !state.sources.has(s))
+                : sources;
+            if (sources.length && !kept.length) return false;
+            const count = kept.length || entry.numSources || 1;
+            return count >= state.minSources;
+        },
+    };
+}
+
+const parallelsFilter = createParallelsFilter();
+
 
 // --- focus channel ----------------------------------------------------------
 // The panel and the gutter bars are separate layers in separate DOM subtrees and
@@ -166,18 +355,27 @@ function assignParallelLanes(entries) {
 function createParallelsIndex(parallelsData, textData) {
     const cache = new Map();
 
+    // Cached per chapter AND per filter version: the reader's filter changes
+    // which entries exist as far as everything downstream is concerned, and
+    // lanes have to be re-packed against the survivors -- switching the Bavli
+    // off should narrow the gutter, not leave its lane standing empty.
     function chapter(chapterIndex) {
-        if (!cache.has(chapterIndex)) {
-            const raw = (parallelsData.chapters || {})[String(chapterIndex)] || [];
+        const key = `${chapterIndex}:${parallelsFilter.version}`;
+        if (!cache.has(key)) {
+            // Stale versions are dead weight -- a reader ticking through a dozen
+            // works would otherwise accumulate a dozen copies of every chapter.
+            if (cache.size > 32) cache.clear();
+            const raw = ((parallelsData.chapters || {})[String(chapterIndex)] || [])
+                .filter(e => parallelsFilter.matches(e));
             // Entries arrive sorted by position from the builder; re-sorting here
             // keeps the lane assignment correct even if that ever changes.
             const entries = raw.slice().sort((a, b) =>
                 a.baseIdx - b.baseIdx || a.endIdx - b.endIdx || a.ref.localeCompare(b.ref));
             const spans = entries.filter(e => e.precision === 'span');
             const { lanes, laneCount } = assignParallelLanes(spans);
-            cache.set(chapterIndex, { entries, spans, lanes, laneCount });
+            cache.set(key, { entries, spans, lanes, laneCount });
         }
-        return cache.get(chapterIndex);
+        return cache.get(key);
     }
 
     return {
@@ -580,8 +778,16 @@ const PARALLELS_LAYER = {
         }
         showResting();
 
-        return {
+        // The filter changes what the list contains without changing what the
+        // reader is looking at, so the panel re-answers the selection it already
+        // has rather than being reset through setContext -- which would drop the
+        // reader back to "click a word" on every ticked box.
+        let lastAddr = null;
+        const unsubscribeFilter = parallelsFilter.subscribe(() => api.select(lastAddr));
+
+        const api = {
             select(addr) {
+                lastAddr = addr;
                 if (!index || !addr || addr.chapter == null) {
                     showResting();
                     return;
@@ -638,10 +844,12 @@ const PARALLELS_LAYER = {
             },
             setContext(next) {
                 setCtx(next);
+                lastAddr = null;
                 showResting();
             },
-            destroy() { panel.destroy(); },
+            destroy() { unsubscribeFilter(); panel.destroy(); },
         };
+        return api;
     },
 };
 
@@ -1550,3 +1758,324 @@ parallelsFocus.subscribe((entryId) => {
         }
     });
 });
+
+
+// --- filter panel -----------------------------------------------------------
+// The sidebar's parallels tab. Built from the loaded tractate rather than from a
+// fixed list, and every row carries its count, because which works and which
+// apparatus sources appear varies enormously between tractates: Zeraim's
+// parallels are Yerushalmi and Mishnah almost throughout, Taharot's are Sifra.
+// A row for a work with no citations here would be a control that does nothing.
+//
+// Polarity is checked = shown, the opposite of the variants sidebar (where the
+// labels read "hide X"). The labels here are the names of works, and a ticked
+// box beside "תלמוד בבלי" can only sensibly mean the Bavli is in.
+
+function parallelsFilterCounts(parallelsData) {
+    const groups = new Map();   // groupId -> { count, works: Map }
+    const sources = new Map();
+    const home = new Map();     // source -> citations printed ON this tractate
+    const precisions = new Map();
+    let total = 0;
+    let compare = 0;
+    let farEnd = 0;
+    Object.values((parallelsData && parallelsData.chapters) || {}).forEach(entries => {
+        entries.forEach(e => {
+            total++;
+            if (!groups.has(e.group)) groups.set(e.group, { count: 0, works: new Map() });
+            const g = groups.get(e.group);
+            g.count++;
+            g.works.set(e.work, (g.works.get(e.work) || 0) + 1);
+            precisions.set(e.precision, (precisions.get(e.precision) || 0) + 1);
+            (e.sources || []).forEach(s => sources.set(s, (sources.get(s) || 0) + 1));
+            (e.apparatusHome || []).forEach(s => home.set(s, (home.get(s) || 0) + 1));
+            if (e.compare) compare++;
+            if (parallelIsFarEndOnly(e)) farEnd++;
+        });
+    });
+    return { groups, sources, home, precisions, total, compare, farEnd };
+}
+
+function parallelsFilterRow(labelText, count, checked, onToggle, opts = {}) {
+    const label = document.createElement('label');
+    if (opts.className) label.className = opts.className;
+    if (opts.title) label.title = opts.title;
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = checked;
+    box.onchange = () => onToggle(box.checked);
+    label.appendChild(box);
+    label.appendChild(document.createTextNode(' ' + labelText));
+    if (count != null) {
+        const c = document.createElement('span');
+        c.className = 'detail-count';
+        c.textContent = `(${count})`;
+        label.appendChild(c);
+    }
+    label.dataset.filterRow = '1';
+    return { label, box };
+}
+
+function parallelsFilterSection(title, opts = {}) {
+    const section = document.createElement('section');
+    section.className = 'filters-section';
+    const details = document.createElement('details');
+    if (opts.open) details.open = true;
+    const summary = document.createElement('summary');
+    summary.textContent = title;
+    const body = document.createElement('div');
+    body.className = 'filter-body';
+    details.append(summary, body);
+    section.appendChild(details);
+    return { section, body };
+}
+
+// Renders the whole filter side of the parallels tab into `root`. Called on
+// every tractate load: the state lives in parallelsFilter and outlives the DOM,
+// so a work switched off stays off across the switch even when the new tractate
+// happens not to cite it.
+let parallelsFilterStatusUnsub = null;
+
+// An apparatus to the Tosefta is only evidence about the tractate its editor
+// actually edited. Lieberman's מסורת התוספתא stops after Bava Batra, and the
+// citations of his that surface in Kodashim and Taharot are all far ends of
+// notes printed in the volumes he did edit -- true parallels, but shown under
+// his name they read as an apparatus he never wrote there. So a home-bearing
+// source is off by default in any tractate where `apparatusHome` never names it,
+// and on everywhere it does. The row stays in the list with its count, and the
+// status line plus the reset button say that something is being held back.
+//
+// Per tractate but not sticky-per-tractate: this only fires while the reader has
+// left the source alone. One click on the row -- in either direction -- and the
+// default stops overriding them, here and in every tractate after.
+function applyParallelsTractateDefaults(counts) {
+    let changed = false;
+    PARALLEL_HOME_BEARING_SOURCES.forEach(slug => {
+        if (parallelsFilter.touched('sources', slug)) return;
+        if (!counts.sources.has(slug)) return;
+        const edits = (counts.home.get(slug) || 0) > 0;
+        const excluded = parallelsFilter.excluded('sources', slug);
+        if (edits === !excluded) return;
+        parallelsFilter.state.sources[edits ? 'delete' : 'add'](slug);
+        changed = true;
+    });
+    return changed;
+}
+
+function renderParallelsFilterUI(root, parallelsData, onChange) {
+    // One live status subscriber at a time: this is re-run on every tractate
+    // load and on reset, and a subscriber per run would keep the discarded DOM
+    // alive along with it.
+    if (parallelsFilterStatusUnsub) parallelsFilterStatusUnsub();
+    parallelsFilterStatusUnsub = null;
+    root.innerHTML = '';
+    if (!parallelsData || !parallelsData.chapters) return;
+    const counts = parallelsFilterCounts(parallelsData);
+    if (!counts.total) return;
+    // Before the rows are drawn, so they show the state they describe. Only the
+    // version bump is needed here -- this runs during a tractate load, ahead of
+    // the render that reads the filter -- so onChange stays out of it.
+    if (applyParallelsTractateDefaults(counts)) parallelsFilter.changed();
+
+    const notify = () => { parallelsFilter.changed(); if (onChange) onChange(); };
+
+    // --- works, grouped -----------------------------------------------------
+    const works = parallelsFilterSection('חיבורים', { open: true });
+    PARALLEL_GROUPS.forEach(group => {
+        const info = counts.groups.get(group.id);
+        if (!info) return;
+        const row = parallelsFilterRow(group.label, info.count,
+            !parallelsFilter.excluded('groups', group.id),
+            checked => {
+                parallelsFilter.state.groups[checked ? 'delete' : 'add'](group.id);
+                children.classList.toggle('disabled', !checked);
+                notify();
+            },
+            { className: 'filter-parent' });
+        // A swatch, so the sidebar row and the gutter bar it governs are
+        // recognisably the same thing.
+        const swatch = document.createElement('span');
+        swatch.className = 'parallel-filter-swatch';
+        swatch.style.background = group.color;
+        row.label.insertBefore(swatch, row.label.childNodes[1]);
+        works.body.appendChild(row.label);
+
+        // Only the midrash group is more than one work; elsewhere the group row
+        // already IS the work, and a lone child repeating its parent's name
+        // would be noise.
+        const children = document.createElement('div');
+        children.className = 'filter-children';
+        if (info.works.size > 1) {
+            [...info.works.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .forEach(([work, n]) => {
+                    const child = parallelsFilterRow(parallelWorkName(work), n,
+                        !parallelsFilter.excluded('works', work),
+                        checked => {
+                            parallelsFilter.state.works[checked ? 'delete' : 'add'](work);
+                            notify();
+                        });
+                    children.appendChild(child.label);
+                });
+            children.classList.toggle('disabled', parallelsFilter.excluded('groups', group.id));
+            works.body.appendChild(children);
+        }
+    });
+    root.appendChild(works.section);
+
+    // --- who says so --------------------------------------------------------
+    const sources = parallelsFilterSection('מקור הציון', { open: true });
+    const note = document.createElement('div');
+    note.className = 'filter-note';
+    note.textContent = 'ציון שכל מקורותיו כבויים לא יוצג; ציון שנתמך גם במקור פעיל יישאר.';
+    // Read one apparatus as its editor left it. Lieberman's מסורת התוספתא is
+    // the one that earns a switch of its own: it is the only source here that
+    // is a scholarly apparatus to THIS text rather than a link graph or another
+    // edition's masoret, and "what did Lieberman himself cite here" is a
+    // question readers ask constantly. It is a mode rather than a shortcut for
+    // unticking the others -- see soloSource in createParallelsFilter -- and
+    // while it is on the individual source rows have nothing left to say.
+    const soloSlug = 'lieberman_tosefta_apparatus';
+    let soloRow = null;
+    const perSource = document.createElement('div');
+    perSource.className = 'filter-children';
+    // Offered only where Lieberman actually IS an apparatus, which the data now
+    // states rather than implies: `apparatusHome` counts the citations whose note
+    // is printed on a passage of THIS tractate, and it is zero for every tractate
+    // after Bava Batra, where his edition stops. The few citations of his that do
+    // appear there are the far ends of notes printed in the volumes he did edit,
+    // and they stay in the per-source list like any other source.
+    const soloCount = counts.home.get(soloSlug) || 0;
+    const soloCovers = soloCount > 0;
+    // Still drawn when the mode is on but this tractate is out of the edition's
+    // range, because a reader who switched it on in Berakhot and paged into
+    // Chullin would otherwise meet an empty margin with nothing on screen saying
+    // why, and no way back short of the reset.
+    if (soloCovers || parallelsFilter.soloSource === soloSlug) {
+        soloRow = parallelsFilterRow(
+            `רק ${PARALLEL_SOURCE_NAMES[soloSlug]}`, soloCount,
+            parallelsFilter.soloSource === soloSlug,
+            checked => {
+                parallelsFilter.soloSource = checked ? soloSlug : null;
+                perSource.classList.toggle('disabled', checked);
+                notify();
+            },
+            { className: 'filter-parent',
+              title: 'רק הציונים שליברמן עצמו מביא במסורת התוספתא, בלי מהדורות מאוחרות, מסורת הש"ס וקישורי ספריא' });
+        sources.body.appendChild(soloRow.label);
+    }
+    perSource.appendChild(note);
+    [...counts.sources.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([slug, n]) => {
+            // Off by default here, and the row is the only place that can say so.
+            const offByDefault = PARALLEL_HOME_BEARING_SOURCES.has(slug)
+                && !(counts.home.get(slug) > 0);
+            const row = parallelsFilterRow(PARALLEL_SOURCE_NAMES[slug] || slug, n,
+                !parallelsFilter.excluded('sources', slug),
+                checked => {
+                    parallelsFilter.touch('sources', slug);
+                    parallelsFilter.state.sources[checked ? 'delete' : 'add'](slug);
+                    notify();
+                },
+                offByDefault ? { title: 'מהדורת ליברמן אינה כוללת מסכת זו; הציונים שלו המגיעים לכאן הם צדן השני של הערות שנדפסו במסכתות שערך, ולכן הם כבויים כברירת מחדל' } : {});
+            perSource.appendChild(row.label);
+        });
+    perSource.classList.toggle('disabled', !!parallelsFilter.soloSource);
+    // The per-source list is long -- sixteen editions in Berakhot -- and is the
+    // fine adjustment, not the common case. It folds away behind the one switch
+    // most readers actually want, which stays visible.
+    if (soloRow) {
+        const collapse = document.createElement('details');
+        collapse.className = 'filter-collapse';
+        collapse.open = parallelsFilter.state.sources.size > 0;
+        const summary = document.createElement('summary');
+        summary.textContent = 'סינון לפי מקור';
+        collapse.append(summary, perSource);
+        sources.body.appendChild(collapse);
+    } else {
+        sources.body.appendChild(perSource);
+    }
+    root.appendChild(sources.section);
+
+    // --- how well placed, how well attested ---------------------------------
+    const quality = parallelsFilterSection('דיוק ומהימנות');
+    Object.keys(PARALLEL_PRECISION_LABELS).forEach(precision => {
+        const n = counts.precisions.get(precision);
+        if (!n) return;
+        const row = parallelsFilterRow(PARALLEL_PRECISION_LABELS[precision], n,
+            !parallelsFilter.excluded('precisions', precision),
+            checked => {
+                parallelsFilter.state.precisions[checked ? 'delete' : 'add'](precision);
+                notify();
+            },
+            { title: precision === 'span'
+                ? 'המקבילות היחידות שמסומן להן היקף בטקסט'
+                : 'ציון שהיקפו לא נמדד -- מוצג ברשימה בלבד' });
+        quality.body.appendChild(row.label);
+    });
+    const corroborated = parallelsFilterRow('רק ציונים שיותר ממקור אחד מציין', null,
+        parallelsFilter.minSources > 1,
+        checked => { parallelsFilter.state.minSources = checked ? 2 : 1; notify(); },
+        { title: 'מסנן את הציונים שמופיעים במהדורה אחת בלבד' });
+    quality.body.appendChild(corroborated.label);
+    root.appendChild(quality.section);
+
+    // --- what kind of note it is --------------------------------------------
+    // Two distinctions the editions themselves draw, which the merge used to
+    // flatten: a passage an editor calls parallel versus one he only sends you
+    // to compare (ועיין / השווה), and a note printed here versus the far end of
+    // a note printed on another passage. Both hide rather than show, matching
+    // the variants sidebar's polarity, because both are "don't show me X" rather
+    // than a choice among works. Each row appears only where it would do
+    // something -- most tractates have a handful of each, some have none.
+    if (counts.compare || counts.farEnd) {
+        const kind = parallelsFilterSection('סוג ההערה');
+        if (counts.compare) {
+            const row = parallelsFilterRow('הסתר הפניות "ועיין"', counts.compare,
+                parallelsFilter.hideCompare,
+                checked => { parallelsFilter.hideCompare = checked; notify(); },
+                { className: 'filter-parent',
+                  title: 'ציונים שכל מקורותיהם ציינו אותם כהשוואה (ועיין, והשווה) ולא כמקבילה' });
+            kind.body.appendChild(row.label);
+        }
+        if (counts.farEnd) {
+            const row = parallelsFilterRow('הסתר ציונים מהערה במקום אחר', counts.farEnd,
+                parallelsFilter.hideBacklinks,
+                checked => { parallelsFilter.hideBacklinks = checked; notify(); },
+                { className: 'filter-parent',
+                  title: 'ציונים שהגיעו לכאן מן הצד השני של הערה שנדפסה על קטע אחר -- למשל הערה בבבא קמא המפנה לתוספתא חולין' });
+            kind.body.appendChild(row.label);
+        }
+        root.appendChild(kind.section);
+    }
+
+    // --- status -------------------------------------------------------------
+    const status = document.createElement('div');
+    status.className = 'status-bar';
+    root.appendChild(status);
+
+    const reset = document.createElement('button');
+    reset.type = 'button';
+    reset.className = 'parallels-filter-reset';
+    reset.textContent = 'הצג הכל';
+    reset.onclick = () => {
+        parallelsFilter.reset();
+        renderParallelsFilterUI(root, parallelsData, onChange);
+        if (onChange) onChange();
+    };
+    root.appendChild(reset);
+
+    function updateStatus() {
+        const shown = Object.values(parallelsData.chapters)
+            .reduce((n, entries) => n + entries.filter(e => parallelsFilter.matches(e)).length, 0);
+        status.innerHTML = shown === counts.total
+            ? `מוצגות כל <strong>${counts.total}</strong> המקבילות במסכת`
+            : `מוצגות <strong>${shown}</strong> מתוך <strong>${counts.total}</strong> מקבילות במסכת`;
+        reset.hidden = !parallelsFilter.active;
+    }
+    updateStatus();
+    // The status line answers to the state, not to the click that changed it --
+    // the reset button and a future keyboard shortcut go through the same path.
+    parallelsFilterStatusUnsub = parallelsFilter.subscribe(updateStatus);
+}

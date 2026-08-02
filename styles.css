@@ -591,6 +591,108 @@ body.sidebar-collapsed .sidebar-toggle {
     margin-top: 6px;
 }
 
+/* --- Sidebar tabs ---
+   Two settings pages in one sidebar: the variants filters and the parallels
+   filters. Styled as a segmented strip rather than as document tabs, because
+   the pane below them is a stack of bordered filter boxes and a second row of
+   borders butting into it read as clutter. */
+.sidebar-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    padding: 3px;
+    background: #f2eee7;
+    border: 1px solid #e0dbd4;
+    border-radius: 6px;
+}
+
+.sidebar-tab {
+    flex: 1;
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: #6b5b47;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.sidebar-tab:hover {
+    background: #e7e1d7;
+}
+
+.sidebar-tab.active {
+    background: #fff;
+    color: #3a2e20;
+    box-shadow: 0 1px 2px rgba(58, 46, 32, 0.12);
+}
+
+/* A single visible tab is not a choice -- it's a label with a border around
+   it. Only shown once the tractate has parallels to filter. */
+.sidebar-tabs:has(.sidebar-tab[hidden]) {
+    display: none;
+}
+
+/* Parallels filter panel (sidebar, second tab) */
+.parallels-panel-options .panel-title {
+    font-weight: 600;
+    font-size: 0.9em;
+    margin-bottom: 4px;
+    color: #3a2e20;
+}
+
+.parallels-panel-options {
+    margin-bottom: 10px;
+}
+
+/* Ties the sidebar row to the gutter bar it governs: same colour, same
+   meaning. 4px is what a bar gets, so that's what the swatch gets. */
+.parallel-filter-swatch {
+    display: inline-block;
+    width: 4px;
+    height: 12px;
+    border-radius: 1px;
+    flex-shrink: 0;
+}
+
+.filters-section .filter-note {
+    font-size: 0.76em;
+    line-height: 1.4;
+    color: #8b7d6b;
+    margin-bottom: 4px;
+    white-space: normal;
+}
+
+/* The filter rows carry work names and source names, which are longer than the
+   sigla the variants panel deals in -- they wrap rather than overflow. */
+.filters-section label[data-filter-row] {
+    white-space: normal;
+    align-items: flex-start;
+    line-height: 1.35;
+}
+
+.filters-section label[data-filter-row] input[type="checkbox"] {
+    margin-top: 2px;
+}
+
+.parallels-filter-reset {
+    font-family: inherit;
+    font-size: 0.8em;
+    color: #6b5b47;
+    background: #fff;
+    border: 1px solid #d8d2c8;
+    border-radius: 4px;
+    padding: 4px 10px;
+    cursor: pointer;
+}
+
+.parallels-filter-reset:hover {
+    background: #f0ece4;
+}
+
 /* Witness-transcription panel (sidebar) */
 .witness-panel .panel-title {
     font-weight: 600;
