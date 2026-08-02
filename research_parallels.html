@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="vendor/midrash-viewer-core/midrash-viewer-core.css">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+    <title>מקבילות פנימיות בתוספתא</title>
+    <script src="vendor/midrash-viewer-core/midrash-viewer-core.js"></script>
+    <script src="tosefta_parsing_tools.js"></script>
+    <!-- viewer_layers.js is included for its top-level helpers only
+         (resolveManuscriptEntry, SIGLUM_TO_WITNESS_SLUG, WITNESS_HEB_LABEL);
+         createToseftaViewer is never called here. -->
+    <script src="viewer_layers.js"></script>
+    <script src="research_parallels_data.js"></script>
+    <style>
+        .research-nav a { margin-inline-start: 12px; }
+        .intro-card p { margin: 6px 0; line-height: 1.7; }
+        td.num, th.num { text-align: center; font-variant-numeric: tabular-nums; }
+        h2.card-title { font-size: 1.15em; margin: 0 0 10px; }
+        .anchor-cell { font-family: 'Noto Serif Hebrew', serif; }
+        .pair-link { cursor: pointer; color: #1c5a7a; text-decoration: underline; }
+        .filter-note { font-size: 0.8em; color: #6b5b47; margin: 4px 0 0; line-height: 1.5; }
+        .tier-strong { color: #1a7a3c; font-weight: bold; }
+        .tier-partial { color: #1c5a7a; }
+        .tier-weak { color: #a06a1c; }
+        .tier-single-source { color: #888; }
+
+        /* ---- detail view: two parallel columns, apparatus in the outer
+                margin of each (side A is the right column in RTL, so its
+                margin is the grid's first track; side B mirrors it) ---- */
+        #detail-card { scroll-margin-top: 70px; }
+        .detail-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: start; }
+        @media (max-width: 1000px) { .detail-columns { grid-template-columns: 1fr; } }
+        .detail-side { border: 1px solid #e0d5c5; border-radius: 8px; padding: 12px 14px; background: #fffdf9; min-width: 0;
+                       display: grid; column-gap: 12px; row-gap: 10px; align-content: start; }
+        .detail-side[data-side="A"] { grid-template-columns: minmax(130px, 2fr) 5fr; }
+        .detail-side[data-side="B"] { grid-template-columns: 5fr minmax(130px, 2fr); }
+        .detail-side-head { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; border-bottom: 2px solid #e0d5c5; padding-bottom: 6px; }
+        .detail-side-head h3 { margin: 0; font-size: 1.15em; }
+        .detail-side-head a { font-size: 0.8em; }
+        .hal-body { min-width: 0; }
+        .hal-body .text-content { margin: 0; }
+        .margin-apparatus { font-size: 0.76em; line-height: 1.55; color: #5a4632; min-width: 0;
+                            border-top: 1px dotted #d8c9b0; padding-top: 3px; align-self: start; }
+        .margin-apparatus .note-sep { color: #b8a888; }
+        .detail-meta { font-size: 0.82em; color: #6b5b47; margin: 0 0 12px; }
+        #detail-close { float: left; }
+        .par-span { background: #fdf3d8; box-shadow: 0 0 0 1px #f0e0b0; border-radius: 2px; }
+
+        /* ---- bottom row: combined synopsis + manuscript pane ---- */
+        /* Same .bottom-panels split as the main viewer (flexbox gives a lone
+           visible panel the full row, 50/50 when both are open), but taller
+           than its 42vh and drag-resizable: the handle sets --bottom-h. */
+        :root { --bottom-h: 55vh; }
+        .synopsis-footer, .bottom-panels .dock-region { max-height: none; height: var(--bottom-h); }
+        body.synopsis-footer-open .main-content { padding-bottom: calc(var(--bottom-h) + 16px); }
+        @media (min-width: 901px) {
+            body.synopsis-footer-open .sidebar { height: calc(100vh - 60px - var(--bottom-h)); }
+        }
+        .bottom-resize-handle { position: absolute; top: -5px; left: 0; right: 0; height: 10px;
+                                cursor: ns-resize; z-index: 10; touch-action: none; }
+        .bottom-resize-handle::after { content: ''; display: block; margin: 4px auto 0; width: 56px;
+                                       height: 4px; border-radius: 2px; background: #c9bda4; }
+        .bottom-resize-handle:hover::after, .bottom-resize-handle.dragging::after { background: #8a5a2b; }
+        .ms-pane-body { flex: 1 1 auto; min-height: 38vh; overflow: hidden; display: flex; flex-direction: column; }
+        .ms-pane-body .mvc-ms { flex: 1 1 auto; min-height: 0; }
+        #ms-pane .mvc-ms {
+            --mvc-accent: #8a5a2b; --mvc-border: #ddcdb4; --mvc-bg: #fffdf9;
+            --mvc-fg: #5a4632; --mvc-muted: #a89880; --mvc-box: #d1453a;
+        }
+        .cmb-table td.synw[data-base-idx] { cursor: pointer; }
+        .synopsis-footer-header .cmb-legend { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .synopsis-footer-label { white-space: nowrap; }
+        .cmb-scroll { overflow-x: auto; }
+        .cmb-table td.cmb-group-label { background: #efe6d6; font-weight: bold; font-size: 1.02em; text-align: right; padding: 4px 10px; border-bottom: 1px solid #d8c9b0; }
+        .cmb-table td.cmb-group-label span { position: sticky; right: 10px; display: inline-block; }
+        /* border between the two location blocks */
+        .cmb-table tr.cmb-group-start td { border-top: 3px double #b8a888; }
+        .cmb-table td.cmb-flagged { border-top: 3px solid #c2571a !important; }
+        /* Base-row cells where both sides land on the identical word -- the
+           literal, word-for-word textual overlap, as opposed to columns the
+           aligner merely lined up. */
+        .cmb-table td.synw.cmb-eq { background: #dcefe0; }
+        .cmb-legend { font-size: 0.78em; color: #6b5b47; line-height: 1.5; }
+        .cmb-legend .cmb-flag-demo { border-top: 3px solid #c2571a; padding: 0 6px; }
+        .cmb-legend .cmb-eq-demo { background: #dcefe0; padding: 0 6px; }
+        .cmb-missing-note { color: #a33; font-size: 0.85em; padding: 8px 0; }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <h1>מקבילות פנימיות בתוספתא</h1>
+        <div class="header-controls">
+            <nav class="research-nav">
+                <a href="research_variance.html">מדדי שוני בין העדים</a>
+                <a href="research_citations.html">היקף ציטוטי מקרא</a>
+                <a href="research_aggadah.html">סיווג קטעי אגדה</a>
+                <a href="index.html">האתר הראשי</a>
+            </nav>
+        </div>
+    </header>
+
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="פתח/סגור סרגל צד">☰</button>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <div class="page-layout">
+        <aside class="sidebar" id="sidebar">
+            <section class="filters-section">
+                <div class="filter-body">
+                    <strong>רמת ביסוס:</strong>
+                    <label class="filter-parent"><input type="checkbox" class="tier-cb" value="strong" checked> חזקה</label>
+                    <label class="filter-parent"><input type="checkbox" class="tier-cb" value="partial" checked> חלקית</label>
+                    <label class="filter-parent"><input type="checkbox" class="tier-cb" value="weak" checked> חלשה</label>
+                    <label class="filter-parent"><input type="checkbox" class="tier-cb" value="single-source"> מקור יחיד</label>
+                </div>
+                <div class="filter-body">
+                    <label class="filter-parent"><input type="checkbox" id="sameTractateOnly"> רק בתוך אותה מסכת</label>
+                    <label class="filter-parent"><input type="checkbox" id="reciprocalOnly"> רק מקבילות דו־כיווניות</label>
+                    <label class="filter-parent"><input type="checkbox" id="withSpanOnly"> רק עם טווח מילים מדויק</label>
+                    <label class="filter-parent"><input type="checkbox" id="oneSidedOnly"> רק עם חילוף חד־צדדי<br>
+                        <small>(מחלוקת עדים במקום אחד בלבד)</small></label>
+                </div>
+                <div class="filter-body">
+                    <label class="filter-parent" for="minTextRun">רצף מילים זהה של לפחות:
+                        <input type="number" id="minTextRun" min="0" value="0" style="width:3.5em"></label>
+                    <p class="filter-note">מבדיל מקבילות טקסטואליות מעניניות — ראו הסבר למטה.</p>
+                </div>
+                <div class="masechet-selector">
+                    <label for="masechet-dropdown">מסכת (אחד משני הצדדים):</label>
+                    <select id="masechet-dropdown">
+                        <option value="">כל המסכתות</option>
+                    </select>
+                </div>
+                <section class="filters-section">
+                    <div class="status-bar">
+                        מוצגות <strong><span id="visible-count">0</span></strong> מקבילות מתוך <strong><span id="total-count">0</span></strong>
+                    </div>
+                </section>
+            </section>
+        </aside>
+
+        <div class="main-content">
+            <section class="card intro-card">
+                <h2 class="card-title">השוואת חילופי נוסח בין מקבילות פנימיות</h2>
+                <p>עמוד זה מציג צמדי מקומות בתוספתא שבהם עוברת אותה מסורת (על פי שכבת המקבילות של האתר),
+                   ומאפשר להשוות את <strong>חילופי הנוסח</strong> בין שני המופעים: מקרים שבהם קריאה השנויה
+                   במחלוקת עדים במקום אחד מופיעה פה אחד במקום האחר — או להפך.</p>
+                <p>בחירת שורה בטבלה פותחת תצוגה מפורטת: שני המופעים בטורים מקבילים, האפרט של כל
+                   אחד בשוליים החיצוניים שלו, ובתחתית המסך (בגובה הניתן לגרירה) <strong>סינופסיס
+                   משולב</strong> שמערים את שורות העדים משני המקומות על עמודות מיושרות מילה־מול־מילה,
+                   לצד <strong>חלונית כתבי היד</strong> — לחיצה על מילה בסינופסיס מציגה אותה בכתב היד המתאים.</p>
+                <p class="filter-note">רמת הביסוס והדיוק נלקחות משכבת המקבילות; "מקור יחיד" פירושו שרק מלקט
+                   אחד ציין את המקבילה. טווח מילים מדויק קיים רק ברשומות ברמת דיוק של רצף מילים או דיבור המתחיל.</p>
+                <p class="filter-note">רמת הביסוס אינה אומרת דבר על חפיפת הנוסח עצמו — היא מודדת כמה מקורות
+                   מסכימים שיש כאן מקבילה, לא כמה מהלשון משותפת בפועל. עמודת <strong>"רצף זהה"</strong> מודדת
+                   זאת ישירות: אורך הרצף הארוך ביותר של מילים זהות שנמצא בין שני המקומות, גם אם הוא רק שורה
+                   אחת בתוך הלכה ארוכה בהרבה. רוב הצמדים ברשימה הם קרבה עניינית (אותו נושא) בלי חפיפת לשון של
+                   ממש; המספר הזה מפריד בין השניים.</p>
+            </section>
+
+            <section class="card" id="detail-card" hidden>
+                <button type="button" id="detail-close" title="סגור">✕ סגירה</button>
+                <h2 class="card-title" id="detail-title"></h2>
+                <p class="detail-meta" id="detail-meta"></p>
+                <div class="detail-columns" id="detail-list"></div>
+            </section>
+
+            <section class="card">
+                <h2 class="card-title">צמדי המקבילות</h2>
+                <p class="filter-note">לחיצה על שורה פותחת את ההשוואה. הקישורים בעמודות המקום פותחים את האתר הראשי.</p>
+                <table id="pairs-table" class="display" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>מקום א</th>
+                            <th>מקום ב</th>
+                            <th class="num" title="אורך טווח המקבילה במילים (הצד הקצר)">אורך</th>
+                            <th class="num" title="הרצף הארוך ביותר של מילים זהות בין שני המקומות — מדד לחפיפה טקסטואלית ולא רק עניינית">רצף זהה</th>
+                            <th class="num">ביסוס</th>
+                            <th class="num">דיוק</th>
+                            <th class="num">דו־כיווני</th>
+                            <th class="num" title="עמדות שבהן העדים חלוקים במקום אחד בלבד">חד־צדדי</th>
+                            <th>תחילת הקטע</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </section>
+        </div>
+    </div>
+
+    <!-- Fixed bottom panel for the combined synopsis — same chrome as the
+         main viewer's synopsis footer, but alone on the row (no manuscript
+         dock here) and taller, since it stacks two locations' witness rows. -->
+    <div class="bottom-panels" id="bottom-panels">
+        <div class="bottom-resize-handle" id="bottom-resize" hidden title="גררו לשינוי גובה"></div>
+        <div class="synopsis-footer" id="cmb-footer" hidden>
+            <div class="synopsis-footer-header">
+                <span id="cmb-footer-label" class="synopsis-footer-label">סינופסיס משולב</span>
+                <span class="cmb-legend"><span class="cmb-flag-demo">עמודה מסומנת</span> = חילוף בעדים
+                    רק באחד המקומות · <span class="cmb-eq-demo">רקע ירקרק</span> = מילה זהה בשני המקומות ·
+                    ⟨ ⟩ = חסר בעד</span>
+                <button type="button" id="cmb-footer-close" class="synopsis-footer-close" title="סגור">✕</button>
+            </div>
+            <div class="synopsis-footer-body" id="combined-synopsis"></div>
+        </div>
+        <div class="dock-region" id="ms-pane" hidden>
+            <div class="synopsis-footer-header">
+                <span class="synopsis-footer-label" id="ms-pane-label">כתב יד</span>
+                <span class="cmb-legend">לחצו על מילה בסינופסיס (או בגוף הטקסט) להצגת המילה בכתב היד</span>
+                <button type="button" id="ms-pane-close" class="synopsis-footer-close" title="סגור">✕</button>
+            </div>
+            <div class="ms-pane-body" id="ms-pane-body"></div>
+        </div>
+    </div>
+
+<script>
+'use strict';
+
+function escapeHtml(text) {
+    return String(text ?? "")
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+const sidebarEl = document.getElementById('sidebar');
+document.getElementById('sidebar-toggle').addEventListener('click', () => {
+    sidebarEl.classList.toggle('open');
+    document.getElementById('sidebar-overlay').classList.toggle('visible');
+});
+document.getElementById('sidebar-overlay').addEventListener('click', () => {
+    sidebarEl.classList.toggle('open');
+    document.getElementById('sidebar-overlay').classList.toggle('visible');
+});
+
+const PAIRS = window.INTERNAL_PARALLELS;
+const HEB = window.INTERNAL_PARALLELS_HEB;
+const TIER_HEBREW = {
+    'strong': '<span class="tier-strong">חזקה</span>',
+    'partial': '<span class="tier-partial">חלקית</span>',
+    'weak': '<span class="tier-weak">חלשה</span>',
+    'single-source': '<span class="tier-single-source">מקור יחיד</span>',
+};
+const PRECISION_HEBREW = { span: 'רצף מילים', dh: 'ד״ה', halakhah: 'הלכה', chapter: 'פרק' };
+
+function hebLoc(side) {
+    const name = HEB[side.tr] || side.tr;
+    let ref = `${convert_number(side.ch + 1)}:${convert_number(side.h + 1)}`;
+    if (side.endH > side.h) ref += `–${convert_number(side.endH + 1)}`;
+    return `${name} ${ref}`;
+}
+function findLocation(eng) {
+    return locations.find(l => decodeURIComponent(l).endsWith('Tosefta ' + eng));
+}
+function viewerLink(side) {
+    const loc = findLocation(side.tr);
+    return loc ? `index.html?masechet=${loc}#hal-${side.ch}-${side.h}` : null;
+}
+
+// --- Tractate dropdown ---
+const masechetDropdown = document.getElementById('masechet-dropdown');
+[...new Set(PAIRS.flatMap(p => [p.a.tr, p.b.tr]))].sort().forEach(eng => {
+    const opt = document.createElement('option');
+    opt.value = eng;
+    opt.textContent = HEB[eng] || eng;
+    masechetDropdown.appendChild(opt);
+});
+
+// --- Pairs table ---
+function placeCell(side) {
+    const link = viewerLink(side);
+    const label = escapeHtml(hebLoc(side));
+    return link ? `${label} <a href="${link}" target="_blank" title="פתח באתר הראשי">↗</a>` : label;
+}
+const pairRows = PAIRS.map((p, i) => [
+    placeCell(p.a),
+    placeCell(p.b),
+    p.len || 0,
+    p.textRun || 0,
+    TIER_HEBREW[p.tier] || escapeHtml(p.tier),
+    escapeHtml(String(p.precision).split('/').map(x => PRECISION_HEBREW[x] || x).join(' / ')),
+    p.reciprocal ? '✓' : '',
+    p.oneSided == null ? -1 : p.oneSided,
+    `<span class="anchor-cell">${escapeHtml(p.anchor || '')}</span>`,
+]);
+const pairsTable = $('#pairs-table').DataTable({
+    data: pairRows,
+    pageLength: 50,
+    order: [[3, 'desc']],
+    columnDefs: [
+        { targets: [2, 3, 4, 5, 6, 7], className: 'num' },
+        // oneSided: -1 stands for "no witness data on one side" — sortable as
+        // a number, displayed as a dash
+        { targets: 7, render: (data, type) => type === 'display' && data < 0 ? '—' : data },
+    ],
+    language: {
+        search: 'חיפוש:',
+        lengthMenu: 'הצג _MENU_ שורות',
+        info: 'מציג _START_–_END_ מתוך _TOTAL_',
+        infoFiltered: '(מסונן מתוך _MAX_ שורות)',
+        paginate: { first: 'ראשון', last: 'אחרון', next: 'הבא', previous: 'הקודם' },
+        emptyTable: 'לא נמצאו נתונים',
+        zeroRecords: 'לא נמצאו שורות תואמות'
+    }
+});
+
+$.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+    if (settings.nTable.id !== 'pairs-table') return true;
+    const p = PAIRS[dataIndex];
+    if (!p) return true;
+    const tiers = new Set([...document.querySelectorAll('.tier-cb:checked')].map(cb => cb.value));
+    if (!tiers.has(p.tier)) return false;
+    if (document.getElementById('sameTractateOnly').checked && p.a.tr !== p.b.tr) return false;
+    if (document.getElementById('reciprocalOnly').checked && !p.reciprocal) return false;
+    if (document.getElementById('withSpanOnly').checked && !p.a.span && !p.b.span) return false;
+    if (document.getElementById('oneSidedOnly').checked && !(p.oneSided > 0)) return false;
+    const minTextRun = Number(document.getElementById('minTextRun').value) || 0;
+    if (minTextRun > 0 && (p.textRun || 0) < minTextRun) return false;
+    const selected = masechetDropdown.value;
+    if (selected && p.a.tr !== selected && p.b.tr !== selected) return false;
+    return true;
+});
+
+function applyFilters() {
+    pairsTable.draw();
+    const info = pairsTable.page.info();
+    document.getElementById('visible-count').textContent = info.recordsDisplay;
+    document.getElementById('total-count').textContent = info.recordsTotal;
+}
+document.querySelectorAll('.tier-cb, #sameTractateOnly, #reciprocalOnly, #withSpanOnly, #oneSidedOnly, #minTextRun')
+    .forEach(el => el.addEventListener('change', applyFilters));
+document.getElementById('minTextRun').addEventListener('input', applyFilters);
+masechetDropdown.addEventListener('change', applyFilters);
+applyFilters();
+
+// Row click -> open detail (ignore clicks on the ↗ external links)
+$('#pairs-table tbody').on('click', 'tr', function (e) {
+    if (e.target.closest('a')) return;
+    const rowData = pairsTable.row(this).data();
+    if (!rowData) return;
+    const idx = pairRows.indexOf(rowData);
+    if (idx >= 0) openPair(idx);
+});
+
+// ==================================================================
+// Detail view
+// ==================================================================
+
+const tractateCache = {};
+async function loadTractate(eng) {
+    if (tractateCache[eng]) return tractateCache[eng];
+    const loc = findLocation(eng);
+    if (!loc) throw new Error('unknown tractate ' + eng);
+    const promise = Promise.all([
+        getToseftaText(loc), getToseftavariants(loc), getWitnessAlignment(loc),
+        Promise.all(MANUSCRIPT_WITNESS_SLUGS.map(slug =>
+            getManuscriptImageData(loc, slug).then(d => [slug, d]))),
+    ]).then(([textData, variantsData, witnessData, msEntries]) => {
+        const wordIndexByChapter = textData.text.map(perek => computeChapterWordIndex(perek));
+        const manuscriptDataBySlug = Object.fromEntries(msEntries.filter(([, d]) => d));
+        return { textData, variantsData, witnessData, wordIndexByChapter, manuscriptDataBySlug };
+    });
+    tractateCache[eng] = promise;
+    return promise;
+}
+
+// --- manuscript pane --------------------------------------------------------
+// One shared midrash-viewer-core panel; which location's image data to read
+// comes from the click (each side block / synopsis row carries data-side).
+const msSides = {};          // side key -> { data, side } set by openPair
+let msPanel = null;
+function ensureMsPanel() {
+    if (msPanel) return msPanel;
+    let activeSide = 'A';
+    msPanel = MidrashViewerCore.createManuscriptPanel({
+        root: document.getElementById('ms-pane-body'),
+        showFolioLabel: false,
+        labels: {
+            noSelection: 'לחצו על מילה בסינופסיס המשולב או בגוף הטקסט כדי להציג את כתב היד',
+            noData: (w) => `אין נתוני כתב יד עבור ${w} במסכת זו`,
+            noChapter: (w) => `אין עדיין נתוני כתב יד לפרק זה ב${w}`,
+            notFound: (w) => `המילה לא זוהתה ב${w} במיקום זה`,
+            approxNote: 'המילה המדויקת לא זוהתה בכתב היד — מוצגת המילה המזוהה הקרובה ביותר',
+        },
+        adapter: {
+            resolve(witnessSlug, addr) {
+                const witnessLabel = WITNESS_HEB_LABEL[witnessSlug] || witnessSlug;
+                const ctx = msSides[activeSide];
+                const bySlug = ctx && ctx.data.manuscriptDataBySlug;
+                const data = bySlug && bySlug[witnessSlug];
+                const resolved = resolveManuscriptEntry(bySlug, witnessSlug, addr.chapter, addr.baseIdx);
+                if (resolved.status === 'no-data' || resolved.status === 'no-chapter') {
+                    return { status: resolved.status, witnessLabel };
+                }
+                const word = resolved.word;
+                const page = word && data.pages && data.pages[String(word.page)];
+                if (!word || !word.bbox || !page) return { status: 'not-found', witnessLabel };
+                return {
+                    status: resolved.status,
+                    page,
+                    bbox: MidrashViewerCore.bbox.fromXYXY(word.bbox),
+                    folio: word.page,
+                    witnessLabel,
+                };
+            },
+        },
+    });
+    msPanel.showWord = function (sideKey, siglum, baseIdx) {
+        const ctx = msSides[sideKey];
+        const witnessSlug = witnessSlugForSynopsisSiglum(siglum);
+        if (!ctx || !witnessSlug || baseIdx == null) return;
+        activeSide = sideKey;
+        const witnessLabel = WITNESS_HEB_LABEL[witnessSlug] || witnessSlug;
+        document.getElementById('ms-pane-label').textContent =
+            `${witnessLabel} — ${hebLoc(ctx.side)}`;
+        msPanel.select(
+            MidrashViewerCore.address.makeAddress(ctx.side.tr, ctx.side.ch, ctx.side.h, baseIdx),
+            { witnessId: witnessSlug });
+    };
+    return msPanel;
+}
+
+// Chapter-wide base token stream, tokenized identically to
+// computeChapterWordIndex (markers become separators before tag-stripping).
+function chapterTokens(textPerek) {
+    const out = [];
+    textPerek.forEach(hal => {
+        const clean = String(hal || '').replace(MARKER_SPLIT_RE, ' ');
+        out.push(...tokenizeHe(clean));
+    });
+    return out;
+}
+
+// Effective inclusive [start, end] chapter-wide token span for one side.
+function sideSpan(side, wordIndex) {
+    if (side.span) return side.span;
+    const startH = wordIndex.ranges[side.h];
+    const endH = wordIndex.ranges[Math.min(side.endH, wordIndex.ranges.length - 1)];
+    return [startH[0], endH[1] - 1];
+}
+
+// --- One side: body + apparatus + per-location synopsis ---
+function renderSide(sideKey, side, data, span) {
+    const { textData, variantsData, witnessData, wordIndexByChapter } = data;
+    const container = document.createElement('div');
+    container.className = 'detail-side';
+    container.dataset.side = sideKey;
+
+    const head = document.createElement('div');
+    head.className = 'detail-side-head';
+    const link = viewerLink(side);
+    head.innerHTML = `<h3>${escapeHtml(hebLoc(side))}</h3>` +
+        (link ? `<a href="${link}" target="_blank">פתח באתר הראשי ↗</a>` : '');
+    container.appendChild(head);
+
+    const perek = textData.text[side.ch];
+    const varsPerek = (variantsData.text[side.ch]) || [];
+    if (!perek) {
+        container.insertAdjacentHTML('beforeend', '<p class="cmb-missing-note">הפרק לא נמצא בנתוני הטקסט.</p>');
+        return container;
+    }
+    const wordIndex = wordIndexByChapter[side.ch];
+    const masechet = (variantsData.title || '').split('Variants on ')[1] || side.tr;
+    const chapterIsKiy = isKiyChapter(varsPerek);
+
+    // grid rows: header is row 1; each halakhah takes one row with the body
+    // in the inner track and its apparatus beside it in the outer margin
+    const bodyCol = sideKey === 'A' ? 2 : 1;
+    const marginCol = sideKey === 'A' ? 1 : 2;
+    let gridRow = 2;
+
+    const lastH = Math.min(side.endH, perek.length - 1);
+    for (let hi = side.h; hi <= lastH; hi++) {
+        const bodyCell = document.createElement('div');
+        bodyCell.className = 'hal-body';
+        bodyCell.style.gridColumn = bodyCol;
+        bodyCell.style.gridRow = gridRow;
+        bodyCell.innerHTML = `<span class="paragraph-number">${hi + 1}</span>`;
+
+        // body
+        const body = document.createElement('p');
+        body.className = 'text-content';
+        let supIndex = 0;
+        body.innerHTML = String(perek[hi] || '').replace(
+            /<i data-commentator="Variants" data-label="([^"]+)" data-order="\d+"><\/i>(\S+)?/g,
+            (m, label, lemma) => {
+                const idx = (supIndex++) + (chapterIsKiy ? 1 : 0);
+                const noteId = `${sideKey}-n-${side.ch}-${hi}-${idx}`;
+                return `<sup class="note-ref" data-note-id="${noteId}">${label}</sup>` + (lemma || '');
+            });
+        annotateWordsWithBaseIdx(body, wordIndex.ranges[hi][0]);
+        bodyCell.appendChild(body);
+
+        // apparatus, beside the body in the outer margin
+        const app = document.createElement('div');
+        app.className = 'margin-apparatus';
+        app.style.gridColumn = marginCol;
+        app.style.gridRow = gridRow;
+        (varsPerek[hi] || []).forEach((note, idx) => {
+            const noteId = `${sideKey}-n-${side.ch}-${hi}-${idx}`;
+            if (typeof note !== 'string') return;
+            if (!note.includes('|')) {
+                app.innerHTML += `<span class="note-span" data-note-id="${noteId}"><sup>*</sup> ${note}</span> `;
+                return;
+            }
+            const parsed = parseNote3(note, [masechet, side.ch, hi]);
+            if (!Array.isArray(parsed) || parsed.length < 2) {
+                app.innerHTML += `<span class="note-span" data-note-id="${noteId}"><sup>*</sup> ${note}</span> `;
+                return;
+            }
+            const [sv, vars, affirming] = parsed;
+            let svFrag = `<b>${sv[0]}${sv[1] ? ' ' + sv[1] : ''}</b>`;
+            if (affirming) svFrag += ` <span class="note-affirming">כ׳׳ה ${affirming}.</span>`;
+            const parts = vars.map(([w, t]) =>
+                `<span class="variant-reading" data-witnesses="${w}"><span class="variant">${w}</span>&nbsp;${t}</span>`);
+            app.innerHTML += `<span class="note-span" data-note-id="${noteId}">${svFrag} | ${parts.join(' ')}</span>` +
+                `<span class="note-sep">․</span> `;
+        });
+        container.appendChild(bodyCell);
+        container.appendChild(app);
+        gridRow++;
+    }
+
+    // highlight the parallel span (body words)
+    container.querySelectorAll('[data-base-idx]').forEach(el => {
+        const i = Number(el.dataset.baseIdx);
+        if (i >= span[0] && i <= span[1]) el.classList.add('par-span');
+    });
+
+    // note-ref <-> note-span highlight (scoped to this location block), and
+    // body-word clicks drive both the combined synopsis and the ms pane.
+    container.addEventListener('click', e => {
+        const el = e.target.closest('[data-note-id]');
+        if (el) {
+            const id = el.dataset.noteId;
+            container.querySelectorAll('.highlight').forEach(x => x.classList.remove('highlight'));
+            container.querySelectorAll(`[data-note-id="${id}"]`).forEach(x => x.classList.add('highlight'));
+        }
+        const w = e.target.closest('.body-word');
+        if (w) {
+            const combined = document.getElementById('combined-synopsis');
+            combined.querySelectorAll('.synw-active').forEach(x => x.classList.remove('synw-active'));
+            combined.querySelectorAll(
+                `tr[data-side="${sideKey}"] td[data-base-idx="${w.dataset.baseIdx}"]`)
+                .forEach(x => x.classList.add('synw-active'));
+            // the base text is Vienna, so a witness-neutral click shows וינה
+            ensureMsPanel().showWord(sideKey, 'בסיס', Number(w.dataset.baseIdx));
+        }
+    });
+    return container;
+}
+
+// Affine-gap (Gotoh) aligner. tosefta_parsing_tools' alignSequencesHe is an
+// LCS: its score depends only on the match count, so when a word could pair
+// with either of two identical tokens it has no reason to prefer the one that
+// keeps the aligned block contiguous (e.g. #p=2045, where צבור jumped 13
+// columns past its run). A gap-OPEN penalty breaks exactly that tie in favor
+// of the denser alignment. Same opcode shape as alignSequencesHe.
+function alignDenseHe(a, b, eqFn) {
+    eqFn = eqFn || wordsMatchHe;
+    const n = a.length, m = b.length;
+    const MATCH = 4, MISMATCH = -1, GAP_OPEN = -3, GAP_EXT = -0.25, NEG = -1e9;
+    // M: a[i-1] paired with b[j-1]; X: gap in b (a-only); Y: gap in a (b-only)
+    const M = [], X = [], Y = [];
+    for (let i = 0; i <= n; i++) {
+        M.push(new Float64Array(m + 1).fill(NEG));
+        X.push(new Float64Array(m + 1).fill(NEG));
+        Y.push(new Float64Array(m + 1).fill(NEG));
+    }
+    M[0][0] = 0;
+    for (let i = 1; i <= n; i++) X[i][0] = GAP_OPEN + GAP_EXT * (i - 1);
+    for (let j = 1; j <= m; j++) Y[0][j] = GAP_OPEN + GAP_EXT * (j - 1);
+    for (let i = 1; i <= n; i++) {
+        for (let j = 1; j <= m; j++) {
+            const s = eqFn(a[i - 1], b[j - 1]) ? MATCH : MISMATCH;
+            M[i][j] = s + Math.max(M[i - 1][j - 1], X[i - 1][j - 1], Y[i - 1][j - 1]);
+            X[i][j] = Math.max(M[i - 1][j] + GAP_OPEN, X[i - 1][j] + GAP_EXT, Y[i - 1][j] + GAP_OPEN);
+            Y[i][j] = Math.max(M[i][j - 1] + GAP_OPEN, Y[i][j - 1] + GAP_EXT, X[i][j - 1] + GAP_OPEN);
+        }
+    }
+    // traceback from the best terminal state
+    let i = n, j = m;
+    let state = 'M';
+    if (X[n][m] >= M[n][m] && X[n][m] >= Y[n][m]) state = 'X';
+    else if (Y[n][m] > M[n][m]) state = 'Y';
+    const steps = []; // 'M' pair | 'X' a-only | 'Y' b-only, reversed
+    while (i > 0 || j > 0) {
+        if (state === 'M') {
+            const s = eqFn(a[i - 1], b[j - 1]) ? MATCH : MISMATCH;
+            const prev = M[i][j] - s;
+            steps.push('M'); i--; j--;
+            state = (Math.abs(prev - M[i][j]) < 1e-6) ? 'M'
+                : (Math.abs(prev - X[i][j]) < 1e-6) ? 'X' : 'Y';
+        } else if (state === 'X') {
+            const cur = X[i][j];
+            steps.push('X'); i--;
+            state = (i === 0 && j === 0) ? 'M'
+                : (Math.abs(cur - (M[i][j] + GAP_OPEN)) < 1e-6) ? 'M'
+                : (Math.abs(cur - (X[i][j] + GAP_EXT)) < 1e-6) ? 'X' : 'Y';
+        } else {
+            const cur = Y[i][j];
+            steps.push('Y'); j--;
+            state = (i === 0 && j === 0) ? 'M'
+                : (Math.abs(cur - (M[i][j] + GAP_OPEN)) < 1e-6) ? 'M'
+                : (Math.abs(cur - (Y[i][j] + GAP_EXT)) < 1e-6) ? 'Y' : 'X';
+        }
+        if (i === 0 && j > 0) state = 'Y';
+        if (j === 0 && i > 0) state = 'X';
+    }
+    steps.reverse();
+    // steps -> opcodes ([tag, i1, i2, j1, j2]); M-runs split into equal/replace
+    const opcodes = [];
+    let ai = 0, bi = 0;
+    for (const st of steps) {
+        let tag, di = 0, dj = 0;
+        if (st === 'M') { tag = eqFn(a[ai], b[bi]) ? 'equal' : 'replace'; di = dj = 1; }
+        else if (st === 'X') { tag = 'delete'; di = 1; }
+        else { tag = 'insert'; dj = 1; }
+        const last = opcodes[opcodes.length - 1];
+        if (last && last[0] === tag) { last[2] += di; last[4] += dj; }
+        else opcodes.push([tag, ai, ai + di, bi, bi + dj]);
+        ai += di; bi += dj;
+    }
+    return { opcodes };
+}
+
+// --- Combined, word-aligned synopsis ---
+function buildCombinedSynopsis(sides) {
+    // sides: [{side, data, span, tokens, chapterWitness, sigla, label}]
+    const [A, B] = sides;
+    if (!A.tokens.length || !B.tokens.length) return null;
+    const { opcodes } = alignDenseHe(A.tokens, B.tokens);
+
+    // columns: {ai, bi} local token indices (null when absent on that side)
+    let cols = [];
+    opcodes.forEach(([tag, i1, i2, j1, j2]) => {
+        if (tag === 'equal') {
+            for (let k = 0; k < i2 - i1; k++) cols.push({ ai: i1 + k, bi: j1 + k, eq: true });
+        } else {
+            const n = Math.max(i2 - i1, j2 - j1);
+            for (let k = 0; k < n; k++) {
+                cols.push({
+                    ai: i1 + k < i2 ? i1 + k : null,
+                    bi: j1 + k < j2 ? j1 + k : null,
+                });
+            }
+        }
+    });
+
+    // When one side is much longer (halakhah-precision vs a short span), LCS
+    // scatters spurious one-word matches over the long side. Clip the table
+    // to the densest cluster of genuinely equal columns (gap <= 20), plus a
+    // little context, when that meaningfully shrinks it. Full context remains
+    // in the per-location synopses above.
+    const eqIdx = cols.map((c, i) => c.eq ? i : -1).filter(i => i >= 0);
+    if (eqIdx.length) {
+        const clusters = [];
+        let cur = { from: eqIdx[0], to: eqIdx[0], count: 1 };
+        for (let k = 1; k < eqIdx.length; k++) {
+            if (eqIdx[k] - cur.to <= 20) { cur.to = eqIdx[k]; cur.count++; }
+            else { clusters.push(cur); cur = { from: eqIdx[k], to: eqIdx[k], count: 1 }; }
+        }
+        clusters.push(cur);
+        const best = clusters.reduce((a, b) => (b.count > a.count ? b : a));
+        const MARGIN = 8;
+        const from = Math.max(0, best.from - MARGIN);
+        const to = Math.min(cols.length, best.to + 1 + MARGIN);
+        if (to - from < 0.7 * cols.length) cols = cols.slice(from, to);
+    }
+
+    // per-column dispute status per side: does any non-null witness word
+    // differ from the base token? (omissions/gaps excluded to reduce noise)
+    function disputed(S, li) {
+        if (li === null || !S.chapterWitness) return null;
+        const abs = S.span[0] + li;
+        const base = S.tokens[li];
+        let sawWitness = false, sawDiff = false;
+        for (const sig of S.sigla) {
+            const w = S.chapterWitness.witnesses[sig];
+            const word = w && w.words[abs];
+            if (word == null) continue;
+            sawWitness = true;
+            if (!wordsMatchHe(base, word)) sawDiff = true;
+        }
+        return sawWitness ? sawDiff : null;
+    }
+    const flags = cols.map(c => {
+        const da = disputed(A, c.ai), db = disputed(B, c.bi);
+        return da !== null && db !== null && da !== db;
+    });
+
+    const table = document.createElement('table');
+    table.className = 'witness-synopsis cmb-table';
+
+    function addGroup(S, isFirst) {
+        const groupRow = document.createElement('tr');
+        if (!isFirst) groupRow.className = 'cmb-group-start';
+        groupRow.innerHTML = `<td class="cmb-group-label" colspan="${cols.length + 1}"><span>${escapeHtml(S.label)}</span></td>`;
+        table.appendChild(groupRow);
+
+        // base row
+        const baseRow = document.createElement('tr');
+        baseRow.className = 'syn-strip syn-strip-base';
+        baseRow.dataset.side = S.key;
+        baseRow.dataset.siglum = 'בסיס';
+        baseRow.innerHTML = '<td class="syn-strip-label">בסיס</td>';
+        cols.forEach((c, ci) => {
+            const li = S === A ? c.ai : c.bi;
+            const td = document.createElement('td');
+            td.className = 'synw';
+            if (li === null) {
+                td.classList.add('synw-plusgap');
+            } else {
+                td.textContent = S.tokens[li];
+                td.dataset.baseIdx = String(S.span[0] + li);
+            }
+            if (flags[ci]) td.classList.add('cmb-flagged');
+            if (cols[ci].eq) td.classList.add('cmb-eq');
+            baseRow.appendChild(td);
+        });
+        table.appendChild(baseRow);
+
+        // witness rows
+        S.sigla.forEach(sig => {
+            const w = S.chapterWitness.witnesses[sig];
+            const row = document.createElement('tr');
+            row.className = 'syn-strip';
+            row.dataset.siglum = sig;
+            row.dataset.side = S.key;
+            row.innerHTML = `<td class="syn-strip-label">${sig}</td>`;
+            cols.forEach(c => {
+                const li = S === A ? c.ai : c.bi;
+                const td = document.createElement('td');
+                td.className = 'synw';
+                if (li === null) {
+                    td.classList.add('synw-plusgap');
+                } else {
+                    const abs = S.span[0] + li;
+                    td.dataset.baseIdx = String(abs);
+                    const word = w.words[abs];
+                    if (word == null) {
+                        td.classList.add('synw-gap');
+                        td.textContent = '⟨ ⟩';
+                    } else {
+                        td.textContent = word;
+                        td.classList.add(wordsMatchHe(S.tokens[li], word) ? 'synw-match' : 'synw-diff');
+                    }
+                }
+                row.appendChild(td);
+            });
+            table.appendChild(row);
+        });
+    }
+
+    addGroup(A, true);
+    addGroup(B, false);
+
+    const scroll = document.createElement('div');
+    scroll.className = 'cmb-scroll';
+    scroll.appendChild(table);
+
+    // click a word cell -> highlight its column (within its block) and show
+    // it in the manuscript pane, resolved through the clicked row's witness
+    scroll.addEventListener('click', e => {
+        const td = e.target.closest('td.synw[data-base-idx]');
+        if (!td) return;
+        const row = td.closest('tr');
+        const sideKey = row.dataset.side, siglum = row.dataset.siglum;
+        if (!sideKey || !siglum) return;
+        table.querySelectorAll('.synw-active').forEach(x => x.classList.remove('synw-active'));
+        table.querySelectorAll(
+            `tr[data-side="${sideKey}"] td[data-base-idx="${td.dataset.baseIdx}"]`)
+            .forEach(x => x.classList.add('synw-active'));
+        ensureMsPanel().showWord(sideKey, siglum, Number(td.dataset.baseIdx));
+    });
+    return scroll;
+}
+
+async function openPair(idx) {
+    const p = PAIRS[idx];
+    if (!p) return;
+    history.replaceState(null, '', '#p=' + idx);
+
+    const card = document.getElementById('detail-card');
+    const listEl = document.getElementById('detail-list');
+    const combinedEl = document.getElementById('combined-synopsis');
+    const pairLabel = `${hebLoc(p.a)} ↔ ${hebLoc(p.b)}`;
+    document.getElementById('detail-title').textContent = `מקבילה: ${pairLabel}`;
+    document.getElementById('detail-meta').textContent = 'טוען…';
+    document.getElementById('cmb-footer-label').textContent = `סינופסיס משולב: ${pairLabel}`;
+    listEl.innerHTML = '';
+    combinedEl.innerHTML = '';
+    card.hidden = false;
+    document.getElementById('cmb-footer').hidden = false;
+    document.getElementById('ms-pane').hidden = false;
+    document.getElementById('ms-pane-label').textContent = 'כתב יד';
+    syncBottomPanels();
+    ensureMsPanel().select(null);
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    let dataA, dataB;
+    try {
+        [dataA, dataB] = await Promise.all([loadTractate(p.a.tr), loadTractate(p.b.tr)]);
+    } catch (err) {
+        document.getElementById('detail-meta').textContent = 'שגיאה בטעינת הנתונים: ' + err.message;
+        return;
+    }
+
+    const spanA = sideSpan(p.a, dataA.wordIndexByChapter[p.a.ch]);
+    const spanB = sideSpan(p.b, dataB.wordIndexByChapter[p.b.ch]);
+
+    const tierText = (TIER_HEBREW[p.tier] || p.tier).replace(/<[^>]+>/g, '');
+    document.getElementById('detail-meta').textContent =
+        `רמת ביסוס: ${tierText} · דיוק: ${String(p.precision).split('/').map(x => PRECISION_HEBREW[x] || x).join(' / ')}` +
+        `${p.reciprocal ? ' · המקבילה רשומה בשני הכיוונים' : ''}` +
+        `${(p.a.span || p.b.span) ? '' : ' · אין טווח מילים מדויק — מוצגות ההלכות במלואן'}` +
+        ` · רצף מילים זהה ארוך ביותר: ${p.textRun || 0}` +
+        `${p.oneSided != null ? ` · חילופים חד־צדדיים: ${p.oneSided}` : ''}` +
+        ` · הרקע הצהוב מסמן את טווח המקבילה.`;
+
+    msSides.A = { data: dataA, side: p.a };
+    msSides.B = { data: dataB, side: p.b };
+
+    listEl.appendChild(renderSide('A', p.a, dataA, spanA));
+    listEl.appendChild(renderSide('B', p.b, dataB, spanB));
+
+    // combined synopsis over the two spans
+    function sideCtx(key, side, data, span, label) {
+        const perek = data.textData.text[side.ch] || [];
+        const allTokens = chapterTokens(perek);
+        const tokens = allTokens.slice(span[0], span[1] + 1);
+        const chapterWitness = data.witnessData && data.witnessData.chapters
+            && data.witnessData.chapters[side.ch];
+        const sigla = chapterWitness ? activeSiglaInRange(chapterWitness, span[0], span[1] + 1) : [];
+        return { key, side, data, span, tokens, chapterWitness, sigla, label };
+    }
+    const ctxA = sideCtx('A', p.a, dataA, spanA, hebLoc(p.a));
+    const ctxB = sideCtx('B', p.b, dataB, spanB, hebLoc(p.b));
+    if (!ctxA.chapterWitness || !ctxB.chapterWitness) {
+        combinedEl.innerHTML = '<p class="cmb-missing-note">אין נתוני עדי נוסח לאחד משני המקומות — לא ניתן לבנות סינופסיס משולב.</p>';
+        return;
+    }
+    const combined = buildCombinedSynopsis([ctxA, ctxB]);
+    if (combined) combinedEl.appendChild(combined);
+    else combinedEl.innerHTML = '<p class="cmb-missing-note">לא ניתן היה ליישר את שני הקטעים.</p>';
+}
+
+// Either bottom pane may be closed alone; the content padding stays as long
+// as one of them is visible (flexbox gives the survivor the full row).
+function syncBottomPanels() {
+    const anyOpen = !document.getElementById('cmb-footer').hidden
+        || !document.getElementById('ms-pane').hidden;
+    document.body.classList.toggle('synopsis-footer-open', anyOpen);
+    document.getElementById('bottom-resize').hidden = !anyOpen;
+}
+
+// drag the handle to resize the whole bottom row
+(() => {
+    const handle = document.getElementById('bottom-resize');
+    handle.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        handle.setPointerCapture(e.pointerId);
+        handle.classList.add('dragging');
+        const onMove = ev => {
+            const h = Math.min(window.innerHeight * 0.85,
+                Math.max(140, window.innerHeight - ev.clientY));
+            document.documentElement.style.setProperty('--bottom-h', h + 'px');
+        };
+        const onUp = () => {
+            handle.classList.remove('dragging');
+            handle.removeEventListener('pointermove', onMove);
+            handle.removeEventListener('pointerup', onUp);
+        };
+        handle.addEventListener('pointermove', onMove);
+        handle.addEventListener('pointerup', onUp);
+    });
+})();
+document.getElementById('cmb-footer-close').addEventListener('click', () => {
+    document.getElementById('cmb-footer').hidden = true;
+    syncBottomPanels();
+});
+document.getElementById('ms-pane-close').addEventListener('click', () => {
+    document.getElementById('ms-pane').hidden = true;
+    syncBottomPanels();
+});
+document.getElementById('detail-close').addEventListener('click', () => {
+    document.getElementById('detail-card').hidden = true;
+    document.getElementById('cmb-footer').hidden = true;
+    document.getElementById('ms-pane').hidden = true;
+    syncBottomPanels();
+    history.replaceState(null, '', location.pathname + location.search);
+});
+
+// deep link: #p=<index>
+function openFromHash() {
+    const m = location.hash.match(/^#p=(\d+)$/);
+    if (m) openPair(Number(m[1]));
+}
+window.addEventListener('hashchange', openFromHash);
+openFromHash();
+</script>
+</body>
+</html>
