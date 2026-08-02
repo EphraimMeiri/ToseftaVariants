@@ -286,7 +286,10 @@ function createParallelsFilter() {
         // cleared, or the very next render would put them straight back.
         reset() {
             ['groups', 'works', 'sources', 'precisions'].forEach(a => state[a].clear());
-            PARALLEL_HOME_BEARING_SOURCES.forEach(s => state.touched.add(`sources:${s}`));
+            PARALLEL_HOME_BEARING_SOURCES.forEach(s => {
+                state.touched.add(`sources:${s}`);
+                state.touched.add(`solo:${s}`);
+            });
             state.minSources = 1;
             state.soloSource = null;
             state.hideCompare = false;
@@ -1887,19 +1890,43 @@ let parallelsFilterStatusUnsub = null;
 // and on everywhere it does. The row stays in the list with its count, and the
 // status line plus the reset button say that something is being held back.
 //
-// Per tractate but not sticky-per-tractate: this only fires while the reader has
-// left the source alone. One click on the row -- in either direction -- and the
-// default stops overriding them, here and in every tractate after.
+// And the other way round: where he DID edit, his apparatus is what this site is
+// an edition of, so the margin opens as he left it -- solo mode on, the later
+// editions and Sefaria's link graph a click away rather than mixed in. That is
+// 412 of Berakhot's 699 citations, 640 of Sotah's; the rest are one untick away
+// and the status line says how many are waiting.
+//
+// Solo mode is a single global slot, so it has to be cleared on the way out as
+// firmly as it is set on the way in: left on into Chullin it would empty the
+// margin, since nothing there is his.
+//
+// Per tractate but not sticky-per-tractate: both defaults fire only while the
+// reader has left that control alone. One click -- in either direction -- and
+// they stop overriding them, here and in every tractate after.
 function applyParallelsTractateDefaults(counts) {
     let changed = false;
     PARALLEL_HOME_BEARING_SOURCES.forEach(slug => {
-        if (parallelsFilter.touched('sources', slug)) return;
         if (!counts.sources.has(slug)) return;
         const edits = (counts.home.get(slug) || 0) > 0;
-        const excluded = parallelsFilter.excluded('sources', slug);
-        if (edits === !excluded) return;
-        parallelsFilter.state.sources[edits ? 'delete' : 'add'](slug);
-        changed = true;
+
+        if (!parallelsFilter.touched('sources', slug)) {
+            const excluded = parallelsFilter.excluded('sources', slug);
+            if (edits === excluded) {
+                parallelsFilter.state.sources[edits ? 'delete' : 'add'](slug);
+                changed = true;
+            }
+        }
+
+        if (!parallelsFilter.touched('solo', slug)) {
+            const on = parallelsFilter.state.soloSource === slug;
+            if (edits && !on) {
+                parallelsFilter.state.soloSource = slug;
+                changed = true;
+            } else if (!edits && on) {
+                parallelsFilter.state.soloSource = null;
+                changed = true;
+            }
+        }
     });
     return changed;
 }
@@ -1990,14 +2017,16 @@ function renderParallelsFilterUI(root, parallelsData, onChange) {
     const soloCount = counts.home.get(soloSlug) || 0;
     const soloCovers = soloCount > 0;
     // Still drawn when the mode is on but this tractate is out of the edition's
-    // range, because a reader who switched it on in Berakhot and paged into
-    // Chullin would otherwise meet an empty margin with nothing on screen saying
-    // why, and no way back short of the reset.
+    // range -- only reachable now by a reader who set solo themselves, since the
+    // default clears it on the way in (applyParallelsTractateDefaults), but they
+    // would otherwise meet an empty margin with nothing on screen saying why, and
+    // no way back short of the reset.
     if (soloCovers || parallelsFilter.soloSource === soloSlug) {
         soloRow = parallelsFilterRow(
             `רק ${PARALLEL_SOURCE_NAMES[soloSlug]}`, soloCount,
             parallelsFilter.soloSource === soloSlug,
             checked => {
+                parallelsFilter.touch('solo', soloSlug);
                 parallelsFilter.soloSource = checked ? soloSlug : null;
                 perSource.classList.toggle('disabled', checked);
                 notify();
