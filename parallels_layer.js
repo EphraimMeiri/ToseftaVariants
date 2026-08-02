@@ -61,10 +61,7 @@ const PARALLEL_SOURCE_NAMES = {
     mishnah_sefaria_links: 'ספריא (משנה)',
     mishnah_connections_workbook: 'רשימת מקבילות למשנה',
     moskovits_yerushalmi_db: 'מקבילות הירושלמי (מוסקוביץ)',
-    oz_vehadar_masoret_hashas: 'מסורת הש"ס (עוז והדר)',
-    oz_vehadar_yerushalmi_masoret: 'מסורת הש"ס לירושלמי (עוז והדר)',
     yefe_einayim_apparatus: 'יפה עינים',
-    ofek_sifra_masoret: 'מסורת הספרא (אופק)',
     sifre_bamidbar_kahana_apparatus: 'ספרי במדבר (כהנא)',
     sifrei_devarim_finkelstein_apparatus: 'ספרי דברים (פינקלשטיין)',
     mekhilta_horowitz_apparatus: 'מכילתא (הורוביץ-רבין)',
@@ -75,6 +72,51 @@ const PARALLEL_SOURCE_NAMES = {
     adrn_schechter_apparatus: 'אבות דר\' נתן (שכטר)',
     adrn_recension_alignment: 'אדר"נ -- הקבלת הנוסחאות',
 };
+
+// Editions still in copyright, whose citations are not ours to publish. What
+// they contribute is a SELECTION of parallels -- the individual "this stands
+// parallel to that" is a fact, but the list is the edition's work -- so they are
+// stripped out of data/parallels itself by strip_restricted_parallels.js, and
+// this is the second line: whatever a rebuild puts back, the viewer drops on
+// load. A citation one of them shares with a free source survives on that
+// source; one nothing else vouches for goes with it.
+const PARALLEL_RESTRICTED_SOURCES = new Set([
+    'oz_vehadar_masoret_hashas',
+    'oz_vehadar_yerushalmi_masoret',
+    'ofek_sifra_masoret',
+]);
+
+// Applied at fetch time (getParallelsData), before anything counts, filters or
+// draws an entry, so no later code has to know that these slugs ever existed.
+// Mutates in place -- the JSON is freshly parsed per tractate load and has no
+// other owner.
+function sanitizeParallelsData(data) {
+    if (!data || !data.chapters) return data;
+    Object.keys(data.chapters).forEach(chapter => {
+        const kept = data.chapters[chapter].filter(entry => {
+            const sources = entry.sources || [];
+            const survivors = sources.filter(s => !PARALLEL_RESTRICTED_SOURCES.has(s));
+            if (survivors.length === sources.length) return true;
+            if (!survivors.length) return false;
+            entry.sources = survivors;
+            entry.numSources = survivors.length;
+            if (entry.apparatusHome) {
+                entry.apparatusHome = entry.apparatusHome
+                    .filter(s => !PARALLEL_RESTRICTED_SOURCES.has(s));
+            }
+            if (entry.tier === 'corroborated' && survivors.length === 1) {
+                entry.tier = 'single-source';
+            }
+            return true;
+        });
+        if (kept.length) data.chapters[chapter] = kept;
+        else delete data.chapters[chapter];
+    });
+    if (data.sourceSchemes) {
+        PARALLEL_RESTRICTED_SOURCES.forEach(s => delete data.sourceSchemes[s]);
+    }
+    return data;
+}
 
 const PARALLEL_PRECISION_LABELS = {
     span: 'היקף מזוהה',

@@ -117,9 +117,16 @@ function getParallelsUrl(location) {
     return PARALLELS_DATA_BASE + tractateSlug + ".json";
 }
 
+// Sanitized on the way in: sanitizeParallelsData (parallels_layer.js) drops the
+// in-copyright apparatus, so nothing downstream can display a source we are not
+// free to publish even if a rebuild puts one back into the file. The data
+// shipped here has already had them stripped -- see strip_restricted_parallels.js
+// -- and the guard is deliberately redundant.
 function getParallelsData(location) {
     return fetch(getParallelsUrl(location))
         .then(response => response.ok ? response.json() : null)
+        .then(data => (data && typeof sanitizeParallelsData === "function")
+            ? sanitizeParallelsData(data) : data)
         .catch(() => null);
 }
 
