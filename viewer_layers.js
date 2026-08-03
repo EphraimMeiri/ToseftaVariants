@@ -510,8 +510,11 @@ function createToseftaViewer() {
             // with different presets; a profile lists what's ON, so a layer
             // absent here is off rather than unavailable.
             'variant-lab': ['manuscript'],
+            // 'parallels' used to be listed here as well, for the dock panel the
+            // parallels had before both registers moved inline. There is no such
+            // layer any more -- 'parallel-extents' is the whole of it.
             'reading': ['brief', 'kifshuta', 'chasdei-david', 'tekhelet-mordechai',
-                        'parallels', 'parallel-extents'],
+                        'parallel-extents'],
         },
     });
 

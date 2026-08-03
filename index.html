@@ -8,18 +8,24 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="vendor/midrash-viewer-core/midrash-viewer-core.css?v=10">
-    <link rel="stylesheet" href="styles.css?v=24">
+    <link rel="stylesheet" href="styles.css?v=30">
     <title>תוספתא עם חילופי נוסח</title>
 </head>
 <body>
     <header class="site-header">
         <div class="header-title">
-            <button class="sidebar-toggle" id="sidebar-toggle" aria-label="הצג/הסתר סרגל צד" title="הצג/הסתר סרגל צד">☰</button>
+            <!-- Opens #sidebar, which drops down from under this button rather
+                 than holding a 280px column open all day. See .sidebar. -->
+            <button class="sidebar-toggle" id="sidebar-toggle" aria-expanded="false"
+                    aria-controls="sidebar" aria-label="הגדרות וסינון" title="הגדרות וסינון">☰</button>
             <!-- Mobile-only: opens the perek/halakhah TOC as a drawer, since
                  .toc-nav's own sticky column has no room on a phone (see the
-                 mobile rules for .toc-nav). Hidden until JS finds the TOC has
-                 content and we're at a mobile width -- see the bottom tab bar
-                 script near the sidebar-toggle wiring. -->
+                 mobile rules for .toc-nav). Shown only once the TOC has content
+                 AND we're at a mobile width -- see syncTocToggleVisibility. On
+                 desktop the TOC is permanently visible in its own column, so
+                 this button had nothing to open: clicking it added .open (a
+                 no-op there) and switched on the modal dimming backdrop, which
+                 dimmed the page for nothing. -->
             <button class="toc-toggle" id="toc-toggle" aria-label="ניווט לפי פרקים והלכות" title="ניווט לפי פרקים והלכות" hidden>📖</button>
             <h1>תוספתא עם חילופי נוסח</h1>
         </div>
@@ -29,45 +35,24 @@
             <button id="load-masechet">טען</button>
             <span class="edition-note" id="edition-note" hidden></span>
         </div>
-        <div class="header-controls">
-            <nav>
-                <a href="otzarHaHilufim.html">אוצר החילופים</a>
-                <button type="button" class="nav-toggle-btn" id="synopsisMode" hidden aria-pressed="false"
-                        title="תצוגת סינופסיס (השוואת עדים בטבלה)" aria-label="תצוגת סינופסיס (השוואת עדים בטבלה)">
-                    <span class="nav-toggle-icon nav-synopsis-icon">▦</span>
-                </button>
-                <button type="button" class="nav-toggle-btn" id="manuscriptMode" hidden aria-pressed="false"
-                        title="תצוגת כתב יד" aria-label="תצוגת כתב יד">
-                    <span class="nav-toggle-icon nav-manuscript-icon">כ״י</span>
-                </button>
-                <!-- One button for every commentary: they share a dock and
-                     appear as tabs within it, so a button apiece was both
-                     redundant and unscalable (four commentaries are coming). -->
-                <button type="button" class="nav-toggle-btn" id="commentaryMode" hidden aria-pressed="false"
-                        title="פירושים" aria-label="פירושים">
-                    <span class="nav-toggle-icon">פי׳</span>
-                </button>
-                <!-- Parallels: one button for both halves of the layer -- the
-                     citation panel in the side dock and the extent bars down the
-                     edge of the reading column. They are separate layers because
-                     they render in different places, but a reader turning
-                     "parallels" on means both. -->
-                <button type="button" class="nav-toggle-btn" id="parallelsMode" hidden aria-pressed="false"
-                        title="מקבילות" aria-label="מקבילות">
-                    <span class="nav-toggle-icon">מק׳</span>
-                </button>
-                <button id="export-docx" class="nav-export" title="ייצוא ל‑Word" aria-label="ייצוא ל‑Word">
-                    <span class="nav-export-w">W</span><span class="nav-export-arrow">↓</span>
-                </button>
-            </nav>
-        </div>
+        <!-- Nothing else. The apparatus toggles are on .apparatus-shelf, and
+             what used to sit here besides them -- the אוצר link and the Word
+             export -- has moved into #sidebar under a divider: neither is a
+             reading control, and neither was worth a permanent seat in the
+             header. -->
     </header>
 
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-    <div class="page-layout">
-        <!-- Sidebar: filters -->
-        <aside class="sidebar" id="sidebar">
+    <!-- Settings and filters. A dropdown from under the ☰ button rather than the
+         280px column this used to be: the filters are set once and then read
+         past, so holding a fifth of the window open for them all session cost
+         the reading column far more than it was worth. Outside .page-layout
+         because it is no longer one of its columns -- it overlays the page and
+         reserves no width at all.
+         Still called "sidebar" throughout (id, .sidebar-tabs, .sidebar-pane):
+         renaming it would touch every rule and handler for no gain. -->
+    <aside class="sidebar" id="sidebar">
             <!-- Two settings pages, not one long scroll. The variants filters and
                  the parallels filters are answers to different questions -- what
                  counts as a meaningful difference between witnesses, and which
@@ -166,6 +151,10 @@
                         <div class="filter-children" data-parent="hideRoutine">
                             <div class="detail-slot" data-category="routine"></div>
                         </div>
+                        <label class="filter-parent"><input type="checkbox" id="hideMorphology"> חילופי נטייה</label>
+                        <div class="filter-children" data-parent="hideMorphology">
+                            <div class="detail-slot" data-category="morphology"></div>
+                        </div>
                     </div>
 
                     <div class="status-bar">
@@ -181,12 +170,26 @@
                      column level with the text: the other stacks in a band below
                      it, in the same paragraph, always visible. Neither is hidden
                      and neither is in a far margin -- that split is what this
-                     control replaced. -->
+                     control replaced.
+                     Showing the parallels at all is the FIRST of these three
+                     options rather than a separate button in the header, because
+                     the two cannot be allowed to disagree and as separate
+                     controls they did: the button governed the inline layer's
+                     decorate pass, while beside-mode is baked into the render by
+                     layoutParallelsBeside. Switching the button off therefore
+                     left a whole parallels apparatus on the page reading "off",
+                     and choosing "beside" while it was off silently rendered
+                     nothing. One control cannot contradict itself. -->
                 <section class="filters-section parallels-panel-options" id="parallels-options-panel">
-                    <div class="panel-title">לצד הטקסט</div>
-                    <label title="חילופי הנוסח בטור שלצד הטקסט, והמקבילות ברצועה שמתחת להלכה"><input type="radio" name="apparatus-beside" id="apparatus-beside-variants" value="variants" checked> חילופי נוסח</label>
-                    <label title="המקבילות בטור שלצד הטקסט, כל אחת בגובה המילים שהיא מכסה, ולחיצה פותחת את לשונה במקום; חילופי הנוסח עוברים לרצועה שמתחת להלכה"><input type="radio" name="apparatus-beside" id="apparatus-beside-parallels" value="parallels"> מקבילות</label>
-                    <label class="filter-parent" title="חלוקת ההלכה לתת־יחידות לפי ראשי המקבילות -- החלוקה להלכות נשארת כשהיתה"><input type="checkbox" id="parallel-subunits"> חלוקה לתת־יחידות לפי המקבילות</label>
+                    <div class="panel-title">תצוגת המקבילות</div>
+                    <label title="המקבילות אינן מוצגות כלל"><input type="radio" name="parallels-mode" id="parallels-mode-off" value="off" checked> מוסתרות</label>
+                    <label title="המקבילות ברצועה שמתחת להלכה, וחילופי הנוסח בטור שלצד הטקסט"><input type="radio" name="parallels-mode" id="parallels-mode-band" value="band"> ברצועה שמתחת להלכה</label>
+                    <label title="המקבילות בטור שלצד הטקסט, כל אחת בגובה המילים שהיא מכסה, ולחיצה פותחת את לשונה במקום; חילופי הנוסח עוברים לרצועה שמתחת להלכה"><input type="radio" name="parallels-mode" id="parallels-mode-beside" value="beside"> בטור שלצד הטקסט</label>
+                    <!-- Only meaningful in band mode: beside-mode does its own
+                         splitting (layoutParallelsBeside puts every measured
+                         extent in its own row), and there is nothing to split
+                         when the parallels are hidden. -->
+                    <label class="filter-parent" title="חלוקת ההלכה לתת־יחידות לפי ראשי המקבילות -- החלוקה להלכות נשארת כשהיתה"><input type="checkbox" id="parallel-subunits" disabled> חלוקה לתת־יחידות לפי המקבילות</label>
                 </section>
 
                 <!-- Built from the loaded tractate's own parallels, so the rows
@@ -194,8 +197,23 @@
                      renderParallelsFilterUI in parallels_layer.js. -->
                 <div id="parallels-filters"></div>
             </div><!-- /sidebar-pane-parallels -->
-        </aside>
 
+        <!-- Page-level actions, below a divider and outside both panes so they
+             show whichever tab is open. They are not filters and not reading
+             controls -- one leaves the page and one produces a file -- which is
+             why they read as a short menu at the foot of the panel rather than
+             as more settings. -->
+        <div class="sidebar-actions">
+            <a class="sidebar-action" href="otzarHaHilufim.html">אוצר החילופים</a>
+            <button type="button" id="export-docx" class="sidebar-action nav-export"
+                    title="ייצוא ל‑Word" aria-label="ייצוא ל‑Word">
+                <span class="nav-export-mark"><span class="nav-export-w">W</span><span class="nav-export-arrow">↓</span></span>
+                ייצוא ל‑Word
+            </button>
+        </div>
+    </aside>
+
+    <div class="page-layout">
         <!-- Perek/Halakha navigation -->
         <nav class="toc-nav" id="toc-nav"></nav>
 
@@ -206,6 +224,40 @@
             </section>
 
         </div>
+
+        <!-- Apparatus shelf: one rail naming every register that can join the
+             text, mirroring the filters sidebar at the other edge of the reading
+             column and sitting on the same edge the commentary dock opens from.
+             A launcher, not a tab strip -- two of the three panels open
+             elsewhere (the synopsis footer and the manuscript dock share the
+             bottom row), so the shelf says which registers are SHOWING rather
+             than where they are.
+             Words, not the abbreviations these buttons used to carry: in the
+             header a bare כ״י/פי׳ put all of its meaning in a `title`, which a
+             touch device never shows at all. The shelf has the width for the
+             real thing.
+             The parallels are deliberately NOT here. They are a rendering mode
+             of the reading column rather than a panel, and they live with the
+             other display settings in the sidebar's מקבילות tab -- as one
+             control, which is what stops them disagreeing with themselves (see
+             syncParallelsModeRadio). -->
+        <nav class="apparatus-shelf" id="apparatus-shelf" aria-label="מנגנוני עזר לטקסט">
+            <button type="button" class="nav-toggle-btn" id="synopsisMode" hidden aria-pressed="false"
+                    title="תצוגת סינופסיס -- השוואת עדי הנוסח בטבלה" aria-label="תצוגת סינופסיס">
+                סינופסיס
+            </button>
+            <button type="button" class="nav-toggle-btn" id="manuscriptMode" hidden aria-pressed="false"
+                    title="צילומי כתבי היד" aria-label="צילומי כתבי היד">
+                כתבי יד
+            </button>
+            <!-- One button for every commentary: they share a dock and appear as
+                 tabs within it, so a button apiece was both redundant and
+                 unscalable (four commentaries are coming). -->
+            <button type="button" class="nav-toggle-btn" id="commentaryMode" hidden aria-pressed="false"
+                    title="פירושים" aria-label="פירושים">
+                פירושים
+            </button>
+        </nav>
     </div>
 
     <div class="bottom-panels" id="bottom-panels">
@@ -242,9 +294,9 @@
     <nav class="bottom-tabbar" id="bottom-tabbar" hidden></nav>
 
     <script src="vendor/midrash-viewer-core/midrash-viewer-core.js?v=10"></script>
-    <script src="tosefta_parsing_tools.js?v=18"></script>
-    <script src="parallels_layer.js?v=24"></script>
-    <script src="viewer_layers.js?v=11"></script>
+    <script src="tosefta_parsing_tools.js?v=19"></script>
+    <script src="parallels_layer.js?v=25"></script>
+    <script src="viewer_layers.js?v=12"></script>
     <script>
         let currentTextData = null;
         let currentVariantsData = null;
@@ -256,44 +308,103 @@
         // Which alternate-edition overlays are toggled on; persists across tractate loads
         // within the page (each tractate load hides/unchecks whichever is native there).
         let editionOverlayState = { vilna: false, lz: false };
+        // Which of the two parallels display modes was last chosen. Held here and
+        // persisted, rather than read back off the radio, because the radio is a
+        // VIEW of this plus the registry's restored layer intent -- see
+        // syncParallelsModeRadio. Reading the DOM instead would make the control
+        // the store, and on the first load it is set before anything has chosen.
+        const PARALLELS_BESIDE_KEY = 'tosefta.parallels.beside';
+        let parallelsBesideState = false;
+        try { parallelsBesideState = localStorage.getItem(PARALLELS_BESIDE_KEY) === '1'; } catch { /* ignore */ }
         let refreshCurrentDisplay = null;
         // Re-runs the inline apparatus layers over the already-rendered body,
         // for options that change only what they draw.
         let refreshInlineLayers = null;
 
-        // --- Sidebar / TOC drawer toggles (mobile) ---
-        // Two off-canvas drawers share one backdrop: the filters sidebar
-        // (slides in from the inline-end edge) and the perek/halakhah TOC
-        // (slides in from the inline-start edge, see .toc-nav's mobile
-        // rules). Only one is ever open at a time -- opening one closes the
-        // other rather than stacking them, since both want the full screen.
+        // --- Settings dropdown / TOC drawer ---
+        // The settings panel is a dropdown from under the ☰ button at EVERY
+        // width now, so there is one open/close path instead of the old split
+        // where desktop hid a layout column (body.sidebar-collapsed) and mobile
+        // slid an off-canvas drawer. The perek/halakhah TOC is still a
+        // mobile-only drawer from the opposite edge. Both are overlays over the
+        // same backdrop, and only one is ever open -- opening either closes the
+        // other rather than stacking them.
         const sidebarEl = document.getElementById('sidebar');
         const sidebarToggleBtn = document.getElementById('sidebar-toggle');
         const sidebarOverlay = document.getElementById('sidebar-overlay');
         const tocNavEl = document.getElementById('toc-nav');
         const tocToggleBtn = document.getElementById('toc-toggle');
 
+        // The backdrop is what makes clicking anywhere else dismiss the panel.
+        // It is invisible on desktop (a dropdown that dimmed the page would
+        // read as a modal, which this is not) and dimmed on mobile, where the
+        // panel covers most of the screen -- see .sidebar-overlay.
+        function syncSidebarToggle() {
+            const open = sidebarEl.classList.contains('open');
+            sidebarToggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            sidebarToggleBtn.classList.toggle('active', open);
+        }
         function closeDrawers() {
             sidebarEl.classList.remove('open');
             tocNavEl.classList.remove('open');
             sidebarOverlay.classList.remove('visible');
+            syncSidebarToggle();
         }
         function toggleSidebar() {
             const opening = !sidebarEl.classList.contains('open');
             tocNavEl.classList.remove('open');
-            sidebarEl.classList.toggle('open', opening); // mobile: slide the drawer in/out
-            sidebarOverlay.classList.toggle('visible', opening); // mobile: dim backdrop
-            document.body.classList.toggle('sidebar-collapsed'); // desktop: hide/show entirely
+            sidebarEl.classList.toggle('open', opening);
+            sidebarOverlay.classList.toggle('visible', opening);
+            syncSidebarToggle();
         }
         function toggleTocNav() {
             const opening = !tocNavEl.classList.contains('open');
             sidebarEl.classList.remove('open');
             tocNavEl.classList.toggle('open', opening);
             sidebarOverlay.classList.toggle('visible', opening);
+            syncSidebarToggle();
         }
         sidebarToggleBtn.addEventListener('click', toggleSidebar);
         tocToggleBtn.addEventListener('click', toggleTocNav);
         sidebarOverlay.addEventListener('click', closeDrawers);
+        // Escape is the expected way out of a dropdown, and the only one that
+        // does not require finding the backdrop or the button again.
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            if (!sidebarEl.classList.contains('open')
+                && !tocNavEl.classList.contains('open')) return;
+            closeDrawers();
+            sidebarToggleBtn.focus();
+        });
+
+        // The panel hangs off the bottom of the header, whose height is not
+        // fixed: it wraps to two or three rows on a narrow screen. Publish the
+        // measured height so the dropdown (and .side-dock, which had been
+        // making do with the 3.5rem fallback) can anchor to the real edge
+        // instead of a guess.
+        (function () {
+            const header = document.querySelector('.site-header');
+            if (!header || typeof ResizeObserver === 'undefined') return;
+            const publish = () => document.documentElement.style.setProperty(
+                '--site-header-height', `${header.offsetHeight}px`);
+            new ResizeObserver(publish).observe(header);
+            publish();
+        })();
+
+        // Below the breakpoint the TOC has no column of its own and this button
+        // is the only way to it; above it the TOC is always on screen and the
+        // button is not merely redundant but harmful, since opening a drawer
+        // that is already visible leaves only the dimming backdrop behind. Both
+        // conditions have to hold, so both are checked in one place and
+        // re-checked whenever either can change -- a tractate load (content) or
+        // a viewport crossing (width).
+        const MOBILE_MQ = window.matchMedia('(max-width: 900px)');
+        let tocHasContent = false;
+        function syncTocToggleVisibility() {
+            tocToggleBtn.hidden = !(tocHasContent && MOBILE_MQ.matches);
+        }
+        MOBILE_MQ.addEventListener('change', syncTocToggleVisibility);
+        syncTocToggleVisibility();
 
         // --- Sidebar tabs ---
         function showSidebarPane(paneId) {
@@ -313,9 +424,10 @@
 
         // --- Mobile bottom tab bar ---
         // Relocates the panel-toggle controls (sidebar, TOC, synopsis,
-        // manuscript, commentary, parallels) into a fixed bar at the bottom of
-        // the screen below the responsive breakpoint, where they're reachable
-        // without a trip back to the header. Moves the actual elements rather
+        // manuscript, commentary) into a fixed bar at the bottom of the screen
+        // below the responsive breakpoint, where they're reachable without a trip
+        // back up the page -- and where the apparatus shelf cannot go, since a
+        // phone has no spare column to give it. Moves the actual elements rather
         // than cloning them: viewer_layers.js's nav-button sync (hidden/active
         // state) and this file's own click listeners above are keyed to these
         // same ids, so cloning would either duplicate ids or need a second
@@ -323,8 +435,7 @@
         // is trivially reversible above the breakpoint.
         (function () {
             const bar = document.getElementById('bottom-tabbar');
-            const mq = window.matchMedia('(max-width: 900px)');
-            const homes = ['sidebar-toggle', 'toc-toggle', 'synopsisMode', 'manuscriptMode', 'commentaryMode', 'parallelsMode']
+            const homes = ['sidebar-toggle', 'toc-toggle', 'synopsisMode', 'manuscriptMode', 'commentaryMode']
                 .map(id => document.getElementById(id))
                 .filter(Boolean)
                 .map(el => ({ el, parent: el.parentNode, next: el.nextSibling }));
@@ -339,8 +450,8 @@
                     bar.hidden = true;
                 }
             }
-            apply(mq.matches);
-            mq.addEventListener('change', e => apply(e.matches));
+            apply(MOBILE_MQ.matches);
+            MOBILE_MQ.addEventListener('change', e => apply(e.matches));
         })();
 
         // --- Parent/child filter interaction ---
@@ -427,6 +538,15 @@
             if (reason.startsWith('routine swap')) {
                 return { key: 'routine_swap', hebrew: 'חילופים שגרתיים' };
             }
+            if (reason === 'inflection (same lexeme)') {
+                return { key: 'inflection', hebrew: 'חילופי נטייה' };
+            }
+            if (reason === 'attested spelling') {
+                return { key: 'attested_spelling', hebrew: 'כתיב מאומת' };
+            }
+            if (reason === 'divine name spelling') {
+                return { key: 'divine_name', hebrew: 'כתיב שם ה\'' };
+            }
             if (reason === 'numeral notation') {
                 return { key: 'numeral', hebrew: 'סימון מספר' };
             }
@@ -471,6 +591,9 @@
             if (reason.startsWith('minor addition/omission: ')) return 'תוספת/השמטה: ' + reason.split(': ')[1];
             if (reason.startsWith('addition/omission: ')) return 'תוספת/השמטה: ' + reason.split(': ')[1];
             if (reason.startsWith('routine swap: ')) return 'חילוף: ' + reason.split(': ')[1];
+            if (reason === 'inflection (same lexeme)') return 'נטייה';
+            if (reason === 'attested spelling') return 'כתיב מאומת';
+            if (reason === 'divine name spelling') return 'כתיב שם ה\'';
             if (reason === 'numeral notation') return 'סימון מספר';
 if (reason === 'word order difference') return 'סדר מילים';
             if (reason === 'word order difference (with prefixes)') return 'סדר מילים (עם תחיליות)';
@@ -485,6 +608,7 @@ if (reason === 'word order difference') return 'סדר מילים';
             if (document.getElementById('hideOtherMinor').checked) hidden.add('other_minor');
             if (document.getElementById('hideCitationScope').checked) hidden.add('citation_scope');
             if (document.getElementById('hideRoutine').checked) hidden.add('routine');
+            if (document.getElementById('hideMorphology').checked) hidden.add('morphology');
             if (document.getElementById('hideParagraphBreak').checked) hidden.add('paragraph_break');
             return hidden;
         }
@@ -731,10 +855,12 @@ if (reason === 'word order difference') return 'סדר מילים';
 
             const textArray = textData.text;
             if (!textArray || textArray.length === 0) {
-                tocToggleBtn.hidden = true;
+                tocHasContent = false;
+                syncTocToggleVisibility();
                 return;
             }
-            tocToggleBtn.hidden = false;
+            tocHasContent = true;
+            syncTocToggleVisibility();
 
             textArray.forEach((textPerek, perekIndex) => {
                 const group = document.createElement('div');
@@ -1087,6 +1213,24 @@ function setNavToggleOn(id, on) {
 // once, outlives every tractate load -- see viewer_layers.js for the layers.
 let viewer = null;
 
+// The parallels-mode radio is a view of two facts that are already stored
+// elsewhere -- whether the inline layer is on (the registry, restored from
+// localStorage across sessions) and which mode was last chosen
+// (parallelsBesideState) -- so it is set FROM them and never treated as the
+// store. Called after every tractate load, because the registry re-runs
+// availability there and a tractate with no parallels turns the layer off
+// underneath a control that would otherwise go on claiming they were showing.
+function syncParallelsModeRadio() {
+    const on = viewer && viewer.isEnabled('parallel-extents');
+    const value = !on ? 'off' : (parallelsBesideState ? 'beside' : 'band');
+    const radio = document.getElementById(`parallels-mode-${value}`);
+    if (radio) radio.checked = true;
+    // Sub-unit splitting is a refinement of band mode alone -- see the note on
+    // the checkbox. Disabled rather than hidden, so the option doesn't appear and
+    // vanish as the mode changes.
+    document.getElementById('parallel-subunits').disabled = value !== 'band';
+}
+
 function displayTextAndVariants(textData, variantsData, witnessData, manuscriptDataBySlug, editionsData, commentaryBySlug, ocrCommentaryBySlug, parallelsData, apparatusData){
     const masechetName = (variantsData.title || '').replace('Variants on ', '');
 
@@ -1104,7 +1248,7 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         // world from ctx, so it travels the same way rather than the layer
         // reaching into the DOM for a checkbox.
         parallelSubunits: document.getElementById('parallel-subunits').checked,
-        parallelsBeside: document.getElementById('apparatus-beside-parallels').checked,
+        parallelsBeside: parallelsBesideState,
     });
 
     // The parallels settings tab: rebuilt once per tractate load (not per
@@ -1123,6 +1267,7 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         document.getElementById('parallels-filters').innerHTML = '';
         showSidebarPane('sidebar-pane-text');
     }
+    syncParallelsModeRadio();
 
     const contentContainer = document.getElementById('content-container');
     const showHiddenCheckbox = document.getElementById('showHidden');
@@ -1132,6 +1277,7 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
     const hideOtherMinorCheckbox = document.getElementById('hideOtherMinor');
     const hideCitationScopeCheckbox = document.getElementById('hideCitationScope');
     const hideRoutineCheckbox = document.getElementById('hideRoutine');
+    const hideMorphologyCheckbox = document.getElementById('hideMorphology');
 
     // --- Highlight linking between sup refs and note spans ---
     let activeNoteId = null;
@@ -1228,9 +1374,7 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
     }
 
     function syncFooterTo(perekIndex, halachaIndex, baseIdx) {
-        const modeOn = isNavToggleOn('synopsisMode');
-        console.log('[synopsis] syncFooterTo called', { perekIndex, halachaIndex, baseIdx, synopsisModeOn: modeOn });
-        if (!modeOn) return;
+        if (!isNavToggleOn('synopsisMode')) return;
         footerState = { perekIndex, halachaIndex };
         renderSynopsisFooter(baseIdx);
     }
@@ -1489,7 +1633,6 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         const synopsisModeOn = hasWitnessData && isNavToggleOn('synopsisMode');
         document.getElementById('synopsis-footer').hidden = !synopsisModeOn;
         document.body.classList.toggle('synopsis-footer-open', synopsisModeOn);
-        console.log('[synopsis] updateDisplay', { hasWitnessData, checkboxChecked: isNavToggleOn('synopsisMode'), synopsisModeOn, chaptersLen: hasWitnessData ? witnessData.chapters.length : 0 });
         if (synopsisModeOn) renderSynopsisFooter();
 
         // The manuscript-image panel needs nothing here any more: the registry
@@ -1980,6 +2123,7 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         hideOtherMinorCheckbox,
         hideCitationScopeCheckbox,
         hideRoutineCheckbox,
+        hideMorphologyCheckbox,
         document.getElementById('hideSoleWitness'),
         document.getElementById('hideParagraphBreak'),
         document.getElementById('paragraphBreakLineBreaks'),
@@ -2010,33 +2154,34 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
     // One button, every commentary: opens the dock with a tab per commentary
     // that has data for this tractate, and shuts them all.
     document.getElementById('commentaryMode').onclick = () => viewer.toggleNavGroup('commentaryMode');
-    // Both halves of the parallels layer -- the dock panel and the extent bars
-    // -- move together. Switching them on has to redraw the bars, since the
-    // inline half draws nothing while it is off.
-    document.getElementById('parallelsMode').onclick = () => {
-        viewer.toggleNavGroup('parallelsMode');
-        applyInlineLayers();
-        // Turning the group on should land the reader on the parallels tab
-        // rather than on whichever commentary was last open in the shared dock.
-        if (viewer.isEnabled('parallels')) viewer.showParallels();
-    };
     document.getElementById('parallel-subunits').onchange = (e) => {
         viewer.setContext({ ...viewer.context, parallelSubunits: e.target.checked });
         applyInlineLayers();
     };
-    // Giving the column to the parallels moves rendered nodes -- the text into
-    // per-subunit rows, the variants into a band -- so unlike the other parallels
-    // options it can't be undone by re-decorating. A full re-render is the way
-    // back out, in either direction.
-    document.querySelectorAll('input[name="apparatus-beside"]').forEach(radio => {
+    // One control for showing the parallels and for where they sit, because the
+    // two cannot be allowed to disagree -- and as a header button plus a radio
+    // pair they did, in both directions. See the note on the section markup.
+    //
+    // Every transition here needs a full re-render, including switching OFF.
+    // That is not conservatism: beside-mode moves rendered nodes (the text into
+    // per-subunit rows, the variants into a band of their own), and a decorate
+    // pass that draws nothing cannot put back what layoutParallelsBeside already
+    // moved. Leaving the layer to "switch itself off" is exactly what stranded a
+    // full apparatus on the page under a control reading "hidden".
+    document.querySelectorAll('input[name="parallels-mode"]').forEach(radio => {
         radio.onchange = () => {
             if (!radio.checked) return;
+            parallelsBesideState = radio.value === 'beside';
+            try {
+                localStorage.setItem(PARALLELS_BESIDE_KEY, parallelsBesideState ? '1' : '0');
+            } catch { /* ignore */ }
             document.body.classList.remove('parallels-beside');
             // Context first, then the re-render: updateDisplay rebuilds the body
             // and hands the layers whatever ctx currently says, so setting the
             // flag afterwards would decorate this pass with the previous answer.
-            viewer.setContext({ ...viewer.context,
-                                parallelsBeside: radio.value === 'parallels' });
+            viewer.setContext({ ...viewer.context, parallelsBeside: parallelsBesideState });
+            viewer.setEnabled('parallel-extents', radio.value !== 'off');
+            syncParallelsModeRadio();
             refreshCurrentDisplay();
         };
     });

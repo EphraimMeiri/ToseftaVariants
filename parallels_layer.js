@@ -1046,8 +1046,6 @@ function createApparatusRenderer(labels = {}) {
 }
 
 
-const PARALLELS_NAV_BUTTON = 'parallelsMode';
-
 // The parallels used to have a dock panel here, in the far margin the
 // commentaries share -- a selection-driven list, mounted like a commentary tab.
 // It is gone: both registers of the apparatus now render in the paragraph they
@@ -1067,7 +1065,11 @@ const PARALLEL_EXTENTS_LAYER = {
     label: 'סימון היקף המקבילות',
     kind: 'parallels',
     placement: 'inline',
-    navButtonId: PARALLELS_NAV_BUTTON,
+    // No navButtonId: unlike the panels, this layer has no button on the
+    // apparatus shelf. Showing the parallels and choosing where they sit is one
+    // question with one answer, asked by the parallels-mode radio in the
+    // sidebar (see index.html) -- a shelf button beside it could only ever
+    // contradict it.
     available: hasParallelsData,
 
     decorate(container, ctx) {

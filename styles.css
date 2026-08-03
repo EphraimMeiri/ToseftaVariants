@@ -10,6 +10,15 @@
     box-sizing: border-box;
 }
 
+:root {
+    /* Width of the apparatus shelf down the inline-end edge. On :root rather
+       than on .apparatus-shelf itself because .side-dock has to inset by it and
+       is not a descendant -- custom properties inherit down the tree, not
+       across it. Set to 0 below the mobile breakpoint, where the shelf is
+       replaced by .bottom-tabbar. */
+    --shelf-width: 4.5rem;
+}
+
 body {
     font-family: 'Noto Serif Hebrew', serif;
     direction: rtl;
@@ -49,34 +58,23 @@ body {
     white-space: nowrap;
 }
 
-.site-header .header-controls {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-}
+/* The header holds only the ☰ handle, the title and the masechet selector now.
+   Its old .header-controls nav -- the אוצר link and the Word export -- moved
+   into #sidebar under a divider, and the apparatus toggles onto
+   .apparatus-shelf, so those rules are gone with the markup. */
 
-.site-header nav {
-    font-size: 0.85em;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
+/* Push-button toggles for the apparatus panels. They live on
+   .apparatus-shelf, which sets their size and type; this rule owns only the
+   pill shape, the palette and the pressed state, so a button reads the same
+   wherever it has been relocated to (the shelf on desktop, .bottom-tabbar on
+   a phone).
 
-.site-header nav a {
-    color: #6b5b47;
-    text-decoration: none;
-    border-bottom: 1px dotted #6b5b47;
-    transition: color 0.2s;
-}
-
-.site-header nav a:hover {
-    color: #3a2e20;
-}
-
-/* Compact push-button toggles (synopsis / manuscript view) -- same pill
-   shape and hover-invert language as .nav-export, so all three navbar
-   controls read as one family. .active marks the pressed/on state. */
+   [hidden] needs stating explicitly: `display` here would otherwise beat the
+   UA's `[hidden] { display: none }`, and every availability check in the JS
+   sets exactly that attribute -- registry.onChange for the dock layers,
+   updateDisplay for the synopsis. Without this the buttons for apparatus a
+   tractate does not have stayed on screen and clickable, which is the whole of
+   what a "dead button" was. */
 .nav-toggle-btn {
     display: inline-flex;
     align-items: center;
@@ -91,6 +89,10 @@ body {
     transition: background 0.15s, color 0.15s;
 }
 
+.nav-toggle-btn[hidden] {
+    display: none;
+}
+
 .nav-toggle-btn:hover {
     background: #6b5b47;
     color: #fff;
@@ -101,41 +103,10 @@ body {
     color: #fff;
 }
 
-.nav-toggle-icon {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-weight: 700;
-}
-
-.nav-synopsis-icon {
-    font-size: 1.05em;
-}
-
-.nav-manuscript-icon {
-    font-size: 0.95em;
-}
-
-/* Word-export icon button in the navbar */
-.nav-export {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 1px;
-    padding: 3px 7px;
-    border: 1px solid #2b579a;       /* Word blue */
-    border-radius: 4px;
-    background: #fff;
-    color: #2b579a;
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-weight: 700;
-    cursor: pointer;
-    line-height: 1;
-    transition: background 0.15s, color 0.15s;
-}
-
-.nav-export:hover {
-    background: #2b579a;
-    color: #fff;
-}
-
+/* Word export. Its appearance is now .sidebar-action's (it is a labelled row in
+   the settings panel, not a bare icon button in the navbar) plus the blue
+   .nav-export-mark badge; what stays here is only the state this button has and
+   the others do not -- the in-progress feedback while the docx is built. */
 .nav-export-w {
     font-size: 1.05em;
 }
@@ -158,24 +129,100 @@ body {
     50% { transform: translateY(2px); }
 }
 
-/* --- Page layout: sidebar + content --- */
+/* --- Page layout: TOC + content + shelf --- */
 .page-layout {
     display: flex;
     min-height: calc(100vh - 60px);
 }
 
-/* --- Sidebar --- */
+/* --- Settings dropdown (the former sidebar column) --- */
+/* Drops down from under the ☰ button instead of standing as a 280px column all
+   session. The filters are set once and then read past, so a permanent column
+   spent a fifth of the window on controls that are idle almost all of the time;
+   as an overlay it reserves no width at all and the reading measure grows by
+   that much.
+
+   Anchored to the inline-START edge because that is where its button is, and to
+   the measured header height (published by the ResizeObserver in index.html)
+   because the header wraps to two or three rows on a narrow screen and a fixed
+   3.5rem would leave the panel overlapping it or floating below it. */
 .sidebar {
-    width: 280px;
-    min-width: 280px;
-    background: #fff;
-    border-left: 1px solid #e0dbd4;
-    padding: 16px 14px;
+    position: fixed;
+    inset-inline-start: 12px;
+    top: calc(var(--site-header-height, 3.5rem) + 6px);
+    z-index: 460;
+    inline-size: 320px;
+    max-inline-size: calc(100vw - 24px);
+    /* Never taller than the room below the header, so the panel scrolls
+       internally rather than running off the bottom of the window. */
+    max-block-size: calc(100vh - var(--site-header-height, 3.5rem) - 24px);
     overflow-y: auto;
+    overscroll-behavior: contain;
+    background: #fff;
+    border: 1px solid #d8ccb8;
+    border-radius: 8px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+    padding: 14px;
+    /* Closed by default. visibility (not display) so the panel can transition,
+       and so its scroll position survives being closed and reopened. */
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+}
+
+.sidebar.open {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* --- Apparatus shelf --- */
+/* A real flex column of .page-layout at the inline-END edge, mirroring the
+   filters sidebar at the inline-start one, with the reading column between
+   them. Deliberately not a fixed overlay: taking its own width means the text
+   is never underneath it and no margin has to be maintained in step, exactly as
+   the sidebar does.
+
+   It sits on the same edge the commentary dock opens from, so a panel appears
+   out from behind its own button. That is why .side-dock is inset by the
+   shelf's width rather than pinned to 0 -- the shelf must stay reachable while
+   a panel is open, since it is how the panel is closed again. */
+.apparatus-shelf {
+    flex: 0 0 var(--shelf-width);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 6px;
+    background: #fff;
+    border-inline-start: 1px solid #e0dbd4;
     position: sticky;
     top: 60px;
+    align-self: flex-start;
     height: calc(100vh - 60px);
-    transition: margin-right 0.3s ease;
+    /* Above the commentary dock (480), so its buttons stay clickable with a
+       panel open -- see the inset note above. */
+    z-index: 490;
+}
+
+/* Words rather than the abbreviations these carried in the header: with a
+   column's width available there is no reason to make a reader hover to learn
+   what a button does, and on a touch device the `title` never appears at all.
+   Wrapping is expected ("כתבי יד" takes two lines). */
+.apparatus-shelf .nav-toggle-btn {
+    /* Equal width regardless of how long the word is: the shelf reads as one
+       stack of peers, not a ragged list. The flex container's `stretch` cannot
+       do it alone here, since each button is itself a flex box that sizes to its
+       own content. */
+    width: 100%;
+    padding: 8px 3px;
+    font-family: inherit;
+    font-size: 0.78em;
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: center;
+    white-space: normal;
+    border-radius: 5px;
 }
 
 .sidebar-toggle,
@@ -196,23 +243,42 @@ body {
     transition: background 0.2s;
 }
 
-.sidebar-toggle:hover {
+/* Same reason as .nav-toggle-btn[hidden]: the `display` above would otherwise
+   beat the UA rule, and #toc-toggle is hidden by attribute whenever the TOC is
+   empty or we are above the mobile breakpoint (syncTocToggleVisibility). */
+.sidebar-toggle[hidden],
+.toc-toggle[hidden] {
+    display: none;
+}
+
+.sidebar-toggle:hover,
+.toc-toggle:hover {
     background: #f0ece4;
 }
 
-/* Sidebar is hidden; button reflects the "closed" state */
-body.sidebar-collapsed .sidebar-toggle {
+/* Filled while the dropdown is open, so the button reads as the panel's own
+   handle. This used to mark the panel CLOSED (body.sidebar-collapsed), which
+   was the right signal when the default state was a column standing open; with
+   a dropdown, closed IS the default and needs no marking. */
+.sidebar-toggle.active {
     background: #8b7d6b;
     border-color: #8b7d6b;
     color: #fff;
 }
 
-/* Desktop: fully hide the sidebar when collapsed (mobile has its own
-   off-canvas drawer behavior below, driven by .sidebar.open instead) */
-@media (min-width: 901px) {
-    body.sidebar-collapsed .sidebar {
-        display: none;
-    }
+/* Click-anywhere-else-to-dismiss, at every width. Invisible on desktop: a
+   dropdown that dimmed the page would read as a modal, which this is not. The
+   mobile block below dims it, where the panel does cover most of the screen. */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 450;
+    background: transparent;
+}
+
+.sidebar-overlay.visible {
+    display: block;
 }
 
 /* --- TOC nav (perek/halakha navigation) --- */
@@ -636,6 +702,81 @@ body.sidebar-collapsed .sidebar-toggle {
     display: none;
 }
 
+/* --- Panel actions (below the divider) --- */
+/* Leaving the page and producing a file are not filters, so they sit apart from
+   them: one rule, and rows that read as a menu rather than as more settings. */
+.sidebar-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid #e0dbd4;
+    /* Pinned to the foot of the panel rather than sitting at the end of the
+       filter list, which on a long tractate is several screens down inside the
+       scroll. Still visibly below the divider -- it just travels with the
+       viewport instead of the content. The negative offset and matching padding
+       cancel .sidebar's own bottom padding, so the strip reaches the panel's
+       edge and nothing shows through beneath it. */
+    position: sticky;
+    bottom: -14px;
+    margin-bottom: -14px;
+    padding-bottom: 14px;
+    background: #fff;
+    /* So filters scrolling underneath read as passing behind an edge rather
+       than being cut off mid-row. */
+    box-shadow: 0 -6px 10px -6px rgba(58, 46, 32, 0.16);
+}
+
+.sidebar-action {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 8px;
+    font-family: inherit;
+    font-size: 0.9em;
+    text-align: start;
+    color: #4a3f30;
+    text-decoration: none;
+    background: transparent;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.sidebar-action:hover {
+    background: #f2eee7;
+    color: #2c2317;
+}
+
+/* The Word mark keeps its own blue -- it names an external format rather than
+   this site's palette -- but it is now a small leading badge on a labelled row
+   instead of the whole button, so the row can say what it does in words. */
+.sidebar-actions .nav-export {
+    color: #4a3f30;
+}
+
+.sidebar-actions .nav-export:hover {
+    background: #f2eee7;
+    color: #2c2317;
+}
+
+.nav-export-mark {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 1px;
+    flex-shrink: 0;
+    padding: 2px 5px;
+    border: 1px solid #2b579a;
+    border-radius: 3px;
+    color: #2b579a;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-weight: 700;
+    line-height: 1;
+}
+
 /* Parallels filter panel (sidebar, second tab) */
 .parallels-panel-options .panel-title {
     font-weight: 600;
@@ -646,6 +787,14 @@ body.sidebar-collapsed .sidebar-toggle {
 
 .parallels-panel-options {
     margin-bottom: 10px;
+}
+
+/* An option that does not apply in the current mode (the sub-unit split outside
+   band mode) is dimmed in place rather than removed, so the pane doesn't change
+   shape under the reader as they move between the three modes. */
+.parallels-panel-options label:has(input:disabled) {
+    opacity: 0.45;
+    cursor: default;
 }
 
 /* Ties the sidebar row to the gutter bar it governs: same colour, same
@@ -965,7 +1114,11 @@ body.sidebar-collapsed .sidebar-toggle {
     position: fixed;
     inline-size: min(30rem, 38vw);
     inset-block: var(--site-header-height, 3.5rem) 0;
-    inset-inline-end: 0;
+    /* Stops short of the very edge: the apparatus shelf occupies it, and the
+       shelf is how this panel gets closed again, so covering it would trap the
+       reader. Falls back to 0 below the breakpoint, where the shelf is gone and
+       its buttons have moved to .bottom-tabbar. */
+    inset-inline-end: var(--shelf-width, 0px);
     z-index: 480;
     display: flex;
     flex-direction: column;
@@ -1018,6 +1171,18 @@ body.side-dock-open .main-content {
 }
 
 @media (max-width: 900px) {
+    /* No spare column for the shelf at phone widths: its buttons are moved into
+       .bottom-tabbar by the script in index.html, which reparents the actual
+       elements, so the emptied shelf is simply taken out of the layout. Zeroing
+       the variable is what returns .side-dock to the true edge. */
+    :root {
+        --shelf-width: 0px;
+    }
+
+    .apparatus-shelf {
+        display: none;
+    }
+
     /* --site-header-height defaults to a single-row desktop measurement
        (3.5rem); the mobile header wraps to two or three rows instead (see
        .site-header's flex-wrap rule), so anchoring the dock to that value
@@ -1069,9 +1234,10 @@ body.side-dock-open .main-content {
 
 /* --- Mobile bottom tab bar ---------------------------------------------
    Holds the panel-toggle buttons (filters, TOC, synopsis, manuscript,
-   commentary, parallels) below the responsive breakpoint; index.html moves
-   the actual button elements in here (see the bottom-tabbar script) rather
-   than duplicating them, so this only needs to lay out whatever it's handed. */
+   commentary) below the responsive breakpoint, where there is no room for the
+   apparatus shelf; index.html moves the actual button elements in here (see the
+   bottom-tabbar script) rather than duplicating them, so this only needs to lay
+   out whatever it's handed. */
 .bottom-tabbar {
     display: none;
 }
@@ -1099,10 +1265,12 @@ body.side-dock-open .main-content {
         display: none;
     }
 
-    /* Bigger, evenly-split touch targets -- these are the same buttons as in
-       the header nav, just relocated, so their own rules (.nav-toggle-btn,
-       .sidebar-toggle, .toc-toggle) still set color/active state; only the
-       layout changes here. */
+    /* Bigger, evenly-split touch targets -- these are the same button elements
+       as on the apparatus shelf, just relocated, so their own rules
+       (.nav-toggle-btn, .sidebar-toggle, .toc-toggle) still set colour and
+       active state; only the layout changes here. The shelf's own sizing rules
+       are scoped as descendants of .apparatus-shelf and so stop applying the
+       moment a button is reparented into this bar. */
     .bottom-tabbar > * {
         flex: 1 1 0;
         min-width: 0;
@@ -1276,12 +1444,11 @@ body.manuscript-dock-open .main-content {
     }
 }
 
-/* Shrink the sticky sidebars by the same amount, so their bottom edge
-   never sits underneath the fixed footer row either. Desktop only -- on
-   mobile .sidebar becomes a fixed full-height off-canvas drawer instead. */
+/* Shrink the sticky TOC column by the same amount, so its bottom edge never
+   sits underneath the fixed footer row either. The settings panel is not listed:
+   it is an overlay with its own max-block-size, not a column, and it is opened
+   and dismissed rather than left standing beside the footer. */
 @media (min-width: 901px) {
-    body.synopsis-footer-open .sidebar,
-    body.manuscript-dock-open .sidebar,
     body.synopsis-footer-open .toc-nav,
     body.manuscript-dock-open .toc-nav {
         height: calc(100vh - 60px - 42vh);
@@ -1390,11 +1557,17 @@ body.manuscript-dock-open .main-content {
 }
 
 /* --- Main content area --- */
+/* The 1100px reading cap moved off this column and onto the card inside it (see
+   #app). While the filters held a 280px column there was never any slack for
+   the cap to leave behind; once that column became a dropdown there was, and a
+   capped flex item stopped short -- stranding the leftover width at the
+   inline-end edge and carrying .apparatus-shelf 274px inward with it, off the
+   edge that .side-dock's inset assumes it occupies. Filling the row keeps the
+   shelf at the edge; the cap still limits the measure, just one level in. */
 .main-content {
     flex: 1;
     min-width: 0;
     padding: 20px 24px 60px;
-    max-width: 1100px;
 }
 
 /* --- Card (shared style for sections) --- */
@@ -1406,9 +1579,12 @@ body.manuscript-dock-open .main-content {
     margin-bottom: 16px;
 }
 
+/* The reading surface holds the measure, and centres whatever width is left
+   over. The 1100px cap used to sit on .main-content, where it worked only
+   because the filters column left no slack behind it; see the note there. */
 #app {
-    max-width: 100%;
-    margin: 0;
+    max-width: 1100px;
+    margin: 0 auto;
 }
 
 #content-container {
@@ -1601,40 +1777,33 @@ sup.note-ref.highlight {
         --bottom-tabbar-h: 54px;
     }
 
+    /* Same dropdown, widened to the screen: at phone widths a 320px panel
+       inset from one edge looks like a mistake, and there is nothing beside it
+       worth leaving visible. The off-canvas drawer this used to be is gone --
+       the dropdown behaves identically at every width now, which is what
+       collapsed two open/close paths into one (see index.html). */
     .sidebar {
-        position: fixed;
-        top: 0;
-        right: 0;
-        height: 100vh;
-        z-index: 150;
-        box-shadow: -4px 0 16px rgba(0,0,0,0.12);
-        margin-right: 0;
-        transform: translateX(100%);
-        transition: transform 0.3s ease;
+        inset-inline: 8px;
+        inline-size: auto;
+        max-inline-size: none;
+        /* Clear of the bottom tab bar, which is above the panel and holds the
+           controls for the docks. */
+        max-block-size: calc(100vh - var(--site-header-height, 3.5rem)
+                             - var(--bottom-tabbar-h, 0px) - 20px);
     }
 
-    .sidebar.open {
-        transform: translateX(0);
-    }
-
+    /* Dimmed here, unlike on desktop: the panel covers most of the screen, so
+       the page behind it genuinely is out of use while it's open. */
     .sidebar-overlay {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.3);
-        z-index: 140;
-    }
-
-    .sidebar-overlay.visible {
-        display: block;
+        background: rgba(0, 0, 0, 0.3);
     }
 
     /* The perek/halakhah TOC has no room for its own sticky column on a
-       phone, so it becomes a second off-canvas drawer -- opened from the
-       bottom tab bar (#toc-toggle), sliding in from the opposite edge to the
-       filters sidebar so the two are never visually confused. JS toggles
-       .open on only one of the two at a time; see closeDrawers/toggleSidebar/
-       toggleTocNav in index.html. */
+       phone, so it becomes an off-canvas drawer -- opened from the bottom tab
+       bar (#toc-toggle), sliding in from the inline-end edge, the opposite one
+       to the settings dropdown's anchor, so the two are never visually
+       confused. JS toggles .open on only one of the two at a time; see
+       closeDrawers/toggleSidebar/toggleTocNav in index.html. */
     .toc-nav {
         display: block;
         position: fixed;
