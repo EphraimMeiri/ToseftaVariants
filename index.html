@@ -159,6 +159,13 @@
                         <div class="filter-children" data-parent="hideCitationScope">
                             <div class="detail-slot" data-category="citation_scope"></div>
                         </div>
+                        <!-- Corpus-mined swaps that recur across enough tractates and
+                             witnesses to be scribal habit (אינו/אין, זה/זו). Visible by
+                             default: statistically routine, but some change local meaning. -->
+                        <label class="filter-parent"><input type="checkbox" id="hideRoutine"> חילופים שגרתיים</label>
+                        <div class="filter-children" data-parent="hideRoutine">
+                            <div class="detail-slot" data-category="routine"></div>
+                        </div>
                     </div>
 
                     <div class="status-bar">
@@ -400,9 +407,14 @@
             if (reason === 'orthography: ה/ן final') {
                 return { key: 'ortho_heh_nun', hebrew: 'ה/ן סופית' };
             }
+            if (reason === 'orthography: א/ה final') {
+                return { key: 'ortho_alef_heh', hebrew: 'א/ה סופית' };
+            }
             if (reason.startsWith('orthography')) {
                 return { key: 'orthography', hebrew: 'כתיב חלופי' };
             }
+            if (reason === 'niqqud/punctuation only') return { key: 'niqqud_only', hebrew: 'ניקוד/פיסוק בלבד' };
+            if (reason === 'phonetic spelling') return { key: 'phonetic', hebrew: 'כתיב פונטי' };
             // Rabbi name variants
             if (reason === 'rabbi name variant') {
                 return { key: 'rabbi_name', hebrew: 'שמות חכמים' };
@@ -410,6 +422,13 @@
             // Citation scope
             if (reason.startsWith('citation_scope:')) {
                 return { key: 'citation_scope', hebrew: 'היקף ציטוט' };
+            }
+            // Corpus-mined routine scribal swaps
+            if (reason.startsWith('routine swap')) {
+                return { key: 'routine_swap', hebrew: 'חילופים שגרתיים' };
+            }
+            if (reason === 'numeral notation') {
+                return { key: 'numeral', hebrew: 'סימון מספר' };
             }
             // Minor addition/omission
             if (reason.startsWith('minor addition/omission:')) {
@@ -441,6 +460,8 @@
             if (reason.startsWith('prefix difference: ')) return 'תחילית: ' + reason.split(': ')[1];
             if (reason.startsWith('prefix swap: ')) return 'חילוף: ' + reason.split(': ')[1];
             if (reason === 'orthography') return 'כתיב';
+            if (reason === 'niqqud/punctuation only') return 'ניקוד/פיסוק בלבד';
+            if (reason === 'phonetic spelling') return 'כתיב פונטי';
             if (reason.startsWith('orthography: ')) return 'כתיב: ' + reason.split(': ')[1];
             if (reason === 'rabbi name variant') return 'שמות חכמים';
             if (reason.startsWith('citation_scope: marker only')) {
@@ -449,6 +470,8 @@
             }
             if (reason.startsWith('minor addition/omission: ')) return 'תוספת/השמטה: ' + reason.split(': ')[1];
             if (reason.startsWith('addition/omission: ')) return 'תוספת/השמטה: ' + reason.split(': ')[1];
+            if (reason.startsWith('routine swap: ')) return 'חילוף: ' + reason.split(': ')[1];
+            if (reason === 'numeral notation') return 'סימון מספר';
 if (reason === 'word order difference') return 'סדר מילים';
             if (reason === 'word order difference (with prefixes)') return 'סדר מילים (עם תחיליות)';
             return reason;
@@ -461,6 +484,7 @@ if (reason === 'word order difference') return 'סדר מילים';
             if (document.getElementById('hideMinor').checked) hidden.add('minor');
             if (document.getElementById('hideOtherMinor').checked) hidden.add('other_minor');
             if (document.getElementById('hideCitationScope').checked) hidden.add('citation_scope');
+            if (document.getElementById('hideRoutine').checked) hidden.add('routine');
             if (document.getElementById('hideParagraphBreak').checked) hidden.add('paragraph_break');
             return hidden;
         }
@@ -1107,6 +1131,7 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
     const hideMinorCheckbox = document.getElementById('hideMinor');
     const hideOtherMinorCheckbox = document.getElementById('hideOtherMinor');
     const hideCitationScopeCheckbox = document.getElementById('hideCitationScope');
+    const hideRoutineCheckbox = document.getElementById('hideRoutine');
 
     // --- Highlight linking between sup refs and note spans ---
     let activeNoteId = null;
@@ -1954,6 +1979,7 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         hideMinorCheckbox,
         hideOtherMinorCheckbox,
         hideCitationScopeCheckbox,
+        hideRoutineCheckbox,
         document.getElementById('hideSoleWitness'),
         document.getElementById('hideParagraphBreak'),
         document.getElementById('paragraphBreakLineBreaks'),
