@@ -37,6 +37,24 @@
                 </select>
             </div>
 
+            <!-- Corpus attestation: does each reading exist independently, and
+                 do the two readings share a dictionary entry? Verdicts come
+                 from morphological analysis against a wide tagged reference
+                 corpus plus the local base+witness texts, stamped at
+                 generation time. -->
+            <div class="masechet-selector">
+                <label for="att-dropdown">אימות מורפולוגי:</label>
+                <select id="att-dropdown">
+                    <option value="">הכל</option>
+                    <option value="same_analysis">אותו ניתוח</option>
+                    <option value="same_entry">אותו ערך (נטייה שונה)</option>
+                    <option value="same">אותו ערך — כולם</option>
+                    <option value="diff">ערכים שונים</option>
+                    <option value="hapax">קריאה יחידאית</option>
+                    <option value="unknown">ללא ניתוח</option>
+                </select>
+            </div>
+
             <section class="filters-section">
                 <!-- Filter mode toggle -->
                 <div class="filter-mode-toggle">
@@ -68,6 +86,10 @@
                     <label class="filter-parent"><input type="checkbox" id="hideRoutine"> חילופים שגרתיים</label>
                     <div class="filter-children" data-parent="hideRoutine">
                         <div class="detail-slot" data-category="routine"></div>
+                    </div>
+                    <label class="filter-parent"><input type="checkbox" id="hideMorphology"> חילופי נטייה</label>
+                    <div class="filter-children" data-parent="hideMorphology">
+                        <div class="detail-slot" data-category="morphology"></div>
                     </div>
                 </div>
 
@@ -152,6 +174,9 @@
         if (reason === 'rabbi name variant') return { key: 'rabbi_name', hebrew: 'שמות חכמים' };
         if (reason.startsWith('citation_scope:')) return { key: 'citation_scope', hebrew: 'היקף ציטוט' };
         if (reason.startsWith('routine swap')) return { key: 'routine_swap', hebrew: 'חילופים שגרתיים' };
+        if (reason === 'inflection (same lexeme)') return { key: 'inflection', hebrew: 'חילופי נטייה' };
+        if (reason === 'attested spelling') return { key: 'attested_spelling', hebrew: 'כתיב מאומת' };
+        if (reason === 'divine name spelling') return { key: 'divine_name', hebrew: 'כתיב שם ה\'' };
         if (reason === 'numeral notation') return { key: 'numeral', hebrew: 'סימון מספר' };
         if (reason.startsWith('minor addition/omission:')) return { key: 'minor_add_omit', hebrew: 'תוספת/השמטה קלה' };
         if (reason.startsWith('addition/omission:')) return { key: 'add_omit', hebrew: 'תוספת/השמטה' };
@@ -180,6 +205,9 @@
         if (reason.startsWith('minor addition/omission: ')) return 'תוספת/השמטה: ' + reason.split(': ')[1];
         if (reason.startsWith('addition/omission: ')) return 'תוספת/השמטה: ' + reason.split(': ')[1];
         if (reason.startsWith('routine swap: ')) return 'חילוף: ' + reason.split(': ')[1];
+        if (reason === 'inflection (same lexeme)') return 'נטייה';
+        if (reason === 'attested spelling') return 'כתיב מאומת';
+        if (reason === 'divine name spelling') return 'כתיב שם ה\'';
         if (reason === 'numeral notation') return 'סימון מספר';
         if (reason === 'word order difference') return 'סדר מילים';
         if (reason === 'word order difference (with prefixes)') return 'סדר מילים (עם תחיליות)';
@@ -193,6 +221,7 @@
         minor: 'חילופי אותיות',
         citation_scope: 'היקף ציטוט',
         routine: 'חילופים שגרתיים',
+        morphology: 'חילופי נטייה',
         paragraph_break: 'ציוני פתוח/סתום',
         major: 'שוני מהותי',
         skip: 'דילוג'
@@ -352,6 +381,7 @@
         if (document.getElementById('hideOtherMinor').checked) hidden.add('other_minor');
         if (document.getElementById('hideCitationScope').checked) hidden.add('citation_scope');
         if (document.getElementById('hideRoutine').checked) hidden.add('routine');
+        if (document.getElementById('hideMorphology').checked) hidden.add('morphology');
         return hidden;
     }
 
@@ -408,6 +438,16 @@
         const selectedMasechet = masechetDropdown.value;
         if (selectedMasechet && !row.masekhtot[selectedMasechet]) return false;
 
+        // Attestation filter (morphological verdicts; multi-word rows have no verdict)
+        const attSel = document.getElementById('att-dropdown').value;
+        if (attSel) {
+            const v = row.att && row.att.v;
+            const ok = attSel === 'same' ? (v === 'same_analysis' || v === 'same_entry')
+                : attSel === 'hapax' ? (v === 'hapax' || v === 'hapax_both')
+                : v === attSel;
+            if (!ok) return false;
+        }
+
         // Column search: reading pair search
         const q1 = searchReadingInput.value.trim();
         const q2 = searchReading2Input.value.trim();
@@ -459,6 +499,18 @@
         const info = dataTable.page.info();
         document.getElementById('visible-count').textContent = info.recordsDisplay;
         document.getElementById('total-count').textContent = info.recordsTotal;
+    }
+
+    const ATT_HEBREW = {
+        same_analysis: 'אותו ניתוח',
+        same_entry: 'אותו ערך',
+        diff: 'ערכים שונים',
+        unknown: 'ללא ניתוח',
+        hapax: 'יחידאי',
+        hapax_both: 'יחידאי (שניהם)'
+    };
+    function attVerdictHebrew(att) {
+        return att && ATT_HEBREW[att.v] || '';
     }
 
     // --- Format helpers ---
@@ -522,6 +574,15 @@
         html += ` &nbsp; <span><strong>מספר:</strong> ${row.count}</span>`;
         html += ` &nbsp; <span><strong>עדים:</strong> ${escapeHtml(formatWitnesses(row.witnesses))}</span>`;
         html += `</div>`;
+
+        if (row.att) {
+            const side = (word, m, l) =>
+                `<strong>${escapeHtml(word)}</strong> — קורפוס רחב: ${m}, מקומי: ${l}`;
+            html += `<div class="modal-summary"><span><strong>אימות (${escapeHtml(attVerdictHebrew(row.att))}):</strong> `;
+            html += side(row.left, row.att.lm, row.att.ll) + ' &nbsp;|&nbsp; ';
+            html += side(row.right, row.att.rm, row.att.rl);
+            html += `</span></div>`;
+        }
 
         html += `<div class="modal-reasons"><strong>סיבות:</strong> `;
         html += Object.entries(row.reasons).sort((a, b) => b[1] - a[1]).map(([r, c]) => `${escapeHtml(reasonToHebrew(r))} (${c})`).join(' | ');
@@ -747,7 +808,7 @@
 
             // Build dynamic <thead> columns
             const theadRow = document.getElementById('otzar-thead-row');
-            const fixedHeaders = ['קריאה א׳', 'קריאה ב׳', 'סה״כ', 'סיווג', 'סיבות'];
+            const fixedHeaders = ['קריאה א׳', 'קריאה ב׳', 'סה״כ', 'סיווג', 'סיבות', 'אימות'];
             fixedHeaders.forEach(h => {
                 const th = document.createElement('th');
                 th.textContent = h;
@@ -766,7 +827,8 @@
                     row.right,
                     row.count,
                     CATEGORY_HEBREW[row.category] || row.category,
-                    formatReasons(row.reasons)
+                    formatReasons(row.reasons),
+                    attVerdictHebrew(row.att)
                 ];
                 WITNESS_SIGLA.forEach(w => {
                     base.push(row.witnesses[w] || 0);
@@ -779,7 +841,7 @@
 
             // Column definitions — witness columns are numeric
             const columnDefs = [];
-            const witnessStartIdx = 5;
+            const witnessStartIdx = 6;
             WITNESS_SIGLA.forEach((w, i) => {
                 columnDefs.push({
                     targets: witnessStartIdx + i,
@@ -838,6 +900,7 @@
                 r.addEventListener('change', applyFilters);
             });
             masechetDropdown.addEventListener('change', applyFilters);
+            document.getElementById('att-dropdown').addEventListener('change', applyFilters);
 
         } catch (err) {
             console.error('Error loading data:', err);

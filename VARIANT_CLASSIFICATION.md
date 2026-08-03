@@ -18,6 +18,7 @@ where the two deliberately diverge it is noted below.
 |---|---|---|---|
 | `major` | שוני מהותי | visible | substantive variant, needs a reader |
 | `routine` | חילופים שגרתיים | visible | corpus-mined habitual swap (see below) |
+| `morphology` | חילופי נטייה | visible | same lexeme, different inflection (see below) |
 | `other_minor` | שינויים בינוניים | visible | prefixes, word order, numerals |
 | `citation_scope` | היקף ציטוט | visible | how much of a verse is quoted |
 | `name_orthography` | כתיב שמות | visible | rabbi-name spelling |
@@ -82,6 +83,62 @@ distinct-lexeme and binyan-voice pairs (קירות/קורות, מכיר/מכור
 phonetic nor certify a cluster. When a conflation is spotted in the wild, add
 it there and rerun. Pairs on both the routine and phonetic lists (נוטל/ניטל)
 classify as routine — the visible label wins over the hidden one.
+
+### Morphologically verified pairs (`ATTESTED_SPELLING_PAIRS`, `INFLECTION_PAIRS`, generated)
+
+Mining the attestation verdicts (below) for learnable patterns showed that
+`same_analysis` pairs decompose into two classes, each unsafe to detect by
+shape alone and unsafe to detect by lemma alone — only the conjunction works
+(`generate_attested_spelling_pairs.js`, needs `data/morphology_lexicon.json`):
+
+- **Attested spelling** (→ `minor_orthography`): identical morphological
+  analysis AND difference confined to orthographic shape — interior א/ו/י (matres,
+  glides, interior א/י swaps: שיארה/שיירה, מצאנו/מצינו), particle prefixes
+  stacked with matres (הציבור/צבור), final א/ה. Interior ה is deliberately
+  NOT an orthographic shape: its high-precision cases proved to be closed
+  classes — rabbi names (יהודה/יודה — added to the name groups), divine
+  names (אלהים/אלים — dedicated `isDivineNameSpelling` rule), the definite
+  article (already prefix-handled) — and the rest is binyan morphology.
+- **Inflection** (→ `morphology`, visible): shared dictionary entry AND
+  difference confined to a short word-final suffix over a shared stem —
+  number, gender, person, possessive (חייב/חייבין, כולה/כולו,
+  לעשות/לעשותו). Meaning-bearing, so labeled, not hidden. This class exists
+  because the analysis granularity stops at the stem: "same analysis" does
+  not see pronominal/plural suffixes.
+
+Both generators carry a BLOCKED_PAIRS list for conflations that ambiguous
+tagging lets through (העור/העיר, נותנין/ניתנין, טובך/טיבך) — extend it when
+one is spotted, then rerun.
+
+## Corpus attestation (otzar annotation, not classification)
+
+The otzar stamps every single-word pair with an attestation verdict against
+two corpora: the local one (base Tosefta + full witness texts, ~1.1M tokens)
+and a **wide morphologically tagged reference corpus** (~4M tokens of
+rabbinic literature with per-word dictionary analyses). Pipeline:
+
+1. `data/morphology_lexicon.json` (built outside this repo, gitignored — it
+   derives from a corpus that cannot be redistributed): for every word form
+   in the apparatus, its counts in both corpora and up to 3 dominant
+   dictionary analyses. Rebuild externally only when the reference corpus
+   grows or new variant data adds words.
+2. `generate_otzar_data.js` (`stampAttestation`) → `row.att` with verdict:
+   `same_analysis` (identical entry+binyan/tense: almost certainly one word),
+   `same_entry` (same lexeme, possibly different inflection — מהן/ממנו),
+   `diff` (two real words: confirmed lexical swap), `unknown`, `hapax` /
+   `hapax_both` (a reading unattested anywhere: suspect spelling or
+   corruption). Omission/citation markers are skipped; pseudo-entries without
+   Hebrew letters (`?` for unresolved words) are ignored.
+3. The otzar shows an אימות column, an "אימות מורפולוגי" filter, and
+   per-side counts in the context modal. The analysis strings themselves stay
+   in the gitignored lexicon — only counts and verdicts are published.
+
+This is deliberately **annotation, not classification**: shared lemma still
+covers meaning-bearing inflection differences (from-him/from-them), so it
+cannot auto-demote a variant; and a hapax may be a perfectly good rare word.
+Measured on the major bucket (Aug 2026): ~55% of single-word major
+occurrences are different-lemma (confirmed substantive), ~32% share a lemma,
+~10% involve a hapax even against the combined ~5M tokens.
 
 ## Measured design decisions (do not re-litigate without data)
 

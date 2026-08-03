@@ -158,6 +158,8 @@ async function main() {
 
     const allRows = [...globalRowsMap.values()];
 
+    stampAttestation(allRows);
+
     // Sort by count descending
     allRows.sort((a, b) => b.count - a.count || a.left.localeCompare(b.left, 'he'));
 
@@ -170,6 +172,64 @@ async function main() {
     const outPath = path.join(__dirname, 'otzar_data.js');
     fs.writeFileSync(outPath, 'const OTZAR_DATA = ' + JSON.stringify(output) + ';\n', 'utf-8');
     console.log(`\nDone. ${allRows.length} unique pairs written to ${outPath}`);
+}
+
+// Stamp single-word rows with corpus attestation from
+// data/morphology_lexicon.json (built externally, not committed: attestation
+// counts and morphological analyses for apparatus words from a wide tagged
+// reference corpus plus the local base+witness texts). Verdicts:
+//   same_analysis - both readings attested under an identical morphological analysis
+//                   (entry + binyan/tense): almost certainly the same word
+//   same_entry    - same dictionary entry, different analysis: same lexeme,
+//                   possibly a different inflection (מהן/ממנו)
+//   diff          - both attested under different entries: a real lexical swap
+//   unknown       - attested but no lemma tagging survived filtering
+//   hapax / hapax_both - a reading unattested anywhere (fewer than 2 tokens in
+//                   ~5M combined): suspect spelling or corruption
+function stampAttestation(rows) {
+    const lexPath = path.join(__dirname, 'data/morphology_lexicon.json');
+    if (!fs.existsSync(lexPath)) {
+        console.log('data/morphology_lexicon.json missing - attestation not stamped');
+        return;
+    }
+    const lex = JSON.parse(fs.readFileSync(lexPath, 'utf-8'));
+    const singleBare = s => {
+        const words = stripMarkup(String(s || '')).split(/\s+/).filter(w => /[א-ת]/.test(w));
+        return words.length === 1 ? bareWord(words[0]) : null;
+    };
+    const entryName = e => e.split(' [')[0];
+    let stamped = 0;
+    rows.forEach(row => {
+        // Omission and citation-continuation markers are notation, not words —
+        // attesting them against the lexicon is meaningless.
+        if (isOmissionMarker(row.left) || isOmissionMarker(row.right)
+            || TRUNCATION_MARKERS.has(normalizeQuotes(row.left).trim())
+            || TRUNCATION_MARKERS.has(normalizeQuotes(row.right).trim())) return;
+        const bl = singleBare(row.left);
+        const br = singleBare(row.right);
+        if (!bl || !br || bl === br) return;
+        const clean = x => ({ ...x, e: (x.e || []).filter(([entry]) => /[א-ת]/.test(entry)) });
+        const L = clean(lex[bl] || { m: 0, l: 0, e: [] });
+        const R = clean(lex[br] || { m: 0, l: 0, e: [] });
+        const attested = x => x.m >= 2 || x.l >= 2;
+        let v;
+        if (!attested(L) || !attested(R)) {
+            v = (!attested(L) && !attested(R)) ? 'hapax_both' : 'hapax';
+        } else if (!L.e.length || !R.e.length) {
+            v = 'unknown';
+        } else {
+            const lAnal = new Set(L.e.map(x => x[0]));
+            const lEntries = new Set(L.e.map(x => entryName(x[0])));
+            if (R.e.some(x => lAnal.has(x[0]))) v = 'same_analysis';
+            else if (R.e.some(x => lEntries.has(entryName(x[0])))) v = 'same_entry';
+            else v = 'diff';
+        }
+        // counts + verdict only: the analysis strings themselves are the
+        // reference corpus's content and must not be redistributed
+        row.att = { v, lm: L.m, ll: L.l, rm: R.m, rl: R.l };
+        stamped++;
+    });
+    console.log(`attestation stamped on ${stamped} rows`);
 }
 
 main().catch(err => {

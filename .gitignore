@@ -17,3 +17,9 @@ node_modules/
 # shows no tab for a commentary whose file is absent, so a checkout without these
 # needs no special casing.
 data/commentaries-ocr/ChasdeiDavid_*.json
+
+# Morphological-analysis lexicon: attestation counts and analyses for apparatus
+# words, derived from an external tagged reference corpus that cannot be
+# redistributed. Built outside this repo; the generators degrade gracefully
+# when it is absent.
+data/morphology_lexicon.json
