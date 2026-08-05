@@ -568,6 +568,11 @@ function createToseftaViewer() {
             btn.hidden = !group.some(l => availableIds.has(l.id));
             setNavToggleOn(id, group.some(l => registry.isEnabled(l.id)));
         });
+        // The תצוגות trigger summarises its whole menu, which includes the
+        // synopsis -- still hand-wired and NOT a registry layer, so it cannot be
+        // summarised from here. syncApparatusMenu reads the buttons instead, and
+        // updateDisplay calls it too for exactly that reason.
+        if (typeof syncApparatusMenu === 'function') syncApparatusMenu();
     });
 
     // Turning a group on enables every layer in it that has data for this

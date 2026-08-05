@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="vendor/midrash-viewer-core/midrash-viewer-core.css?v=10">
-    <link rel="stylesheet" href="styles.css?v=30">
+    <link rel="stylesheet" href="styles.css?v=32">
     <title>תוספתא עם חילופי נוסח</title>
 </head>
 <body>
@@ -27,6 +27,32 @@
                  no-op there) and switched on the modal dimming backdrop, which
                  dimmed the page for nothing. -->
             <button class="toc-toggle" id="toc-toggle" aria-label="ניווט לפי פרקים והלכות" title="ניווט לפי פרקים והלכות" hidden>📖</button>
+            <!-- Which apparatus registers are showing. A dropdown for the same
+                 reason the settings are one: these are occasional gestures --
+                 a panel is opened, read for a while, and closed by its own ✕ --
+                 so a rail standing down the edge of every page was permanent
+                 chrome bought for an intermittent need.
+                 Hidden when the loaded tractate has no register at all, and
+                 filled while any is open, so the header still answers "is
+                 anything beside the text?" without being opened. Both are
+                 derived from the registry, in the same pass as the buttons
+                 inside it -- see registry.onChange in viewer_layers.js. -->
+            <div class="header-menu" id="apparatus-menu-wrap" hidden>
+                <button type="button" class="header-menu-btn" id="apparatus-menu-toggle"
+                        aria-expanded="false" aria-controls="apparatus-menu"
+                        title="תצוגות נלוות לטקסט" aria-label="תצוגות נלוות לטקסט">תצוגות</button>
+                <div class="header-dropdown" id="apparatus-menu">
+                    <button type="button" class="nav-toggle-btn" id="synopsisMode" hidden aria-pressed="false"
+                            title="תצוגת סינופסיס -- השוואת עדי הנוסח בטבלה">סינופסיס</button>
+                    <button type="button" class="nav-toggle-btn" id="manuscriptMode" hidden aria-pressed="false"
+                            title="צילומי כתבי היד">כתבי יד</button>
+                    <!-- One button for every commentary: they share a dock and
+                         appear as tabs within it, so a button apiece was both
+                         redundant and unscalable (four commentaries are coming). -->
+                    <button type="button" class="nav-toggle-btn" id="commentaryMode" hidden aria-pressed="false"
+                            title="פירושים">פירושים</button>
+                </div>
+            </div>
             <h1>תוספתא עם חילופי נוסח</h1>
         </div>
         <div class="masechet-selector">
@@ -35,11 +61,9 @@
             <button id="load-masechet">טען</button>
             <span class="edition-note" id="edition-note" hidden></span>
         </div>
-        <!-- Nothing else. The apparatus toggles are on .apparatus-shelf, and
-             what used to sit here besides them -- the אוצר link and the Word
+        <!-- Nothing else. What used to sit here -- the אוצר link and the Word
              export -- has moved into #sidebar under a divider: neither is a
-             reading control, and neither was worth a permanent seat in the
-             header. -->
+             reading control, and neither was worth a permanent seat. -->
     </header>
 
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
@@ -225,39 +249,6 @@
 
         </div>
 
-        <!-- Apparatus shelf: one rail naming every register that can join the
-             text, mirroring the filters sidebar at the other edge of the reading
-             column and sitting on the same edge the commentary dock opens from.
-             A launcher, not a tab strip -- two of the three panels open
-             elsewhere (the synopsis footer and the manuscript dock share the
-             bottom row), so the shelf says which registers are SHOWING rather
-             than where they are.
-             Words, not the abbreviations these buttons used to carry: in the
-             header a bare כ״י/פי׳ put all of its meaning in a `title`, which a
-             touch device never shows at all. The shelf has the width for the
-             real thing.
-             The parallels are deliberately NOT here. They are a rendering mode
-             of the reading column rather than a panel, and they live with the
-             other display settings in the sidebar's מקבילות tab -- as one
-             control, which is what stops them disagreeing with themselves (see
-             syncParallelsModeRadio). -->
-        <nav class="apparatus-shelf" id="apparatus-shelf" aria-label="מנגנוני עזר לטקסט">
-            <button type="button" class="nav-toggle-btn" id="synopsisMode" hidden aria-pressed="false"
-                    title="תצוגת סינופסיס -- השוואת עדי הנוסח בטבלה" aria-label="תצוגת סינופסיס">
-                סינופסיס
-            </button>
-            <button type="button" class="nav-toggle-btn" id="manuscriptMode" hidden aria-pressed="false"
-                    title="צילומי כתבי היד" aria-label="צילומי כתבי היד">
-                כתבי יד
-            </button>
-            <!-- One button for every commentary: they share a dock and appear as
-                 tabs within it, so a button apiece was both redundant and
-                 unscalable (four commentaries are coming). -->
-            <button type="button" class="nav-toggle-btn" id="commentaryMode" hidden aria-pressed="false"
-                    title="פירושים" aria-label="פירושים">
-                פירושים
-            </button>
-        </nav>
     </div>
 
     <div class="bottom-panels" id="bottom-panels">
@@ -295,8 +286,8 @@
 
     <script src="vendor/midrash-viewer-core/midrash-viewer-core.js?v=10"></script>
     <script src="tosefta_parsing_tools.js?v=19"></script>
-    <script src="parallels_layer.js?v=25"></script>
-    <script src="viewer_layers.js?v=12"></script>
+    <script src="parallels_layer.js?v=26"></script>
+    <script src="viewer_layers.js?v=14"></script>
     <script>
         let currentTextData = null;
         let currentVariantsData = null;
@@ -321,61 +312,113 @@
         // for options that change only what they draw.
         let refreshInlineLayers = null;
 
-        // --- Settings dropdown / TOC drawer ---
-        // The settings panel is a dropdown from under the ☰ button at EVERY
-        // width now, so there is one open/close path instead of the old split
-        // where desktop hid a layout column (body.sidebar-collapsed) and mobile
-        // slid an off-canvas drawer. The perek/halakhah TOC is still a
-        // mobile-only drawer from the opposite edge. Both are overlays over the
-        // same backdrop, and only one is ever open -- opening either closes the
-        // other rather than stacking them.
+        // --- Header dropdowns / TOC drawer ---
+        // Three overlays compete for the same screen and share one backdrop: the
+        // settings dropdown (☰), the apparatus dropdown (תצוגות) and -- on
+        // mobile only -- the perek/halakhah TOC drawer. Exactly one is ever
+        // open. Rather than each toggle remembering to close the other two, they
+        // all go through openPanel(), which is also what the backdrop, Escape
+        // and the mobile-breakpoint handler call. Nothing about which panels
+        // exist is encoded in more than one place.
+        //
+        // Both dropdowns are dropdowns at EVERY width, so there is one
+        // open/close path where there used to be a split: desktop hid a layout
+        // column (body.sidebar-collapsed) and mobile slid an off-canvas drawer.
         const sidebarEl = document.getElementById('sidebar');
         const sidebarToggleBtn = document.getElementById('sidebar-toggle');
         const sidebarOverlay = document.getElementById('sidebar-overlay');
         const tocNavEl = document.getElementById('toc-nav');
         const tocToggleBtn = document.getElementById('toc-toggle');
+        const apparatusMenuEl = document.getElementById('apparatus-menu');
+        const apparatusMenuBtn = document.getElementById('apparatus-menu-toggle');
 
-        // The backdrop is what makes clicking anywhere else dismiss the panel.
-        // It is invisible on desktop (a dropdown that dimmed the page would
-        // read as a modal, which this is not) and dimmed on mobile, where the
-        // panel covers most of the screen -- see .sidebar-overlay.
-        function syncSidebarToggle() {
-            const open = sidebarEl.classList.contains('open');
-            sidebarToggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-            sidebarToggleBtn.classList.toggle('active', open);
+        // A panel and the button that owns it. The TOC drawer's opener lives in
+        // the bottom tab bar and carries no expanded state of its own, hence the
+        // null trigger.
+        const OVERLAY_PANELS = [
+            { el: sidebarEl, trigger: sidebarToggleBtn },
+            { el: apparatusMenuEl, trigger: apparatusMenuBtn },
+            { el: tocNavEl, trigger: null },
+        ];
+
+        // The backdrop is what makes clicking anywhere else dismiss a panel. It
+        // is invisible on desktop (a dropdown that dimmed the page would read as
+        // a modal, which these are not) and dimmed on mobile, where a panel
+        // covers most of the screen -- see .sidebar-overlay.
+        //
+        // `which` is the element to leave open, or null to close everything. A
+        // trigger reads pressed only while its own panel is open, so a stale
+        // "expanded" is not expressible.
+        function openPanel(which) {
+            OVERLAY_PANELS.forEach(({ el, trigger }) => {
+                const on = el === which;
+                el.classList.toggle('open', on);
+                if (!trigger) return;
+                trigger.classList.toggle('active', on);
+                trigger.setAttribute('aria-expanded', on ? 'true' : 'false');
+            });
+            sidebarOverlay.classList.toggle('visible', !!which);
         }
-        function closeDrawers() {
-            sidebarEl.classList.remove('open');
-            tocNavEl.classList.remove('open');
-            sidebarOverlay.classList.remove('visible');
-            syncSidebarToggle();
+        function togglePanel(el) {
+            openPanel(el.classList.contains('open') ? null : el);
         }
-        function toggleSidebar() {
-            const opening = !sidebarEl.classList.contains('open');
-            tocNavEl.classList.remove('open');
-            sidebarEl.classList.toggle('open', opening);
-            sidebarOverlay.classList.toggle('visible', opening);
-            syncSidebarToggle();
-        }
-        function toggleTocNav() {
-            const opening = !tocNavEl.classList.contains('open');
-            sidebarEl.classList.remove('open');
-            tocNavEl.classList.toggle('open', opening);
-            sidebarOverlay.classList.toggle('visible', opening);
-            syncSidebarToggle();
-        }
-        sidebarToggleBtn.addEventListener('click', toggleSidebar);
-        tocToggleBtn.addEventListener('click', toggleTocNav);
+        function closeDrawers() { openPanel(null); }
+
+        sidebarToggleBtn.addEventListener('click', () => togglePanel(sidebarEl));
+        apparatusMenuBtn.addEventListener('click', () => togglePanel(apparatusMenuEl));
+        tocToggleBtn.addEventListener('click', () => togglePanel(tocNavEl));
         sidebarOverlay.addEventListener('click', closeDrawers);
+        // The backdrop deliberately stops below the header (see .sidebar-overlay),
+        // so clicks up there never reach it. Anything in the bar that is not a
+        // menu handle or inside an open menu still counts as clicking away.
+        document.querySelector('.site-header').addEventListener('click', (e) => {
+            if (e.target.closest('#sidebar-toggle, #toc-toggle, #apparatus-menu-wrap')) return;
+            closeDrawers();
+        });
         // Escape is the expected way out of a dropdown, and the only one that
-        // does not require finding the backdrop or the button again.
+        // does not require finding the backdrop or the button again. Focus goes
+        // back to whichever trigger opened the panel, not to a fixed one.
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
-            if (!sidebarEl.classList.contains('open')
-                && !tocNavEl.classList.contains('open')) return;
+            const open = OVERLAY_PANELS.find(p => p.el.classList.contains('open'));
+            if (!open) return;
             closeDrawers();
-            sidebarToggleBtn.focus();
+            if (open.trigger) open.trigger.focus();
         });
+        // Choosing a register is a one-shot gesture: the panel it opens is what
+        // the reader wanted to look at, and leaving the menu hanging over it
+        // would just be something else to dismiss. Closing on the button's own
+        // click (not on any click inside) keeps the menu open if a future
+        // control in here is one you'd adjust repeatedly.
+        apparatusMenuEl.querySelectorAll('.nav-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', closeDrawers);
+        });
+
+        // The trigger is a summary of its own menu: shown only while the menu has
+        // at least one entry, and filled while any of them is on, so the header
+        // answers "is anything beside the text?" without being opened.
+        //
+        // Derived from the BUTTONS, by id, not from the layer registry. Two
+        // reasons, and both matter: the synopsis is still hand-wired rather than
+        // a registry layer, so the registry cannot see it at all (its `hidden` is
+        // set by updateDisplay) -- summarising from the registry hid the whole
+        // menu, synopsis included, on any tractate with witnesses but no images
+        // and no commentary. And reading by id survives the buttons being
+        // reparented into .bottom-tabbar on mobile, which a container query would
+        // not. Called from both places that can change a button.
+        const APPARATUS_BUTTON_IDS = ['synopsisMode', 'manuscriptMode', 'commentaryMode'];
+        function syncApparatusMenu() {
+            const buttons = APPARATUS_BUTTON_IDS
+                .map(id => document.getElementById(id))
+                .filter(Boolean);
+            const shown = buttons.filter(b => !b.hidden);
+            document.getElementById('apparatus-menu-wrap').hidden = shown.length === 0;
+            apparatusMenuBtn.classList.toggle(
+                'has-open', shown.some(b => b.classList.contains('active')));
+            // An open menu with nothing left in it (a tractate switch can empty
+            // it) would be an empty box hanging off a hidden button.
+            if (!shown.length && apparatusMenuEl.classList.contains('open')) openPanel(null);
+        }
 
         // The panel hangs off the bottom of the header, whose height is not
         // fixed: it wraps to two or three rows on a narrow screen. Publish the
@@ -425,14 +468,19 @@
         // --- Mobile bottom tab bar ---
         // Relocates the panel-toggle controls (sidebar, TOC, synopsis,
         // manuscript, commentary) into a fixed bar at the bottom of the screen
-        // below the responsive breakpoint, where they're reachable without a trip
-        // back up the page -- and where the apparatus shelf cannot go, since a
-        // phone has no spare column to give it. Moves the actual elements rather
-        // than cloning them: viewer_layers.js's nav-button sync (hidden/active
-        // state) and this file's own click listeners above are keyed to these
-        // same ids, so cloning would either duplicate ids or need a second
-        // sync path. Reparenting a node keeps its id and listeners intact and
-        // is trivially reversible above the breakpoint.
+        // below the responsive breakpoint, where they're thumb-reachable without
+        // a trip back up the page. On a phone the register toggles come OUT of
+        // the תצוגות dropdown and sit directly in the bar -- a dropdown reached
+        // from a bar that is already one tap away would be a tap for nothing --
+        // which is why #apparatus-menu-wrap hides itself at this width (CSS) and
+        // its buttons are listed here.
+        //
+        // Moves the actual elements rather than cloning them: viewer_layers.js's
+        // nav-button sync (hidden/active state) and this file's own click
+        // listeners above are keyed to these same ids, so cloning would either
+        // duplicate ids or need a second sync path. Reparenting a node keeps its
+        // id and listeners intact, and `parent`/`next` are captured before any
+        // move so putting them back is exact.
         (function () {
             const bar = document.getElementById('bottom-tabbar');
             const homes = ['sidebar-toggle', 'toc-toggle', 'synopsisMode', 'manuscriptMode', 'commentaryMode']
@@ -1634,6 +1682,9 @@ function displayTextAndVariants(textData, variantsData, witnessData, manuscriptD
         document.getElementById('synopsis-footer').hidden = !synopsisModeOn;
         document.body.classList.toggle('synopsis-footer-open', synopsisModeOn);
         if (synopsisModeOn) renderSynopsisFooter();
+        // Both of the synopsis button's states were just decided here, and the
+        // registry -- which drives this everywhere else -- cannot see this button.
+        syncApparatusMenu();
 
         // The manuscript-image panel needs nothing here any more: the registry
         // decides whether it's relevant (MANUSCRIPT_LAYER.available -- any
