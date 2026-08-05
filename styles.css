@@ -1052,6 +1052,19 @@ body {
     background: #f5f0e6;
 }
 
+/* Which physical fragment the ג row is quoting here: the catalogue's codex
+   siglum (G14, E5), hung off the witness siglum. Deliberately quiet -- it
+   qualifies the siglum, it is not a second witness -- with the full shelfmark
+   in the label's tooltip. */
+.syn-frag-siglum {
+    margin-right: 2px;
+    font-size: 0.62em;
+    font-weight: 600;
+    letter-spacing: 0;
+    color: #a08a63;
+    cursor: help;
+}
+
 .synw-match {
     color: #b8a890;
 }

@@ -99,6 +99,47 @@ function getWitnessAlignment(location) {
         .catch(() => null);
 }
 
+// The geniza catalogue (data/geniza_catalog.json, built from
+// analysis/geniza_catalog.xlsx) -- one file for the whole corpus, not per
+// tractate, so it is fetched once and cached rather than per masechet. It maps
+// a codex siglum (G14, E5) to the shelfmarks it is catalogued under; the
+// witness data records only the siglum, so this is what lets the synopsis name
+// which physical fragment attests a passage. Absent/failed fetch just means no
+// shelfmarks in tooltips, never a broken synopsis.
+const GENIZA_CATALOG_URL = "data/geniza_catalog.json";
+let genizaCatalog = null;
+
+function loadGenizaCatalog() {
+    if (genizaCatalog) return Promise.resolve(genizaCatalog);
+    return fetch(GENIZA_CATALOG_URL)
+        .then(response => response.ok ? response.json() : null)
+        .then(data => { genizaCatalog = data; return data; })
+        .catch(() => null);
+}
+
+// Codex sigla of the fragments a base range falls in, in order.
+function genizaCodicesInRange(w, start, end) {
+    if (!w || !Array.isArray(w.fragments)) return [];
+    const out = [];
+    w.fragments.forEach(f => {
+        if (f.start > end - 1 || f.end < start) return;
+        (f.codices || (f.codex ? [f.codex] : [])).forEach(c => {
+            if (!out.includes(c)) out.push(c);
+        });
+    });
+    return out;
+}
+
+// "G14 — T-S F1(1) p.119, T-S NS 219.35" for the label's title attribute.
+function genizaCodexTooltip(sigla) {
+    if (!sigla.length) return '';
+    const codices = (genizaCatalog && genizaCatalog.codices) || {};
+    return sigla.map(sig => {
+        const marks = (codices[sig] && codices[sig].shelfmarks) || [];
+        return marks.length ? `${sig} — ${marks.join(', ')}` : sig;
+    }).join('\n');
+}
+
 function getManuscriptImageUrl(location, witnessSlug) {
     const tractateSlug = location.split("/").pop().replace("Tosefta%20", witnessSlug + "_");
     return MANUSCRIPT_IMAGES_DATA_BASE + tractateSlug + ".json";
@@ -2027,6 +2068,21 @@ function buildSynopsisStrips(chapterWitness, range, halakhaHtml, ranges) {
         tr.appendChild(labelCell);
 
         const w = siglum ? chapterWitness.witnesses[siglum] : null;
+
+        // A fragmentary witness's siglum alone ("ג") does not say WHICH
+        // fragment is speaking, and over a given passage that is the citable
+        // fact -- the geniza pieces are separate manuscripts, catalogued
+        // individually. Name the codex here and put its shelfmark in the
+        // tooltip. (Two sigla when the passage runs from one fragment into the
+        // next; see _label_for_span in the alignment engine.)
+        const codices = genizaCodicesInRange(w, start, end);
+        if (codices.length) {
+            const tag = document.createElement('sup');
+            tag.className = 'syn-frag-siglum';
+            tag.textContent = codices.join('+');
+            labelCell.appendChild(tag);
+            labelCell.title = genizaCodexTooltip(codices);
+        }
         const rowSubst = siglum ? subst[siglum] : null;
 
         function appendPlusCell(anchor) {

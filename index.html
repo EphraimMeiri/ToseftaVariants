@@ -979,6 +979,11 @@ if (reason === 'word order difference') return 'סדר מילים';
             const selectedText = dropdown.options[dropdown.selectedIndex].text;
             updateUrl(selectedText);
 
+            // Corpus-wide, not per masechet, and only used to fill in tooltips:
+            // fetched alongside but not awaited, so a slow or missing catalogue
+            // never delays the text.
+            loadGenizaCatalog();
+
             Promise.all([
                 getToseftaText(selectedLocation),
                 getToseftavariants(selectedLocation),
