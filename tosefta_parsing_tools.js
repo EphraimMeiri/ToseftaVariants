@@ -1889,7 +1889,13 @@ function buildWitnessStrips(chapterWitness, range, sigla) {
             }
         });
         const body = parts.join(' ');
-        row.innerHTML = `<span class="witness-strip-label">${siglum}</span><span class="witness-strip-body">${body}</span>`;
+        // Same fragment naming as the footer synopsis (see buildRow): "ג"
+        // alone does not say which geniza piece is speaking here.
+        const codices = genizaCodicesInRange(w, start, end);
+        const tag = codices.length
+            ? `<sup class="syn-frag-siglum" title="${genizaCodexTooltip(codices).replace(/"/g, '&quot;')}">${codices.join('+')}</sup>`
+            : '';
+        row.innerHTML = `<span class="witness-strip-label">${siglum}${tag}</span><span class="witness-strip-body">${body}</span>`;
         container.appendChild(row);
     });
     return container.children.length ? container : null;
