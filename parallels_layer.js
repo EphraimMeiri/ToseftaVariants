@@ -118,6 +118,9 @@ function sanitizeParallelsData(data) {
     return data;
 }
 
+const PARALLEL_COMPARE_TITLE =
+    'ציון שכל מקורותיו ציינו אותו כהשוואה (ועיין, והשווה) ולא כמקבילה';
+
 const PARALLEL_PRECISION_LABELS = {
     span: 'היקף מזוהה',
     dh: 'ראש הקטע בלבד',
@@ -801,6 +804,18 @@ function createApparatusRenderer(labels = {}) {
         dots.title = `${entry.numSources || 1} מקורות: ${sourceList(entry)}`;
         meta.appendChild(dots);
 
+        // A reference every one of its sources introduced with ועיין/השווה is a
+        // different claim from a parallel, and the reader is entitled to see
+        // which they are looking at before they open it -- the hide-them filter
+        // answers "get these out of my way", not "which of these is which".
+        if (entry.compare) {
+            const flag = document.createElement('span');
+            flag.className = 'parallel-compare';
+            flag.textContent = 'ועיין';
+            flag.title = PARALLEL_COMPARE_TITLE;
+            meta.appendChild(flag);
+        }
+
         if (entry.precision !== 'span') {
             const flag = document.createElement('span');
             flag.className = 'parallel-precision';
@@ -903,8 +918,13 @@ function createApparatusRenderer(labels = {}) {
         const out = document.createElement('button');
         out.type = 'button';
         out.className = 'apparatus-ref apparatus-ref-live';
+        // A ועיין reference is a pointer, not a claimed parallel; underlined the
+        // same way it was indistinguishable from one.
+        if (entry.compare) out.classList.add('apparatus-ref-compare');
         out.textContent = span.s;
-        out.title = entry.heRef || entry.ref;
+        out.title = entry.compare
+            ? `${entry.heRef || entry.ref} -- ${PARALLEL_COMPARE_TITLE}`
+            : (entry.heRef || entry.ref);
         out.addEventListener('click', () => {
             const body = block.querySelector('.apparatus-note-body');
             const open = block.dataset.openId === entry.id;
@@ -1065,10 +1085,10 @@ const PARALLEL_EXTENTS_LAYER = {
     label: 'סימון היקף המקבילות',
     kind: 'parallels',
     placement: 'inline',
-    // No navButtonId: unlike the panels, this layer has no button on the
-    // apparatus shelf. Showing the parallels and choosing where they sit is one
+    // No navButtonId: unlike the panels, this layer has no entry in the תצוגות
+    // dropdown. Showing the parallels and choosing where they sit is one
     // question with one answer, asked by the parallels-mode radio in the
-    // sidebar (see index.html) -- a shelf button beside it could only ever
+    // sidebar (see index.html) -- a second control beside it could only ever
     // contradict it.
     available: hasParallelsData,
 
@@ -2396,8 +2416,7 @@ function renderParallelsFilterUI(root, parallelsData, onChange, opts = {}) {
             const row = parallelsFilterRow('הסתר הפניות "ועיין"', counts.compare,
                 parallelsFilter.hideCompare,
                 checked => { parallelsFilter.hideCompare = checked; notify(); },
-                { className: 'filter-parent',
-                  title: 'ציונים שכל מקורותיהם ציינו אותם כהשוואה (ועיין, והשווה) ולא כמקבילה' });
+                { className: 'filter-parent', title: PARALLEL_COMPARE_TITLE });
             kind.body.appendChild(row.label);
         }
         if (counts.farEnd) {

@@ -2460,6 +2460,18 @@ body.parallel-extents-on .text-content {
     letter-spacing: 1px;
 }
 
+/* ועיין: what the edition called a comparison rather than a parallel. Named in
+   the edition's own word, and quiet -- it qualifies the reference, it is not a
+   warning about it. */
+.parallel-compare {
+    font-size: 0.72em;
+    color: #8a7a62;
+    white-space: nowrap;
+    border: 1px solid #ded3c0;
+    border-radius: 3px;
+    padding: 0 3px;
+}
+
 /* Precision is shown only when it is WORSE than a measured span -- the absence
    of this label is what "we located the extent" looks like. */
 .parallel-precision {
@@ -2542,6 +2554,13 @@ body.parallel-extents-on .text-content {
 .apparatus-ref-live.open {
     background: #dce8f3;
     font-weight: 600;
+}
+
+/* A ועיין reference inside a note: still live, still opens the passage, but the
+   underline is dashed, so a pointer to compare does not read on the page as an
+   asserted parallel. */
+.apparatus-ref-compare {
+    text-decoration-style: dashed;
 }
 
 /* Recognised, unplaceable: the midrashic works, which the parser can name but
