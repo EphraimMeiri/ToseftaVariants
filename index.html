@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="vendor/midrash-viewer-core/midrash-viewer-core.css?v=10">
-    <link rel="stylesheet" href="styles.css?v=32">
+    <link rel="stylesheet" href="styles.css?v=33">
     <title>תוספתא עם חילופי נוסח</title>
 </head>
 <body>
@@ -260,6 +260,21 @@
                 <label class="synopsis-footer-toggle"><input type="checkbox" id="synopsisShowChapter"> הצג פרק שלם</label>
                 <button type="button" id="synopsis-footer-close" class="synopsis-footer-close" title="סגור">✕</button>
             </div>
+            <!-- A cell that holds no word now says WHY, and the cells that do
+                 hold one are graded. Without a key the reader cannot tell an
+                 omission from missing parchment, so the states are named. -->
+            <div class="synopsis-legend">
+                <span><i class="synopsis-legend-swatch legend-gap">⟨ ⟩</i>חסר בעד</span>
+                <span><i class="synopsis-legend-swatch legend-absent"></i>אינו קיים</span>
+                <span><i class="synopsis-legend-swatch legend-subst"></i>תמורה</span>
+                <span><i class="synopsis-legend-swatch legend-plus"></i>תוספת</span>
+                <span><i class="synopsis-legend-swatch legend-fold"></i>קיצור</span>
+                <span><i class="synopsis-legend-swatch legend-ghost"></i>סדר שונה</span>
+                <span class="synopsis-legend-sep"></span>
+                <span class="synw-diff-minor">כתיב</span>
+                <span class="synw-diff-routine">שגרתי</span>
+                <span class="synw-diff-major">מהותי</span>
+            </div>
             <div class="synopsis-footer-body" id="synopsis-footer-body"></div>
         </div>
 
@@ -285,7 +300,7 @@
     <nav class="bottom-tabbar" id="bottom-tabbar" hidden></nav>
 
     <script src="vendor/midrash-viewer-core/midrash-viewer-core.js?v=10"></script>
-    <script src="tosefta_parsing_tools.js?v=19"></script>
+    <script src="tosefta_parsing_tools.js?v=20"></script>
     <script src="parallels_layer.js?v=26"></script>
     <script src="viewer_layers.js?v=14"></script>
     <script>

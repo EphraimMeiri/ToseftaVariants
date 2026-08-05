@@ -759,7 +759,8 @@ function buildCombinedSynopsis(sides) {
                         td.textContent = '⟨ ⟩';
                     } else {
                         td.textContent = word;
-                        td.classList.add(wordsMatchHe(S.tokens[li], word) ? 'synw-match' : 'synw-diff');
+                        if (wordsMatchHe(S.tokens[li], word)) td.classList.add('synw-match');
+                        else td.classList.add(...synopsisDiffClasses(S.tokens[li], word));
                     }
                 }
                 row.appendChild(td);

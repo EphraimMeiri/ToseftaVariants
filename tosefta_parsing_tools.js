@@ -1913,19 +1913,108 @@ function buildSynopsisStrips(chapterWitness, range, halakhaHtml, ranges) {
         return (run && run.length) ? run : null;
     }
 
+    // True when witness `w` simply does not survive at base position
+    // `baseIdx`. A fragmentary witness (the Cambridge geniza pieces, ג) carries
+    // `fragments: [{start, end}]` -- the inclusive base ranges it is extant
+    // for. Outside those ranges the parchment is gone, which is a different
+    // fact from "this witness omits the word", and by far the commoner one:
+    // 71% of the ג gap cells the synopsis renders fall outside every fragment.
+    // Witnesses with no `fragments` field are complete and never absent.
+    function notExtantAt(w, baseIdx) {
+        if (!w || !Array.isArray(w.fragments) || !w.fragments.length) return false;
+        return !w.fragments.some(f => baseIdx >= f.start && baseIdx <= f.end);
+    }
+
+    // The base index whose word this position's reading is folded into, or
+    // null. `folds: {covered_base_idx: anchor_base_idx}` records the other
+    // multiword-abbreviation shape: the witness wrote one abbreviated word
+    // (at `anchor`) where the base has several, so the covered positions are
+    // empty for a reason that is neither omission nor missing parchment.
+    // The word sits in the anchor cell; the covered cells continue it.
+    function foldAnchorFor(w, baseIdx) {
+        const anchor = w && w.folds && w.folds[String(baseIdx)];
+        return anchor === undefined ? null : Number(anchor);
+    }
+
+    // Does a witness word at this position open a fold (i.e. some later
+    // position is folded into it)? Used to box the pair as one unit.
+    function opensFold(w, baseIdx) {
+        if (!w || !w.folds) return false;
+        return Object.values(w.folds).some(a => Number(a) === baseIdx);
+    }
+
     const sigla = activeSiglaInRange(chapterWitness, start, end);
     if (!sigla.length) {
         console.log('[synopsis] buildSynopsisStrips: no witness has data in range', { range, availableSigla: Object.keys(chapterWitness.witnesses || {}) });
         return null;
     }
 
+    // Substitutions. The offline pipeline has only two channels -- a word
+    // aligned at a base position, or an addition with no base counterpart --
+    // so where a witness *replaces* base material it lands in both at once:
+    // the base positions go null and the replacement is parked in `additions`.
+    // Rendered literally that reads as an omission (⟨ ⟩ over the base words)
+    // plus an unrelated plus-box, and the reader cannot see what stands in
+    // place of what. Corpus-wide that is 4,118 runs covering 10,122 base
+    // words -- the largest remaining source of ⟨ ⟩ after the geniza fragments.
+    //
+    // So: a run of null positions whose boundary carries an addition is a
+    // substitution. Lay the replacement out across the run's own columns and
+    // suppress the now-redundant plus box. The word-to-column distribution is
+    // a display convenience, not a claim about which word answers which --
+    // `synw-subst` underlines the whole run to say "over this span the witness
+    // reads this", and any overflow past the last column joins that cell so
+    // no transcribed word is dropped.
+    //
+    // Anchors below `start` are deliberately left alone: they belong to the
+    // preceding halakha's table, which already renders them, and consuming
+    // them here would show the same words twice.
+    function substitutionsFor(w) {
+        const byIdx = new Map();   // base index -> word(s) to show there
+        const consumed = new Set();  // addition anchors now shown in the grid
+        if (!w || !w.additions) return { byIdx, consumed };
+        for (let i = start; i < end; i++) {
+            if (w.words[i]) continue;
+            let j = i;
+            while (j + 1 < end && !w.words[j + 1]) j++;
+            const anchors = [];
+            for (let a = Math.max(i - 1, start); a <= j; a++) {
+                if (additionRunAt(w, a)) anchors.push(a);
+            }
+            // A position the witness's own abbreviation already covers (a
+            // fold) is not free to hold a replacement -- it is empty for a
+            // reason of its own, and the fold branch renders it. Only the
+            // rest of the run can carry the substitution; if the fold takes
+            // the whole run, the addition stays a plus rather than vanishing.
+            const cols = [];
+            for (let k = i; k <= j; k++) {
+                if (foldAnchorFor(w, k) === null) cols.push(k);
+            }
+            if (anchors.length && cols.length) {
+                const repl = anchors.flatMap(a => additionRunAt(w, a));
+                cols.forEach((idx, k) => {
+                    const chunk = k === cols.length - 1 ? repl.slice(k) : repl.slice(k, k + 1);
+                    if (chunk.length) byIdx.set(idx, chunk.join(' '));
+                });
+                anchors.forEach(a => consumed.add(a));
+            }
+            i = j;
+        }
+        return { byIdx, consumed };
+    }
+
+    const subst = {};
+    sigla.forEach(s => { subst[s] = substitutionsFor(chapterWitness.witnesses[s]); });
+
     // Column plan: an optional leading "plus column" (anchor -1, only at the
     // chapter's start), then for each base position i a base column followed
-    // by a plus column if any active witness has an addition anchored there.
+    // by a plus column if any active witness has an addition anchored there
+    // that is a genuine plus rather than a substitution laid into the grid.
     const hasLeadPlus = start === 0 && sigla.some(s => additionRunAt(chapterWitness.witnesses[s], -1));
     const plusAfter = [];
     for (let i = 0; i < n; i++) {
-        plusAfter.push(sigla.some(s => additionRunAt(chapterWitness.witnesses[s], start + i)));
+        plusAfter.push(sigla.some(s => additionRunAt(chapterWitness.witnesses[s], start + i)
+            && !subst[s].consumed.has(start + i)));
     }
 
     function buildRow(table, label, siglum, words, isBase) {
@@ -1938,10 +2027,11 @@ function buildSynopsisStrips(chapterWitness, range, halakhaHtml, ranges) {
         tr.appendChild(labelCell);
 
         const w = siglum ? chapterWitness.witnesses[siglum] : null;
+        const rowSubst = siglum ? subst[siglum] : null;
 
         function appendPlusCell(anchor) {
             const cell = document.createElement('td');
-            const run = additionRunAt(w, anchor);
+            const run = rowSubst && rowSubst.consumed.has(anchor) ? null : additionRunAt(w, anchor);
             if (run) {
                 cell.className = 'synw synw-plus';
                 cell.textContent = run.join(' ');
@@ -1971,12 +2061,33 @@ function buildSynopsisStrips(chapterWitness, range, halakhaHtml, ranges) {
             const cell = document.createElement('td');
             cell.className = 'synw';
             cell.dataset.baseIdx = String(baseIdx);
-            if (!word) {
-                cell.classList.add('synw-gap');
-                cell.textContent = '⟨ ⟩';
+            const replacement = rowSubst ? rowSubst.byIdx.get(baseIdx) : undefined;
+            const foldAnchor = word || isBase ? null : foldAnchorFor(w, baseIdx);
+            if (foldAnchor !== null) {
+                cell.classList.add('synw-fold-cont');
+                if (foldAnchorFor(w, baseIdx + 1) !== foldAnchor) cell.classList.add('synw-fold-last');
+                cell.title = `הקיצור ${w.words[foldAnchor] || ''} שבעד זה מכסה גם תיבה זו`.trim();
+            } else if (!word && replacement !== undefined) {
+                cell.textContent = replacement;
+                cell.classList.add('synw-subst');
+                if (!rowSubst.byIdx.has(baseIdx - 1)) cell.classList.add('synw-subst-first');
+                if (!rowSubst.byIdx.has(baseIdx + 1)) cell.classList.add('synw-subst-last');
+                cell.title = 'תמורה — הנוסח שבעד זה תחת מקבילו שבפנים';
+            } else if (!word) {
+                if (!isBase && notExtantAt(w, baseIdx)) {
+                    cell.classList.add('synw-absent');
+                    cell.title = 'הקטע אינו קיים כאן — אין עדות, לא חסרון';
+                } else {
+                    cell.classList.add('synw-gap');
+                    cell.textContent = '⟨ ⟩';
+                }
             } else {
                 cell.textContent = word;
-                if (!isBase) cell.classList.add(wordsMatchHe(baseWords[i], word) ? 'synw-match' : 'synw-diff');
+                if (!isBase) {
+                    if (opensFold(w, baseIdx)) cell.classList.add('synw-fold');
+                    if (wordsMatchHe(baseWords[i], word)) cell.classList.add('synw-match');
+                    else cell.classList.add(...synopsisDiffClasses(baseWords[i], word));
+                }
             }
             if (!isBase) {
                 const entry = displacedEntryAt(w, baseIdx);
@@ -2231,8 +2342,22 @@ function wordsMatchHe(w1, w2) {
     // Normalize markup/quotes but KEEP geresh/apostrophe — isKitzur and the
     // matres-lectionis checks rely on the abbreviation marker. Only strip
     // trailing sentence punctuation.
-    const a = normalizeQuotes(String(w1 || "").replace(/<[^>]+>/g, "")).trim().replace(/[.,;:!?]+$/, "");
-    const b = normalizeQuotes(String(w2 || "").replace(/<[^>]+>/g, "")).trim().replace(/[.,;:!?]+$/, "");
+    //
+    // Pointing must go first: sixteen tractates (Kelim, Menachot, Zevachim,
+    // Oholot, Chullin...) have a vocalized base text while every witness
+    // transcription is unpointed, so without stripNiqqud עַל/על compares as a
+    // variant and the synopsis paints essentially every word of every witness
+    // row as divergent. Square brackets are editorial too — Lieberman's
+    // supplements in the base ([באים]) and scribal restorations in the
+    // witnesses (שמ[ר]חיקין) — so they come out wherever they sit; parens
+    // only at the edges, where they are stray rather than notation.
+    const norm = w => normalizeQuotes(stripNiqqud(String(w || "").replace(/<[^>]+>/g, "")))
+        .replace(/[[\]]/g, "")
+        .trim()
+        .replace(/^[(]+|[)]+$/g, "")
+        .replace(/[.,;:!?]+$/, "");
+    const a = norm(w1);
+    const b = norm(w2);
     if (!a || !b) return false;
     if (a === b) return true;
     if (isKitzur(a, b)) return true;
@@ -2249,6 +2374,28 @@ function wordsMatchHe(w1, w2) {
         if (a === pre + b || b === pre + a) return true;
     }
     return false;
+}
+
+// How loudly a synopsis cell should read. The apparatus layer already grades
+// every reading through classifyVariantPair's nine categories; the synopsis
+// used to collapse all of them into one "diff" colour, so a habitual אין/אינו
+// shouted as loudly as a genuine lexical swap. Three tones over the same
+// categories: `minor` (spelling and rabbi-name shapes -- the same word),
+// `routine` (habitual swap, prefix, word order, inflection, citation scope --
+// the same word differently formed or a scribe's reflex), `major` (a different
+// word). Measured over the corpus: 4.6k minor, 9.6k routine, 17.7k major.
+const SYNOPSIS_TONE_BY_CATEGORY = {
+    minor: 'minor', minor_orthography: 'minor', name_orthography: 'minor',
+    routine: 'routine', other_minor: 'routine', morphology: 'routine',
+    citation_scope: 'routine',
+};
+
+// CSS classes for a witness cell whose word diverges from the base word --
+// the generic `synw-diff` plus its tone. Spread into classList.add. Callers
+// only reach here once wordsMatchHe has said the two differ.
+function synopsisDiffClasses(baseWord, word) {
+    const category = classifyVariantPair(baseWord, word).category;
+    return ['synw-diff', 'synw-diff-' + (SYNOPSIS_TONE_BY_CATEGORY[category] || 'major')];
 }
 
 // LCS-based sequence aligner producing opcodes and a per-A match flag list.

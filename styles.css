@@ -1056,14 +1056,95 @@ body {
     color: #b8a890;
 }
 
+/* Three tones over one hue, graded by classifyVariantPair's category (see
+   synopsisDiffClasses): the eye should be able to skim a strip and land on the
+   substantive readings without the habitual swaps competing for attention.
+   `.synw-diff` alone keeps the old middle weight for any caller that has not
+   picked a tone. */
 .synw-diff {
     color: #2d7a3e;
     font-weight: 600;
 }
 
+/* Spelling and rabbi-name shapes: the same word, written differently. Barely
+   louder than a match -- visible on inspection, invisible when skimming. */
+.synw-diff-minor {
+    color: #7d9b84;
+    font-weight: 400;
+}
+
+/* Habitual swap, prefix, word order, inflection, citation scope. */
+.synw-diff-routine {
+    color: #4a8a5c;
+    font-weight: 500;
+}
+
+/* A different word. */
+.synw-diff-major {
+    color: #1c6b2e;
+    font-weight: 700;
+}
+
 .synw-gap {
     color: #b8a890;
     font-style: italic;
+}
+
+/* Multiword abbreviation ("fold"): the witness wrote one contracted word
+   (רשב"ג, ע"ג, בד"א) where the base has several. The word sits in the anchor
+   cell and the base positions it covers continue it -- so they must NOT show
+   the ⟨ ⟩ that means "this witness lacks the word". A tinted box across the
+   pair, with a leader line carrying the eye from the abbreviation to the base
+   words it stands for. */
+.witness-synopsis td.synw-fold,
+.witness-synopsis td.synw-fold-cont {
+    background: #f6f1e3;
+    border-top: 1px solid #d3c393;
+    border-bottom: 1px solid #d3c393;
+}
+
+.witness-synopsis td.synw-fold {
+    border-right: 1px solid #d3c393;
+}
+
+.witness-synopsis td.synw-fold-last {
+    border-left: 1px solid #d3c393;
+}
+
+.witness-synopsis td.synw-fold-cont {
+    background-image: linear-gradient(to left, #b8a061 0 100%);
+    background-size: 100% 1px;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* Substitution: the witness replaces the base material at these positions
+   (see substitutionsFor). Same blue as a plus -- it is unaligned witness
+   material either way -- but boxed as one continuous span across the base
+   columns it stands in for, because the word-to-column layout inside the run
+   is presentational and must not read as a word-for-word pairing. */
+.witness-synopsis td.synw-subst {
+    color: #1d5c8f;
+    font-weight: 600;
+    background: #eef4fa;
+    border-top: 1px solid #9fc0dd;
+    border-bottom: 1px solid #9fc0dd;
+}
+
+.witness-synopsis td.synw-subst-first {
+    border-right: 1px solid #9fc0dd;
+}
+
+.witness-synopsis td.synw-subst-last {
+    border-left: 1px solid #9fc0dd;
+}
+
+/* Not extant: a fragmentary witness (ג) whose parchment does not cover this
+   base position. Deliberately wordless -- a hatch, not a marker -- so it can
+   never be misread as the ⟨ ⟩ that means "this witness lacks the word". */
+.witness-synopsis td.synw-absent {
+    background: repeating-linear-gradient(135deg,
+        #f0ece4 0, #f0ece4 2px, #fffdf9 2px, #fffdf9 5px);
 }
 
 /* "Plus" column: a witness's extra words with no base-text counterpart
@@ -1377,6 +1458,75 @@ body.side-dock-open .main-content {
 
 .synopsis-footer-header button:hover {
     background: #e9e1d1;
+}
+
+/* Key to the cell states, sitting between the footer's controls and the
+   strips. Quiet by design -- it has to survive being read past. */
+.synopsis-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    padding: 4px 14px;
+    border-bottom: 1px solid #e0dbd4;
+    background: #fffdf9;
+    font-size: 0.72em;
+    color: #7a6a52;
+    flex: none;
+}
+
+.synopsis-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.synopsis-legend-swatch {
+    display: inline-block;
+    width: 1.5em;
+    height: 1em;
+    border: 1px solid #d7d0c4;
+    font-style: normal;
+    font-size: 0.85em;
+    line-height: 1;
+    text-align: center;
+}
+
+.synopsis-legend .legend-gap {
+    border-color: transparent;
+    color: #b8a890;
+    width: auto;
+}
+
+.synopsis-legend .legend-absent {
+    background: repeating-linear-gradient(135deg,
+        #f0ece4 0, #f0ece4 2px, #fffdf9 2px, #fffdf9 5px);
+}
+
+.synopsis-legend .legend-subst {
+    background: #eef4fa;
+    border-color: #9fc0dd;
+}
+
+.synopsis-legend .legend-plus {
+    background: #eef4fa;
+}
+
+.synopsis-legend .legend-fold {
+    background: #f6f1e3;
+    border-color: #d3c393;
+}
+
+.synopsis-legend .legend-ghost {
+    background: #fdeef2;
+    border-color: #e3bcc7;
+}
+
+.synopsis-legend-sep {
+    width: 1px;
+    height: 1em;
+    background: #e0dbd4;
 }
 
 .synopsis-footer-label {
