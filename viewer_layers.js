@@ -50,16 +50,83 @@ function witnessSlugForSynopsisSiglum(siglum) {
 //                   right region of the page, marked as approximate.
 //   'not-found'  -- nothing aligned close enough to stand in.
 
-// How far the 'approx' fallback may reach, in base-word positions. The promise
-// it makes to the reader is "you are looking at the right line", so the cap is
-// about one line of manuscript. Unbounded -- as this was -- that promise breaks
-// badly wherever a chapter has sparse coverage: Berakhot ch1's Geniza data has
-// one box at base 3 and nothing again until 478, so every word in the first
-// half of the chapter was being pointed at that single box, up to 237
-// positions away, and presented as the nearest match. Measured cost of the cap
-// on the well-covered witnesses is negligible (Erfurt 99.6% -> 98.3% of
-// positions still resolving, London 100% -> 98.9%, Vienna 97.5% -> 96.2%).
-const MANUSCRIPT_APPROX_MAX_DISTANCE = 10;
+// How far the word-level 'approx' fallback may reach, in base-word positions.
+// Kept deliberately short: a neighbouring word or two really is the same spot
+// on the page, and beyond that the LINE fallback below is both more honest and
+// more useful. Unbounded -- as this was -- the fallback lies outright wherever
+// coverage is sparse: Berakhot ch1's Geniza data had one box at base 3 and
+// nothing again until 478, so every word in the first half of the chapter was
+// pointed at that single box, up to 237 positions away, and presented as the
+// nearest match.
+const MANUSCRIPT_APPROX_MAX_DISTANCE = 2;
+
+// Lines, derived from the word boxes themselves rather than carried in the
+// data: words on one manuscript line share a y-band on the same page, so
+// grouping a chapter's boxes by y-centre reconstructs its lines without the
+// emitters having to record them -- and without any risk of the two channels
+// disagreeing, since one is computed from the other. Verified across all four
+// witnesses: 8-14 words per line, spanning 11-15 base positions (p90 <= 20),
+// which is what a line of these manuscripts actually holds.
+//
+// Cached against the chapter object itself, so switching masechet or witness
+// simply lands on a different object -- nothing to invalidate.
+const _manuscriptLineCache = new WeakMap();
+
+function manuscriptLinesFor(chapter) {
+    const cached = _manuscriptLineCache.get(chapter);
+    if (cached) return cached;
+
+    const byPage = new Map();
+    for (const [k, v] of Object.entries(chapter)) {
+        if (!v || !v.bbox) continue;
+        const page = String(v.page);
+        if (!byPage.has(page)) byPage.set(page, []);
+        byPage.get(page).push({ idx: Number(k), bbox: v.bbox });
+    }
+
+    const lines = [];
+    for (const [page, items] of byPage) {
+        const heights = items.map(it => it.bbox[3] - it.bbox[1]).sort((a, b) => a - b);
+        const h = heights[Math.floor(heights.length / 2)] || 1;
+        items.sort((a, b) => a.bbox[1] - b.bbox[1]);
+        let cur = null, ref = null;
+        const flush = () => {
+            if (!cur || !cur.length) return;
+            lines.push({
+                page,
+                from: Math.min(...cur.map(it => it.idx)),
+                to: Math.max(...cur.map(it => it.idx)),
+                bbox: [Math.min(...cur.map(it => it.bbox[0])), Math.min(...cur.map(it => it.bbox[1])),
+                       Math.max(...cur.map(it => it.bbox[2])), Math.max(...cur.map(it => it.bbox[3]))],
+            });
+        };
+        for (const it of items) {
+            const centre = (it.bbox[1] + it.bbox[3]) / 2;
+            if (ref === null || Math.abs(centre - ref) <= h * 0.5) {
+                if (ref === null) { cur = [it]; ref = centre; } else { cur.push(it); }
+            } else {
+                flush();
+                cur = [it]; ref = centre;
+            }
+        }
+        flush();
+    }
+    _manuscriptLineCache.set(chapter, lines);
+    return lines;
+}
+
+// The line a base position sits on, if a recognised word brackets it on both
+// sides. Only bracketing counts: a position beyond every recognised word on a
+// line could equally be on the next line, and guessing there is how the old
+// unbounded fallback went wrong.
+function manuscriptLineContaining(chapter, baseIdx) {
+    let best = null;
+    for (const line of manuscriptLinesFor(chapter)) {
+        if (baseIdx < line.from || baseIdx > line.to) continue;
+        if (!best || (line.to - line.from) < (best.to - best.from)) best = line;
+    }
+    return best;
+}
 
 function resolveManuscriptEntry(manuscriptDataBySlug, witnessSlug, perekIndex, baseIdx) {
     const manuscriptData = manuscriptDataBySlug && manuscriptDataBySlug[witnessSlug];
@@ -74,9 +141,17 @@ function resolveManuscriptEntry(manuscriptDataBySlug, witnessSlug, perekIndex, b
         const dist = Math.abs(Number(k) - baseIdx);
         if (dist < nearestDist) { nearestDist = dist; nearestKey = k; }
     }
-    if (nearestKey == null) return { status: 'no-chapter' };
-    if (nearestDist > MANUSCRIPT_APPROX_MAX_DISTANCE) return { status: 'not-found' };
-    return { status: 'approx', word: chapter[nearestKey], distance: nearestDist };
+    if (nearestKey != null && nearestDist <= MANUSCRIPT_APPROX_MAX_DISTANCE) {
+        return { status: 'approx', word: chapter[nearestKey], distance: nearestDist };
+    }
+    // No word close enough, but if recognised words bracket this position on a
+    // line, that line IS where the word is -- highlight it rather than showing
+    // nothing.
+    const line = manuscriptLineContaining(chapter, baseIdx);
+    if (line) {
+        return { status: 'approx', word: { page: line.page, bbox: line.bbox }, level: 'line' };
+    }
+    return { status: 'not-found' };
 }
 
 function anyManuscriptData(ctx) {
