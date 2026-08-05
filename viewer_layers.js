@@ -45,10 +45,22 @@ function witnessSlugForSynopsisSiglum(siglum) {
 //                   at all (e.g. Geniza/London outside their covered scope).
 //   'no-chapter' -- the file exists but this chapter has zero aligned entries.
 //   'exact'      -- the word itself is aligned; a solid highlight box.
-//   'approx'     -- the word itself isn't aligned (an HTR miss), but the
-//                   chapter has other aligned words; falls back to the nearest
-//                   so the reader at least sees the right region of the page,
-//                   marked as approximate.
+//   'approx'     -- the word itself isn't aligned (an HTR miss), but a nearby
+//                   word is; falls back to it so the reader at least sees the
+//                   right region of the page, marked as approximate.
+//   'not-found'  -- nothing aligned close enough to stand in.
+
+// How far the 'approx' fallback may reach, in base-word positions. The promise
+// it makes to the reader is "you are looking at the right line", so the cap is
+// about one line of manuscript. Unbounded -- as this was -- that promise breaks
+// badly wherever a chapter has sparse coverage: Berakhot ch1's Geniza data has
+// one box at base 3 and nothing again until 478, so every word in the first
+// half of the chapter was being pointed at that single box, up to 237
+// positions away, and presented as the nearest match. Measured cost of the cap
+// on the well-covered witnesses is negligible (Erfurt 99.6% -> 98.3% of
+// positions still resolving, London 100% -> 98.9%, Vienna 97.5% -> 96.2%).
+const MANUSCRIPT_APPROX_MAX_DISTANCE = 10;
+
 function resolveManuscriptEntry(manuscriptDataBySlug, witnessSlug, perekIndex, baseIdx) {
     const manuscriptData = manuscriptDataBySlug && manuscriptDataBySlug[witnessSlug];
     if (!manuscriptData) return { status: 'no-data' };
@@ -63,6 +75,7 @@ function resolveManuscriptEntry(manuscriptDataBySlug, witnessSlug, perekIndex, b
         if (dist < nearestDist) { nearestDist = dist; nearestKey = k; }
     }
     if (nearestKey == null) return { status: 'no-chapter' };
+    if (nearestDist > MANUSCRIPT_APPROX_MAX_DISTANCE) return { status: 'not-found' };
     return { status: 'approx', word: chapter[nearestKey], distance: nearestDist };
 }
 
