@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Hebrew:wght@100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Suez+One&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <title>זיהוי מובאות מקרא — הנתונים</title>
+    <script src="research_spans_data.js"></script>
+    <style>
+        .research-nav a { margin-inline-start: 12px; }
+        .intro-card p { margin: 6px 0; line-height: 1.7; }
+        .meta-line { color: #6b5b47; font-size: 0.85em; }
+
+        .hal { margin: 0 0 18px; padding: 10px 12px; border: 1px solid #e6ded2;
+               border-radius: 6px; background: #fffdfa; }
+        .hal-ref { font-family: 'Suez One', serif; font-size: 0.95em;
+                   color: #7a5c34; margin-bottom: 6px; }
+        .hal-text { font-family: 'Noto Serif Hebrew', serif; font-size: 1.12em;
+                    line-height: 2.05; }
+        .w { padding: 1px 0; }
+        .w.sel { background: #ffe9a8; box-shadow: 0 0 0 1px #d9a441; }
+        .span { border-radius: 3px; padding: 2px 1px; cursor: pointer; }
+        .span.s1 { background: #eef6ea; }        /* one signal  */
+        .span.s2 { background: #d9f0cf; }        /* two         */
+        .span.s3 { background: #b9e5a8; }        /* three+      */
+        .span.active { box-shadow: 0 0 0 2px #3f7a26; }
+        .span.fp { background: #fbe0e0; text-decoration: line-through 1px #b33; }
+        .span.ok { box-shadow: inset 0 -3px 0 #3f7a26; }
+        .w.missed { background: #e3e9fb; box-shadow: inset 0 -3px 0 #37519e; }
+
+        .detail { margin-top: 8px; padding: 10px; border-radius: 6px;
+                  background: #f6f2ea; border: 1px solid #e0d6c6; }
+        .detail h4 { margin: 0 0 6px; font-size: 0.95em; color: #5a4630; }
+        .sig-badge { display: inline-block; font-size: 0.75em; padding: 1px 7px;
+                     border-radius: 10px; margin-inline-end: 4px;
+                     background: #e7ddcc; color: #5a4630; }
+        .sig-badge.masoret { background: #cfe3f7; color: #1c4a70; }
+        .sig-badge.quote   { background: #f7e2cf; color: #7a4a1c; }
+        .sig-badge.peh     { background: #e6d6f2; color: #543070; }
+        .verse-line { font-family: 'Noto Serif Hebrew', serif; font-size: 1.05em;
+                      line-height: 1.9; margin: 4px 0; }
+        .vw { color: #b3a894; }
+        .vw.given { color: #1a1a1a; background: #dcefd3; border-radius: 2px;
+                    padding: 0 2px; font-weight: 600; }
+        .verse-src { font-size: 0.78em; color: #6b5b47; }
+        .note-row { font-size: 0.9em; margin: 3px 0; padding-inline-start: 8px;
+                    border-inline-start: 3px solid #d8cbb5; }
+        .note-lemma { font-weight: 600; }
+        .cls-tag { font-size: 0.75em; background: #ece4d6; border-radius: 8px;
+                   padding: 0 6px; margin-inline-start: 4px; color: #6b5b47; }
+        .cls-tag.verse_extent { background: #cfe8c2; color: #2c5a1c; }
+
+        .review-bar { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap;
+                      align-items: center; }
+        .review-bar button { font-size: 0.85em; padding: 3px 10px; cursor: pointer;
+                             border: 1px solid #c9bda8; border-radius: 4px;
+                             background: #fff; }
+        .review-bar button.on { background: #3f7a26; color: #fff; border-color: #3f7a26; }
+        .review-bar input[type=text] { flex: 1; min-width: 140px; font-size: 0.85em;
+                                       padding: 3px 6px; border: 1px solid #c9bda8;
+                                       border-radius: 4px; }
+        .filter-body { margin-bottom: 10px; }
+        .filter-note { font-size: 0.8em; color: #6b5b47; line-height: 1.5; }
+        .status-bar strong { color: #3f7a26; }
+        .pager { display: flex; gap: 8px; align-items: center; margin: 10px 0; }
+        .pager button { padding: 4px 12px; cursor: pointer; }
+        .edit-only { display: none; }
+        body.editing .edit-only { display: block; }
+        body.editing .review-bar { display: flex; }
+        .review-bar { display: none; }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <h1>זיהוי מובאות מקרא — הנתונים שמאחורי הסטטיסטיקה</h1>
+        <div class="header-controls">
+            <nav class="research-nav">
+                <a href="research_citations.html">היקף ציטוטי מקרא</a>
+                <a href="research_variance.html">מדדי שוני</a>
+                <a href="research_aggadah.html">קטעי אגדה</a>
+                <a href="index.html">האתר הראשי</a>
+            </nav>
+        </div>
+    </header>
+
+    <button class="sidebar-toggle" id="sidebar-toggle" aria-label="פתח/סגור סרגל צד">☰</button>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <div class="page-layout">
+        <aside class="sidebar" id="sidebar">
+            <section class="filters-section">
+                <div class="masechet-selector">
+                    <label for="tractate">מסכת:</label>
+                    <select id="tractate"></select>
+                </div>
+                <div class="masechet-selector">
+                    <label for="chapter">פרק:</label>
+                    <select id="chapter"><option value="">הכל</option></select>
+                </div>
+                <div class="filter-body">
+                    <strong>הסימן שזיהה:</strong>
+                    <label class="filter-parent"><input type="checkbox" class="sig-f" value="masoret" checked> מסורת התוספתא</label>
+                    <label class="filter-parent"><input type="checkbox" class="sig-f" value="quote" checked> מרכאות מאגרים</label>
+                    <label class="filter-parent"><input type="checkbox" class="sig-f" value="peh" checked> עד פ</label>
+                    <label class="filter-parent"><input type="checkbox" class="sig-f" value="attr" checked> סימני ציטוט + קונקורדנציה</label>
+                    <p class="filter-note">מוצגות הלכות שיש בהן מובאה שזוהתה לפחות על ידי אחד מן הסימנים המסומנים.</p>
+                </div>
+                <div class="filter-body">
+                    <strong>סינון:</strong>
+                    <label class="filter-parent"><input type="checkbox" id="f-single"> רק מובאות שסימן אחד בלבד זיהה</label>
+                    <label class="filter-parent"><input type="checkbox" id="f-noverse"> רק מובאות שלא זוהה להן פסוק</label>
+                    <label class="filter-parent"><input type="checkbox" id="f-unreviewed"> רק מה שטרם נבדק</label>
+                    <label class="filter-parent"><input type="checkbox" id="f-notes"> רק מובאות שיש בהן חילוף נוסח</label>
+                </div>
+                <div class="filter-body">
+                    <label class="filter-parent"><input type="checkbox" id="edit-mode"> <strong>מצב עריכה</strong></label>
+                    <p class="filter-note">במצב עריכה אפשר לסמן זיהוי שגוי, לאשר זיהוי, ולסמן מובאה שהמערכת פספסה
+                       (לוחצים על המילה הראשונה ואחר כך על האחרונה; לחיצה על סימון קיים מסירה אותו).
+                       הסימונים נשמרים בדפדפן בלבד. כדי לקבע אותם: הורידו את הקובץ, שימו אותו ב־<code
+                       >sota_project/span_review.json</code> שבמאגר sefaria-tosefta, והריצו שוב את <code
+                       >export_span_review.py</code> — מכאן ואילך הם מוצגים לכל קורא.</p>
+                    <div class="edit-only">
+                        <button id="export-btn">הורדת הסימונים (JSON)</button>
+                        <button id="import-btn">טעינת קובץ סימונים</button>
+                        <input type="file" id="import-file" accept=".json" style="display:none">
+                    </div>
+                </div>
+                <section class="filters-section">
+                    <div class="status-bar" id="status"></div>
+                </section>
+            </section>
+        </aside>
+
+        <div class="main-content">
+            <section class="card intro-card">
+                <h2 class="card-title">מה רואים כאן</h2>
+                <p>כל מובאה מקראית שזוהתה בנוסח הפנים, עם הפסוק שהיא מצטטת לצידה. הצבע מציין
+                   בכמה סימנים בלתי תלויים היא זוהתה: ירוק בהיר — סימן אחד, ירוק כהה — שלושה או יותר.
+                   לחיצה על מובאה פותחת את פרטיה.</p>
+                <p>בפסוק המוצג מודגשות המילים שהעד אכן מביא, והשאר עמומות — כך נראית בעין
+                   השאלה שברודי העמיד: כמה מן הפסוק בחר המעתיק לתת.</p>
+                <p class="meta-line" id="meta-line"></p>
+            </section>
+
+            <div class="pager">
+                <button id="prev">הקודם</button>
+                <span id="page-label"></span>
+                <button id="next">הבא</button>
+            </div>
+            <div id="halakhot"></div>
+            <div class="pager">
+                <button id="prev2">הקודם</button>
+                <button id="next2">הבא</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+(function () {
+"use strict";
+
+// The data file declares `const SPANS_DATA`, which is script-scoped and never
+// a property of window — so it has to be read as a bare identifier.
+const DATA = (typeof SPANS_DATA !== "undefined") ? SPANS_DATA : null;
+const PAGE = 15;
+const LS_KEY = "toseftaSpanReview";
+
+function esc(t) {
+    return String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// ---- review state -------------------------------------------------------
+// Judgments live in localStorage while they are being made, and are merged
+// over whatever the export baked in, so re-running the detector never discards
+// review work and a reader always sees the judgments as published.
+let review = { spans: {}, missed: [] };
+function loadReview() {
+    const baked = DATA.review || { spans: {}, missed: [] };
+    let local = { spans: {}, missed: [] };
+    try { local = JSON.parse(localStorage.getItem(LS_KEY)) || local; } catch (e) {}
+    review = {
+        spans: Object.assign({}, baked.spans || {}, local.spans || {}),
+        missed: (baked.missed || []).concat(local.missed || []),
+    };
+}
+function saveReview() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(review)); } catch (e) {}
+    renderStatus();
+}
+const spanKey = (t, c, h, s, e) => [t, c, h, s, e].join("|");
+
+// ---- state --------------------------------------------------------------
+let tractate = null, chapter = "", page = 0, openSpan = null;
+let pendingStart = null;   // first word clicked when marking a missed citation
+
+const el = id => document.getElementById(id);
+const sigFilters = () => Array.from(document.querySelectorAll(".sig-f"))
+    .filter(c => c.checked).map(c => c.value);
+
+function normSig(sig) {
+    // "attr" and "marker" are the same signal seen from two sides (the quote's
+    // opening marker and its closing one); the reader has no use for that split.
+    return sig.map(s => (s === "marker" ? "attr" : s));
+}
+
+function spanPasses(sp) {
+    const sig = normSig(sp.sig), want = sigFilters();
+    if (!sig.some(s => want.includes(s))) return false;
+    if (el("f-single").checked && new Set(sig).size > 1) return false;
+    if (el("f-noverse").checked && sp.verse) return false;
+    if (el("f-notes").checked && !(sp.notes && sp.notes.length)) return false;
+    if (el("f-unreviewed").checked) {
+        const h = sp._hal;
+        if (review.spans[spanKey(tractate, h.c, h.h, sp.s, sp.e)]) return false;
+    }
+    return true;
+}
+
+function visibleHalakhot() {
+    const t = DATA.tractates[tractate];
+    if (!t) return [];
+    return t.halakhot.filter(h => {
+        if (chapter && String(h.c) !== chapter) return false;
+        return h.spans.some(sp => { sp._hal = h; return spanPasses(sp); });
+    });
+}
+
+// ---- rendering ----------------------------------------------------------
+function renderHalakha(h) {
+    const shown = h.spans.filter(sp => { sp._hal = h; return spanPasses(sp); });
+    const cover = new Map();          // word index -> span
+    shown.forEach((sp, i) => {
+        for (let w = sp.s; w <= sp.e; w++) cover.set(w, i);
+    });
+    const missed = (review.missed || []).filter(
+        m => m.t === tractate && m.c === h.c && m.h === h.h);
+    const missedIdx = new Set();
+    missed.forEach(m => { for (let w = m.s; w <= m.e; w++) missedIdx.add(w); });
+
+    let html = "", openIdx = null;
+    for (let w = 0; w < h.w.length; w++) {
+        const idx = cover.has(w) ? cover.get(w) : null;
+        if (idx !== openIdx) {
+            if (openIdx !== null) html += "</span>";
+            if (idx !== null) {
+                const sp = shown[idx];
+                const n = Math.min(3, new Set(normSig(sp.sig)).size);
+                const key = spanKey(tractate, h.c, h.h, sp.s, sp.e);
+                const verdict = (review.spans[key] || {}).v || "";
+                const active = openSpan === key ? " active" : "";
+                html += `<span class="span s${n} ${verdict}${active}" data-span="${idx}">`;
+            }
+            openIdx = idx;
+        }
+        const cls = "w" + (missedIdx.has(w) ? " missed" : "")
+                  + (pendingStart && pendingStart.h === h && pendingStart.w === w ? " sel" : "");
+        html += `<span class="${cls}" data-w="${w}">${esc(h.w[w])}</span> `;
+    }
+    if (openIdx !== null) html += "</span>";
+
+    let detail = "";
+    shown.forEach((sp, i) => {
+        const key = spanKey(tractate, h.c, h.h, sp.s, sp.e);
+        if (openSpan === key) detail = renderDetail(h, sp, key);
+    });
+
+    return `<div class="hal" data-c="${h.c}" data-h="${h.h}">
+        <div class="hal-ref">פרק ${h.c}, הלכה ${h.h} — ${shown.length} מובאות</div>
+        <div class="hal-text">${html}</div>
+        ${detail}
+    </div>`;
+}
+
+function renderDetail(h, sp, key) {
+    const sig = Array.from(new Set(normSig(sp.sig)));
+    const badges = sig.map(s =>
+        `<span class="sig-badge ${s}">${esc(DATA.signal_labels[s] || s)}</span>`).join("");
+
+    let verse = '<p class="verse-src">לא זוהה פסוק — המובאה נשענת על סימן ציטוט או על מרכאות בלבד.</p>';
+    if (sp.verse) {
+        const given = sp.verse.given || [];
+        const words = sp.verse.words.map((w, i) =>
+            `<span class="vw${given[i] ? " given" : ""}">${esc(w)}</span>`).join(" ");
+        const src = sp.verse.src === "masoret"
+            ? "הפסוק על פי מסורת התוספתא (ליברמן)"
+            : `זיהוי על פי קורפוס התנ״ך (ציון ${sp.verse.score})`;
+        const n = given.filter(Boolean).length;
+        verse = `<h4>${esc(sp.verse.ref)} <span class="verse-src">— ${src};
+                 ${n} מתוך ${sp.verse.words.length} מילות הפסוק</span></h4>
+                 <div class="verse-line">${words}</div>`;
+    }
+
+    let notes = "";
+    const rows = sp.notes || [];
+    if (rows.length) {
+        notes = "<h4>חילופי נוסח בתוך המובאה</h4>" + rows.map(n =>
+            `<div class="note-row"><span class="note-lemma">${esc(n.lemma)}</span> | ${esc(n.app)}</div>`
+        ).join("");
+    }
+    // The Sotah sites carry the branch classification, which is what the
+    // extent argument is actually counted from.
+    const sites = (h.sites || []).filter(s => sp.notes.some(
+        n => s.lemma && n.lemma && (s.lemma.indexOf(n.lemma) >= 0 || n.lemma.indexOf(s.lemma) >= 0)));
+    if (sites.length) {
+        notes += "<h4>אתרי הבדל בין הענפים</h4>" + sites.map(s =>
+            `<div class="note-row"><span class="note-lemma">${esc(s.lemma)}</span> |
+             ${esc(s.app)} <span class="cls-tag ${esc(s.cls)}">${esc(s.cls)}</span>
+             <span class="cls-tag">${esc(s.branch)}</span></div>`).join("");
+    }
+
+    const v = (review.spans[key] || {});
+    return `<div class="detail">
+        <div>${badges}</div>
+        ${verse}
+        ${notes}
+        <div class="review-bar" data-key="${key}">
+            <button class="verdict ${v.v === "ok" ? "on" : ""}" data-v="ok">זיהוי נכון</button>
+            <button class="verdict ${v.v === "fp" ? "on" : ""}" data-v="fp">זיהוי שגוי</button>
+            <input type="text" class="rnote" placeholder="הערה" value="${esc(v.note || "")}">
+            <button class="clear-verdict">ניקוי</button>
+        </div>
+    </div>`;
+}
+
+function render() {
+    const list = visibleHalakhot();
+    const pages = Math.max(1, Math.ceil(list.length / PAGE));
+    if (page >= pages) page = pages - 1;
+    if (page < 0) page = 0;
+    const slice = list.slice(page * PAGE, page * PAGE + PAGE);
+    el("halakhot").innerHTML = slice.map(renderHalakha).join("")
+        || '<p class="filter-note">אין הלכות התואמות את הסינון.</p>';
+    el("page-label").textContent = `עמוד ${page + 1} מתוך ${pages} (${list.length} הלכות)`;
+    renderStatus();
+}
+
+function renderStatus() {
+    const t = DATA.tractates[tractate];
+    if (!t) return;
+    let shown = 0;
+    t.halakhot.forEach(h => h.spans.forEach(sp => {
+        sp._hal = h; if (spanPasses(sp)) shown++;
+    }));
+    const marks = Object.keys(review.spans).length;
+    el("status").innerHTML = `מוצגות <strong>${shown}</strong> מובאות מתוך
+        <strong>${t.counts.spans}</strong> במסכת. נבדקו <strong>${marks}</strong>,
+        סומנו <strong>${(review.missed || []).length}</strong> מובאות שפוספסו.`;
+}
+
+// ---- events -------------------------------------------------------------
+el("halakhot").addEventListener("click", ev => {
+    const spanEl = ev.target.closest(".span");
+    const halEl = ev.target.closest(".hal");
+    if (!halEl) return;
+    const c = +halEl.dataset.c, hh = +halEl.dataset.h;
+    const h = DATA.tractates[tractate].halakhot.find(x => x.c === c && x.h === hh);
+
+    const vBtn = ev.target.closest(".verdict");
+    if (vBtn) {
+        const bar = vBtn.closest(".review-bar");
+        const key = bar.dataset.key;
+        const note = bar.querySelector(".rnote").value;
+        review.spans[key] = { v: vBtn.dataset.v, note: note };
+        saveReview(); render();
+        return;
+    }
+    if (ev.target.closest(".clear-verdict")) {
+        delete review.spans[ev.target.closest(".review-bar").dataset.key];
+        saveReview(); render();
+        return;
+    }
+    if (ev.target.classList.contains("rnote")) return;
+
+    if (spanEl) {
+        const shown = h.spans.filter(sp => { sp._hal = h; return spanPasses(sp); });
+        const sp = shown[+spanEl.dataset.span];
+        const key = spanKey(tractate, c, hh, sp.s, sp.e);
+        openSpan = (openSpan === key) ? null : key;
+        pendingStart = null;
+        render();
+        return;
+    }
+
+    // A click on a bare word, in edit mode, marks a citation the detector
+    // missed: first click sets the start, second the end.
+    if (document.body.classList.contains("editing")) {
+        const wEl = ev.target.closest(".w");
+        if (!wEl) return;
+        const w = +wEl.dataset.w;
+        // Clicking inside a mark already made removes it, so a misclick is
+        // recoverable without editing the exported file by hand.
+        const existing = review.missed.findIndex(
+            m => m.t === tractate && m.c === c && m.h === hh && m.s <= w && w <= m.e);
+        if (existing >= 0 && !pendingStart) {
+            if (confirm("להסיר את הסימון «" + review.missed[existing].text + "»?")) {
+                review.missed.splice(existing, 1);
+                saveReview();
+            }
+            render();
+            return;
+        }
+        if (!pendingStart || pendingStart.h !== h) {
+            pendingStart = { h: h, w: w };
+        } else {
+            const s = Math.min(pendingStart.w, w), e = Math.max(pendingStart.w, w);
+            const ref = prompt("הפסוק (למשל Genesis 6:17), או ריק אם לא ידוע:", "");
+            if (ref !== null) {
+                review.missed.push({ t: tractate, c: c, h: hh, s: s, e: e,
+                                     ref: ref, text: h.w.slice(s, e + 1).join(" ") });
+                saveReview();
+            }
+            pendingStart = null;
+        }
+        render();
+    }
+});
+
+["chapter"].forEach(id => el(id).addEventListener("change", () => {
+    chapter = el("chapter").value; page = 0; render();
+}));
+el("tractate").addEventListener("change", () => {
+    tractate = el("tractate").value; chapter = ""; page = 0; openSpan = null;
+    fillChapters(); render();
+});
+document.querySelectorAll(".sig-f, #f-single, #f-noverse, #f-unreviewed, #f-notes")
+    .forEach(c => c.addEventListener("change", () => { page = 0; render(); }));
+el("edit-mode").addEventListener("change", ev => {
+    document.body.classList.toggle("editing", ev.target.checked);
+    pendingStart = null; render();
+});
+[["prev", -1], ["next", 1], ["prev2", -1], ["next2", 1]].forEach(([id, d]) =>
+    el(id).addEventListener("click", () => {
+        page += d; render();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }));
+
+el("export-btn").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(review, null, 1)],
+                          { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "span_review.json";
+    a.click();
+});
+el("import-btn").addEventListener("click", () => el("import-file").click());
+el("import-file").addEventListener("change", ev => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        try {
+            const loaded = JSON.parse(reader.result);
+            review.spans = Object.assign({}, review.spans, loaded.spans || {});
+            review.missed = review.missed.concat(loaded.missed || []);
+            saveReview(); render();
+        } catch (e) { alert("קובץ לא תקין: " + e.message); }
+    };
+    reader.readAsText(file);
+});
+
+el("sidebar-toggle").addEventListener("click", () => {
+    el("sidebar").classList.toggle("open");
+    el("sidebar-overlay").classList.toggle("visible");
+});
+el("sidebar-overlay").addEventListener("click", () => {
+    el("sidebar").classList.remove("open");
+    el("sidebar-overlay").classList.remove("visible");
+});
+
+// ---- init ---------------------------------------------------------------
+function fillChapters() {
+    const t = DATA.tractates[tractate];
+    const chapters = Array.from(new Set(t.halakhot.map(h => h.c))).sort((a, b) => a - b);
+    el("chapter").innerHTML = '<option value="">הכל</option>'
+        + chapters.map(c => `<option value="${c}">${c}</option>`).join("");
+}
+
+function init() {
+    if (!DATA) { document.body.innerHTML = "<p>research_spans_data.js לא נטען.</p>"; return; }
+    loadReview();
+    const names = Object.keys(DATA.tractates).sort();
+    el("tractate").innerHTML = names.map(n =>
+        `<option value="${esc(n)}">${esc(n)} (${DATA.tractates[n].counts.spans})</option>`).join("");
+    tractate = names.includes("Sotah") ? "Sotah" : names[0];
+    el("tractate").value = tractate;
+    el("meta-line").textContent =
+        `${DATA.totals.spans} מובאות ב-${DATA.totals.halakhot} הלכות, `
+        + `${DATA.totals.tractates} מסכתות. עודכן ${DATA.generated}.`;
+    fillChapters();
+    render();
+}
+init();
+})();
+</script>
+</body>
+</html>
