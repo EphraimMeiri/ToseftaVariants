@@ -79,6 +79,24 @@
             border-radius: 3px; padding: 0 2px; cursor: help;
         }
         .vb { color: var(--vc-line); cursor: help; font-size: 0.8em; }
+        /* sieve overlay: the chapter-2 list's own classification */
+        .vh-sieve { --vc-bg: #e7e0f2; --vc-line: #6e4a9e; }
+        .vh-sieve.dir-vd_plus { --vc-bg: #d8ecd8; --vc-line: #2c7a2c; }
+        .vh-sieve.dir-a_plus  { --vc-bg: #f7e0cf; --vc-line: #a35a1c; }
+        .vh-sieve.dir-swap    { --vc-bg: #e7e0f2; --vc-line: #6e4a9e; }
+        .sieve-leftover { font-size: 0.85em; color: #5a4630; margin-top: 4px; }
+        .sieve-leftover .s { border-radius: 3px; padding: 0 3px; cursor: help;
+            background: var(--vc-bg); box-shadow: 0 1.5px 0 var(--vc-line); }
+        /* deep-link target: the site named in the URL hash */
+        .halakha-block.link-target { outline: 2px solid #b03a2e; outline-offset: 3px; }
+        .vh.link-target, .vb.link-target {
+            outline: 2px solid #b03a2e; outline-offset: 2px;
+            animation: linkflash 1.4s ease-out 3;
+        }
+        @keyframes linkflash {
+            0%, 100% { background: var(--vc-bg); }
+            30% { background: #ffd9a8; }
+        }
         .chapter-head { font-family: 'Suez One', serif; color: #5a4a35; margin: 22px 0 4px; font-size: 1.3em; }
         .leftover { font-size: 0.85em; color: #6b5b47; margin-top: 6px; border-top: 1px dashed #e0d5c5; padding-top: 5px; line-height: 1.9; }
         .leftover .vh { cursor: help; }
@@ -93,6 +111,7 @@
                 <a href="research_spans.html">זיהוי מובאות מקרא</a>
                 <a href="research_aggadah.html">סיווג קטעי אגדה</a>
                 <a href="research_citations.html">היקף ציטוטי מקרא</a>
+                <a href="research_register.html">מרשם האגדה</a>
                 <a href="index.html">האתר הראשי</a>
             </nav>
         </div>
@@ -131,6 +150,13 @@
                     <label class="filter-parent"><input type="radio" name="section" value="aggadah"> אגדה בלבד</label>
                     <label class="filter-parent"><input type="radio" name="section" value="other"> הלכה בלבד (לא־אגדה)</label>
                     <label class="filter-parent"><input type="checkbox" id="highOnly"> תיוג בביטחון גבוה בלבד</label>
+                </div>
+                <div class="filter-body only-text" id="sieve-overlay-box" style="display:none">
+                    <label class="filter-parent"><input type="checkbox" id="sieveOverlay">
+                        <strong>שכבת הנפה (סוטה ג–טו)</strong></label>
+                    <p class="filter-note">סיווג הנפה של פרק ב במאמר — פיצול א:וד בלבד, ללא היקף ציטוט.
+                        ירוק = יתרון בוד, כתום = יתרון בא, סגול = חילוף. הקישורים ברשימות שבמאמר
+                        מפנים לכאן.</p>
                 </div>
                 <div class="filter-body only-text">
                     <p class="filter-note">הלכות המתויגות כאגדה (תיוג היגר) מוצגות על רקע זהוב עם תג
@@ -436,6 +462,10 @@
     if (textTractates.includes('Sotah')) masechetDropdown.value = 'Sotah';
 
     const textCache = {};   // eng -> {text, sites}
+    let sieveSites = null;   // Sotah_sieve.json {sites:{ref:[[id,stage,label_he,direction,lemma,apparatus,register,refrain]]}}
+
+    const sieveOverlayBox = document.getElementById('sieve-overlay-box');
+    const sieveOverlayCb = document.getElementById('sieveOverlay');
 
     async function loadTextView() {
         const eng = masechetDropdown.value;
@@ -455,6 +485,14 @@
                 document.getElementById('text-loading').textContent = 'שגיאה בטעינת הנתונים: ' + e;
                 return;
             }
+        }
+        // The sieve overlay only exists for Sotah 3–15.
+        sieveOverlayBox.style.display = (eng === 'Sotah') ? '' : 'none';
+        if (eng === 'Sotah' && sieveSites === null) {
+            try {
+                sieveSites = await fetch('data/research_sites/Sotah_sieve.json')
+                    .then(r => r.ok ? r.json() : false);
+            } catch (e) { sieveSites = false; }
         }
         renderTextView(eng);
     }
@@ -510,12 +548,13 @@
                 const chips = CLASSES.filter(c => counts[c]).map(c =>
                     `<span class="count-chip vh-${c}${visible.has(c) ? '' : ' off'}">${CLASS_HEBREW[c]} ${counts[c]}</span>`).join(' ');
 
-                let block = `<div class="halakha-block${conf ? ' aggadah' : ''}" id="hal-${ci}-${hi}">`;
+                let block = `<div class="halakha-block${conf ? ' aggadah' : ''}" id="hal-${ci}-${hi}" data-ref="${ref}">`;
                 block += `<div class="halakha-head"><span class="hal-ref">${heNum(hi + 1)}</span>`;
                 if (conf) block += `<span class="agg-badge${conf === 'medium' ? ' medium' : ''}">${conf === 'medium' ? 'אגדה?' : 'אגדה'}</span>`;
                 block += chips ? `<span>${chips}</span>` : '';
                 block += `</div><div class="halakha-text">${html}</div>`;
                 block += researchLeftoverHtml(leftovers, st.pair, visible);
+                block += sieveOverlayHtml(ref);
                 block += `</div>`;
                 chunks.push(block);
             });
@@ -524,7 +563,34 @@
         document.getElementById('text-body').innerHTML = chunks.join('\n');
     }
 
+    // The sieve layer for chapter 2 of the article: one line per א:וד site
+    // the sieve caught, coloured by which side the difference favours, each
+    // carrying data-si = Site.id so the list document's links can flash it.
+    const SIEVE_DIR_HE = { vd_plus: 'יתרון בוד', a_plus: 'יתרון בא', swap: 'חילוף' };
+    function sieveOverlayHtml(ref) {
+        if (!sieveOverlayCb.checked || !sieveSites || !sieveSites.sites) return '';
+        const rows = sieveSites.sites[ref];
+        if (!rows || !rows.length) return '';
+        const items = rows.map(r => {
+            const [id, stage, labelHe, direction, lemma, apparatus] = r;
+            const shown = (lemma && lemma.trim())
+                ? `${lemma} — ${apparatus}` : apparatus;
+            const tip = `${SIEVE_DIR_HE[direction] || direction} · ${labelHe} (${stage})`;
+            return `<span class="s vh-sieve dir-${direction}" data-si="${escapeHtml(id)}" `
+                 + `title="${escapeHtml(tip)}">${escapeHtml(shown)}</span>`;
+        }).join(' · ');
+        return `<div class="sieve-leftover">שכבת הנפה (${rows.length}): ${items}</div>`;
+    }
+
     // ============ wiring ============
+    sieveOverlayCb.addEventListener('change', () => {
+        if (currentView === 'text') renderTextViewCurrent();
+    });
+    // renderTextView needs its `eng`; keep a tiny re-entry that reuses the cache.
+    function renderTextViewCurrent() {
+        const eng = masechetDropdown.value;
+        if (eng && textCache[eng]) renderTextView(eng);
+    }
     document.querySelectorAll('input[name="pair"], .class-cb, input[name="section"], #highOnly')
         .forEach(el => el.addEventListener('change', () => {
             rebuildSummary();
@@ -533,8 +599,104 @@
     masechetDropdown.addEventListener('change', () => { if (currentView === 'text') loadTextView(); });
 
     rebuildSummary();
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('view') === 'text') setView('text');
+
+    // ============ deep links ============
+    // The chapter-2 list document links here as
+    //   research_variance.html#tractate=Sotah&view=text&sieve=1&id=1234
+    // where `id` is Site.id (the docx footnote number). The handler opens the
+    // text view on Sotah, turns on the sieve layer, and flashes the site whose
+    // data-si is `id`. A plain #hal=3:1 (or &id= against a data-vi span) also
+    // works for the variance-classifier sites.
+    function readLinkParams() {
+        const p = {};
+        const merge = s => new URLSearchParams(s).forEach((v, k) => { p[k] = v; });
+        merge(window.location.search.replace(/^\?/, ''));
+        merge(window.location.hash.replace(/^#/, ''));
+        return p;
+    }
+
+    function clearLinkTarget() {
+        document.querySelectorAll('.link-target')
+            .forEach(el => el.classList.remove('link-target'));
+    }
+
+    function focusSite(id, doScroll) {
+        if (!id) return false;
+        const sel = `[data-si="${CSS.escape(id)}"], [data-vi="${CSS.escape(id)}"]`;
+        const marks = [...document.querySelectorAll(sel)];
+        if (!marks.length) return false;
+        const block = marks[0].closest('.halakha-block');
+        if (!marks[0].classList.contains('link-target')) {
+            clearLinkTarget();
+            marks.forEach(m => m.classList.add('link-target'));
+        }
+        if (block) block.classList.add('link-target');   // survive re-renders
+        if (doScroll) {
+            (block || marks[0]).scrollIntoView({ behavior: 'auto', block: 'center' });
+        }
+        return true;
+    }
+
+    function focusHalakha(ref, doScroll) {
+        const block = document.querySelector(`.halakha-block[data-ref="${CSS.escape(ref)}"]`);
+        if (!block) return false;
+        if (!block.classList.contains('link-target')) {
+            clearLinkTarget();
+            block.classList.add('link-target');
+        }
+        if (doScroll) block.scrollIntoView({ behavior: 'auto', block: 'center' });
+        return true;
+    }
+
+    async function applyLinkParams(fromHashChange) {
+        const p = readLinkParams();
+        if (!p.tractate && !p.id && !p.hal && p.view !== 'text') return;
+
+        if (p.tractate && [...masechetDropdown.options].some(o => o.value === p.tractate)) {
+            masechetDropdown.value = p.tractate;
+        }
+        if (p.pair) {
+            const radio = document.querySelector(`input[name="pair"][value="${CSS.escape(p.pair)}"]`);
+            if (radio) radio.checked = true;
+        }
+        // A site can settle at a stage whose class is filtered out by default
+        // (e.g. citation_context); make sure every class is on so the link
+        // always lands on something.
+        if (p.id || p.hal) document.querySelectorAll('.class-cb').forEach(cb => { cb.checked = true; });
+        // A sieve-layer link needs the sieve layer on.
+        if ((p.sieve === '1' || p.sieve === 'true') || (p.id && masechetDropdown.value === 'Sotah')) {
+            sieveOverlayCb.checked = true;
+        }
+
+        if (p.view === 'text' || p.id || p.hal) {
+            if (currentView !== 'text') {
+                setView('text');           // setView already calls loadTextView()
+            } else {
+                loadTextView();
+            }
+            // loadTextView() is async (fetch + render) and the sieve layer
+            // re-renders again. Wait for the target to exist, then let the DOM
+            // settle before the one scroll that has to land.
+            let tries = 0, settle = 0;
+            const tick = () => {
+                const present = p.id
+                    ? document.querySelector(`[data-si="${CSS.escape(p.id)}"], [data-vi="${CSS.escape(p.id)}"]`)
+                    : (p.hal && document.querySelector(`.halakha-block[data-ref="${CSS.escape(p.hal)}"]`));
+                if (present) {
+                    (p.id ? focusSite(p.id, false) : focusHalakha(p.hal, false));
+                    if (++settle >= 3) {           // DOM has held for ~360 ms
+                        (p.id ? focusSite(p.id, true) : focusHalakha(p.hal, true));
+                        return;
+                    }
+                }
+                if (tries++ < 60) setTimeout(tick, 120);
+            };
+            setTimeout(tick, 150);
+        }
+    }
+
+    window.addEventListener('hashchange', () => applyLinkParams(true));
+    applyLinkParams(false);
     </script>
 </body>
 </html>

@@ -128,7 +128,7 @@ function researchRenderHalakha(html, sites, pair, visible) {
         if (!badgeAt.has(idx)) return;
         for (const site of badgeAt.get(idx)) {
             if (visible.has(site[1])) {
-                out.push(`<sup class="vb vh-${site[1]}" title="${researchEscapeHtml(site[2] + ' — ' + researchSiteTooltip(pair, site[3], site[4]))}">●</sup>`);
+                out.push(`<sup class="vb vh-${site[1]}" data-vi="${site[0]}" title="${researchEscapeHtml(site[2] + ' — ' + researchSiteTooltip(pair, site[3], site[4]))}">●</sup>`);
             }
         }
     };
@@ -139,7 +139,7 @@ function researchRenderHalakha(html, sites, pair, visible) {
             let j = i;
             while (j < tokens.length && tokenSite[j] === site) j++;
             const words = tokens.slice(i, j).map(researchEscapeHtml).join(' ');
-            out.push(`<span class="vh vh-${site[1]}" title="${researchEscapeHtml(researchSiteTooltip(pair, site[3], site[4]))}">${words}</span>`);
+            out.push(`<span class="vh vh-${site[1]}" data-vi="${site[0]}" title="${researchEscapeHtml(researchSiteTooltip(pair, site[3], site[4]))}">${words}</span>`);
             i = j;
         } else {
             out.push(researchEscapeHtml(tokens[i]));
@@ -158,6 +158,6 @@ function researchLeftoverHtml(leftovers, pair, visible) {
         items.map(s => {
             const label = (s[2] && s[2].trim()) ? s[2]
                 : '+ ' + ((s[3] && s[3].trim()) || (s[4] && s[4].trim()) || '—');
-            return `<span class="vh vh-${s[1]}" title="${researchEscapeHtml(researchSiteTooltip(pair, s[3], s[4]))}">${researchEscapeHtml(label)}</span>`;
+            return `<span class="vh vh-${s[1]}" data-vi="${s[0]}" title="${researchEscapeHtml(researchSiteTooltip(pair, s[3], s[4]))}">${researchEscapeHtml(label)}</span>`;
         }).join(' · ') + `</div>`;
 }
